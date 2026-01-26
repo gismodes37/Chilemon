@@ -1,0 +1,69 @@
+/* ===== Topbar tipo Supermon ===== */
+.cm-topbar {
+  background: linear-gradient(90deg, #101826, #0b1220);
+  color: #fff;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+  padding: 10px 0;
+}
+
+.cm-brand { display:flex; flex-direction:column; line-height:1.1; }
+.cm-title { font-weight: 800; letter-spacing: .2px; font-size: 1.15rem; }
+.cm-subtitle { font-size: .8rem; opacity: .8; }
+
+.cm-pill {
+  font-size: .75rem;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.10);
+  border: 1px solid rgba(255,255,255,.12);
+}
+
+.cm-theme-btn { border-radius: 999px; }
+
+/* ===== Cards ===== */
+.cm-card {
+  border-radius: 14px;
+  border: 1px solid rgba(0,0,0,.08);
+  box-shadow: 0 2px 14px rgba(0,0,0,.06);
+}
+
+/* ===== Status dot ===== */
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  display: inline-block;
+  background: #999;
+}
+.dot-ok { background: #2ecc71; }
+.dot-warn { background: #f1c40f; }
+.dot-bad { background: #e74c3c; }
+
+/* ===== Badges ===== */
+.badge-ok { background: #2ecc71 !important; }
+.badge-warn { background: #f1c40f !important; color:#111 !important; }
+.badge-bad { background: #e74c3c !important; }
+
+/* ===== Text severity ===== */
+.text-ok { color: #2ecc71 !important; }
+.text-warn { color: #f1c40f !important; }
+.text-bad { color: #e74c3c !important; }
+
+/*======= Text Color Variables =======*/
+.text-titulo { color: #66A01B;}
+
+
+/* Tema claro (override) */
+body.theme-light{
+  --bg-0: #f3f6fb;
+  --bg-1: rgba(255,255,255,0.75);
+  --card: rgba(255,255,255,0.85);
+  --card-2: rgba(255,255,255,0.95);
+
+  --border: rgba(0,0,0,0.10);
+  --border-2: rgba(0,0,0,0.16);
+
+  --text: rgba(0,0,0,0.88);
+  --muted: rgba(0,0,0,0.60);
+}
+

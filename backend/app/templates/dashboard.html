@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="row g-3">
+  <div class="col-12">
+    <h4 class="mb-1">Dashboard</h4>
+    <div class="text-secondary small">Resumen del nodo y del backend</div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card cm-card">
+      <div class="card-body">
+        <div class="d-flex align-items-center justify-content-between">
+          <div>
+            <div class="text-secondary small">Backend</div>
+            <div class="fw-semibold">FastAPI detrás de /chilemon</div>
+          </div>
+          <div class="text-end">
+            <span id="backendBadge" class="badge rounded-pill badge-warn">—</span>
+          </div>
+        </div>
+        <div class="mt-3 d-flex align-items-center gap-2">
+          <span id="backendDot" class="dot dot-warn"></span>
+          <span id="backendStateLabel" class="text-secondary small">Esperando...</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card cm-card">
+      <div class="card-body">
+        <div class="d-flex align-items-center justify-content-between">
+          <div>
+            <div class="text-secondary small">Servicio (systemd)</div>
+            <div class="fw-semibold">Unidad: chilemon.service</div>
+          </div>
+          <div class="text-end">
+            <span id="systemdBadge" class="badge rounded-pill badge-warn">—</span>
+          </div>
+        </div>
+
+        <div class="mt-3 small">
+          <div class="d-flex justify-content-between">
+            <span class="text-secondary">Activo</span>
+            <span id="systemdActive">—</span>
+          </div>
+          <div class="d-flex justify-content-between">
+            <span class="text-secondary">Desde</span>
+            <span id="systemdSince">—</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card cm-card">
+      <div class="card-body">
+        <div class="d-flex align-items-center justify-content-between">
+          <div>
+            <div class="text-secondary small">Nodo</div>
+            <div class="fw-semibold">Recursos del sistema</div>
+          </div>
+          <div class="text-end">
+            <span id="nodeBadge" class="badge rounded-pill badge-warn">—</span>
+          </div>
+        </div>
+
+        <div class="mt-3 small">
+          <div class="d-flex justify-content-between">
+            <span class="text-secondary">Load avg</span>
+            <span id="loadavg">—</span>
+          </div>
+          <div class="d-flex justify-content-between">
+            <span class="text-secondary">RAM (GB)</span>
+            <span id="ram">—</span>
+          </div>
+          <div class="d-flex justify-content-between">
+            <span class="text-secondary">Disco / (GB)</span>
+            <span id="disk">—</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr class="my-4">
+
+<div class="card cm-card">
+  <div class="card-body">
+    <div class="fw-semibold mb-1">Acciones rápidas</div>
+    <div class="text-secondary small">Por ahora solo enlaces, luego lo hacemos con botones reales.</div>
+    <div class="mt-3 d-flex flex-wrap gap-2">
+      <a class="btn btn-sm btn-outline-secondary" href="./status" target="_blank">Ver /status</a>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

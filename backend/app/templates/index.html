@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <div>
+    <h4 class="mb-0">Dashboard</h4>
+    <div class="text-secondary small">Resumen del nodo y del backend</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-light btn-sm" href="./health">Health</a>
+    <a class="btn btn-outline-light btn-sm" href="./status">Status JSON</a>
+  </div>
+</div>
+
+<div class="row g-3">
+  <!-- Backend -->
+  <div class="card">
+  <div class="d-flex justify-content-between align-items-start">
+    <div>
+      <h6 class="card-title mb-1">Backend</h6>
+      <div class="text-secondary small" id="backendStateLabel">
+        FastAPI detrás de /chilemon
+      </div>
+    </div>
+
+    <span class="badge-soft" id="backendBadge">…</span>
+  </div>
+
+  <hr>
+
+  <div class="d-flex align-items-center gap-2">
+    <span class="dot" id="backendDot"></span>
+    <span class="small">Estado del backend</span>
+  </div>
+</div>
+
+
+  <!-- Systemd -->
+  <div class="card">
+  <div class="d-flex justify-content-between align-items-start">
+    <div>
+      <h6 class="card-title mb-1">Servicio (systemd)</h6>
+      <div class="text-secondary small">Unidad: chilemon.service</div>
+    </div>
+
+    <span class="badge-soft" id="systemdBadge">…</span>
+  </div>
+
+  <hr>
+
+  <div class="small">
+    <div>Estado: <strong id="systemdActive">—</strong></div>
+    <div>Desde: <span id="systemdSince">—</span></div>
+  </div>
+</div>
+
+
+  <!-- Nodo -->
+  <div class="card">
+  <div class="d-flex justify-content-between align-items-start">
+    <div>
+      <h6 class="card-title mb-1">Nodo</h6>
+      <div class="text-secondary small">Recursos del sistema</div>
+    </div>
+
+    <span class="badge-soft" id="nodeBadge">…</span>
+  </div>
+
+  <hr>
+
+  <div class="small">
+    <div>Load avg: <span id="loadavg">—</span></div>
+    <div>RAM: <span id="ram">—</span></div>
+    <div>Disco: <span id="disk">—</span></div>
+  </div>
+</div>
+
+
+
+<div class="row g-3 mt-0">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-body d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <div>
+          <h6 class="mb-1">Acciones rápidas</h6>
+          <div class="text-secondary small">Por ahora solo enlaces; luego lo hacemos con botones reales.</div>
+        </div>
+        <div class="d-flex gap-2">
+          <a class="btn btn-outline-light btn-sm" href="./">Recargar Dashboard</a>
+          <a class="btn btn-outline-light btn-sm" href="./health">Ver /health</a>
+          <a class="btn btn-outline-light btn-sm" href="./status">Ver /status</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
