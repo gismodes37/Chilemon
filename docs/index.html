@@ -1,0 +1,543 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ChileMon — Supermon mejorado para AllStarLink (ASL3)</title>
+  <meta name="description" content="ChileMon es un dashboard estilo Supermon para ASL3: login, favoritos, SQLite, conectar/desconectar y base para control desde PC." />
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="ChileMon — Supermon mejorado para ASL3" />
+  <meta property="og:description" content="Dashboard estilo Supermon, con login, favoritos, SQLite y APIs protegidas. Instalación como /chilemon en ASL3." />
+  <meta property="og:type" content="website" />
+
+  <!-- Bootstrap 5 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Bootstrap Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+
+  <style>
+    :root{
+      --chile-blue:#0039A6;
+      --chile-red:#D52B1E;
+    }
+    .hero{
+      background:
+        radial-gradient(1200px 600px at 20% 0%, rgba(0,57,166,.35), transparent 60%),
+        radial-gradient(900px 500px at 90% 10%, rgba(213,43,30,.25), transparent 55%),
+        linear-gradient(135deg, #0b1220 0%, #0a1633 45%, #081128 100%);
+    }
+    .brand-badge{
+      background: rgba(255,255,255,.10);
+      border: 1px solid rgba(255,255,255,.18);
+      color: #fff;
+      border-radius: 999px;
+      padding: .35rem .75rem;
+      font-size: .9rem;
+    }
+    .feature-icon{
+      width: 44px; height: 44px;
+      display:flex; align-items:center; justify-content:center;
+      border-radius: 12px;
+      background: rgba(0,57,166,.10);
+      border: 1px solid rgba(0,57,166,.18);
+      color: var(--chile-blue);
+      font-size: 1.25rem;
+      flex: 0 0 auto;
+    }
+    .card{ border-radius: 16px; }
+    .section-title{ letter-spacing: .2px; }
+    .code{
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: .95rem;
+      background: rgba(0,0,0,.04);
+      border: 1px solid rgba(0,0,0,.06);
+      border-radius: 10px;
+      padding: .75rem 1rem;
+      overflow-x: auto;
+    }
+    .kbd {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      background: rgba(0,0,0,.06);
+      border: 1px solid rgba(0,0,0,.10);
+      border-bottom-width: 2px;
+      padding: .15rem .35rem;
+      border-radius: .5rem;
+      font-size: .9em;
+    }
+    .footer{ border-top: 1px solid rgba(0,0,0,.08); }
+    .screenshot{
+      background: linear-gradient(135deg, rgba(0,57,166,.08), rgba(213,43,30,.06));
+      border: 1px dashed rgba(0,0,0,.15);
+      border-radius: 16px;
+      height: 220px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      color: rgba(0,0,0,.55);
+      font-weight: 600;
+    }
+  </style>
+</head>
+
+<body>
+<nav class="navbar navbar-expand-lg bg-body-tertiary border-bottom sticky-top">
+  <div class="container">
+    <a class="navbar-brand d-flex align-items-center gap-2" href="#">
+      <span class="badge text-bg-primary" style="background:var(--chile-blue)!important;">ChileMon</span>
+      <span class="text-secondary small d-none d-md-inline">Supermon mejorado para ASL3</span>
+    </a>
+
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#nav">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div id="nav" class="collapse navbar-collapse">
+      <ul class="navbar-nav ms-auto">
+        <li class="nav-item"><a class="nav-link" href="#features">Características</a></li>
+        <li class="nav-item"><a class="nav-link" href="#screens">Screenshots</a></li>
+        <li class="nav-item"><a class="nav-link" href="#install">Instalación</a></li>
+        <li class="nav-item"><a class="nav-link" href="#architecture">Arquitectura</a></li>
+        <li class="nav-item"><a class="nav-link" href="#milestones">Roadmap</a></li>
+        <li class="nav-item"><a class="nav-link" href="#faq">FAQ</a></li>
+      </ul>
+
+      <div class="d-flex gap-2 ms-lg-3 mt-3 mt-lg-0">
+        <a class="btn btn-outline-primary" href="https://github.com/gismodes37/Chilemon" target="_blank" rel="noreferrer">
+          <i class="bi bi-github"></i> Repo
+        </a>
+        <a class="btn btn-primary" style="background:var(--chile-red);border-color:var(--chile-red);"
+           href="https://github.com/gismodes37/Chilemon/releases" target="_blank" rel="noreferrer">
+          <i class="bi bi-box-arrow-down"></i> Releases
+        </a>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<header class="hero text-white py-5">
+  <div class="container py-4">
+    <div class="row align-items-center g-4">
+      <div class="col-lg-7">
+        <div class="d-flex flex-wrap gap-2 mb-3">
+          <span class="brand-badge"><i class="bi bi-broadcast"></i> AllStarLink (ASL3)</span>
+          <span class="brand-badge"><i class="bi bi-shield-lock"></i> Login</span>
+          <span class="brand-badge"><i class="bi bi-database"></i> SQLite</span>
+          <span class="brand-badge"><i class="bi bi-star"></i> Favoritos</span>
+        </div>
+
+        <h1 class="display-5 fw-semibold mb-3">ChileMon</h1>
+        <p class="lead opacity-90 mb-4">
+          Dashboard estilo <strong>Supermon</strong> para nodos ASL3, con una base moderna:
+          autenticación, favoritos, registro de eventos y conexión/desconexión.
+          Diseñado para instalarse como sub-path: <span class="badge text-bg-light text-dark">/chilemon</span>.
+        </p>
+
+        <div class="d-flex flex-wrap gap-2">
+          <a class="btn btn-light btn-lg" href="#install">
+            <i class="bi bi-terminal"></i> Instalar
+          </a>
+          <a class="btn btn-outline-light btn-lg" href="#features">
+            <i class="bi bi-list-check"></i> Ver características
+          </a>
+          <!-- GitHub Pages (URL típica). Si tu Pages usa otra ruta, cámbiala -->
+          <a class="btn btn-outline-light btn-lg" href="https://gismodes37.github.io/Chilemon/" target="_blank" rel="noreferrer">
+            <i class="bi bi-eye"></i> Ver Demo (Pages)
+          </a>
+        </div>
+
+        <div class="mt-4 small opacity-75">
+          <i class="bi bi-info-circle"></i>
+          Objetivo: mantener la esencia de Supermon, pero con un core profesional que permita crecer (sin romper ASL3).
+        </div>
+      </div>
+
+      <div class="col-lg-5">
+        <div class="card bg-body text-body shadow-lg">
+          <div class="card-body p-4">
+            <h2 class="h5 section-title mb-3">Quick start</h2>
+
+            <div class="code mb-3">
+              <div><span class="text-secondary">$</span> git clone https://github.com/gismodes37/Chilemon.git</div>
+              <div><span class="text-secondary">$</span> cd Chilemon</div>
+              <div><span class="text-secondary">$</span> # (deploy a /opt/chilemon, ver README)</div>
+            </div>
+
+            <div class="d-flex gap-2">
+              <a class="btn btn-primary w-100" style="background:var(--chile-blue);border-color:var(--chile-blue);"
+                 href="https://github.com/gismodes37/Chilemon/blob/main/README.md" target="_blank" rel="noreferrer">
+                <i class="bi bi-book"></i> README
+              </a>
+              <a class="btn btn-outline-secondary w-100"
+                 href="https://github.com/gismodes37/Chilemon/issues" target="_blank" rel="noreferrer">
+                <i class="bi bi-bug"></i> Issues
+              </a>
+            </div>
+
+            <hr class="my-4">
+
+            <div class="small text-secondary">
+              <div><i class="bi bi-folder"></i> Instalación recomendada: <span class="code">/opt/chilemon</span></div>
+              <div class="mt-1"><i class="bi bi-link-45deg"></i> Public web: <span class="code">/chilemon</span> → <span class="code">/opt/chilemon/public</span></div>
+              <div class="mt-1"><i class="bi bi-database"></i> DB: <span class="code">/opt/chilemon/data/chilemon.sqlite</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</header>
+
+<main>
+  <section id="features" class="py-5">
+    <div class="container">
+      <div class="row align-items-end mb-4">
+        <div class="col-lg-8">
+          <h2 class="h1 section-title">Características</h2>
+          <p class="text-secondary mb-0">
+            Mantiene el flujo mental de Supermon, pero con estructura y persistencia (SQLite) para facilitar la operación.
+          </p>
+        </div>
+      </div>
+
+      <div class="row g-4">
+        <div class="col-md-6 col-lg-4">
+          <div class="card h-100 shadow-sm">
+            <div class="card-body p-4">
+              <div class="d-flex gap-3">
+                <div class="feature-icon"><i class="bi bi-shield-lock"></i></div>
+                <div>
+                  <h3 class="h5 mb-1">Login + sesión</h3>
+                  <p class="text-secondary mb-0">Acceso controlado y endpoints protegidos (API).</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-6 col-lg-4">
+          <div class="card h-100 shadow-sm">
+            <div class="card-body p-4">
+              <div class="d-flex gap-3">
+                <div class="feature-icon"><i class="bi bi-database"></i></div>
+                <div>
+                  <h3 class="h5 mb-1">SQLite estándar</h3>
+                  <p class="text-secondary mb-0">Cero dependencia de MySQL/MariaDB para funcionar.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-6 col-lg-4">
+          <div class="card h-100 shadow-sm">
+            <div class="card-body p-4">
+              <div class="d-flex gap-3">
+                <div class="feature-icon"><i class="bi bi-plug"></i></div>
+                <div>
+                  <h3 class="h5 mb-1">Conectar/Desconectar</h3>
+                  <p class="text-secondary mb-0">Registra signos de vida para mostrar estado en el dashboard.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-6 col-lg-4">
+          <div class="card h-100 shadow-sm">
+            <div class="card-body p-4">
+              <div class="d-flex gap-3">
+                <div class="feature-icon"><i class="bi bi-star"></i></div>
+                <div>
+                  <h3 class="h5 mb-1">Favoritos por usuario</h3>
+                  <p class="text-secondary mb-0">Acceso rápido a nodos frecuentes (sin teclear siempre).</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-6 col-lg-4">
+          <div class="card h-100 shadow-sm">
+            <div class="card-body p-4">
+              <div class="d-flex gap-3">
+                <div class="feature-icon"><i class="bi bi-link-45deg"></i></div>
+                <div>
+                  <h3 class="h5 mb-1">Sub-path fijo</h3>
+                  <p class="text-secondary mb-0">Se sirve como <span class="kbd">/chilemon</span> (como Supermon).</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-6 col-lg-4">
+          <div class="card h-100 shadow-sm">
+            <div class="card-body p-4">
+              <div class="d-flex gap-3">
+                <div class="feature-icon"><i class="bi bi-layout-wtf"></i></div>
+                <div>
+                  <h3 class="h5 mb-1">UI estilo Supermon</h3>
+                  <p class="text-secondary mb-0">Tabla central + acciones rápidas, sin perder simplicidad.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="alert alert-info mt-4">
+        <i class="bi bi-lightbulb"></i>
+        Próximo paso: conectar ChileMon con datos reales de ASL/Asterisk (rpt/iax) sin afectar estabilidad.
+      </div>
+    </div>
+  </section>
+
+  <section id="screens" class="py-5 bg-body-tertiary">
+    <div class="container">
+      <div class="d-flex align-items-end justify-content-between flex-wrap gap-2 mb-3">
+        <div>
+          <h2 class="h1 section-title mb-1">Screenshots</h2>
+          <p class="text-secondary mb-0">Sube imágenes a <span class="kbd">docs/img/</span> y reemplaza estos placeholders.</p>
+        </div>
+        <a class="btn btn-outline-primary" href="https://github.com/gismodes37/Chilemon/tree/main/docs" target="_blank" rel="noreferrer">
+          <i class="bi bi-folder2-open"></i> Carpeta docs
+        </a>
+      </div>
+
+      <div class="row g-4">
+        <div class="col-md-6">
+          <!-- Reemplazar por: <img src="img/dashboard.png" class="img-fluid rounded-4 border" alt="Dashboard"> -->
+          <div class="screenshot">Dashboard (placeholder)</div>
+        </div>
+        <div class="col-md-6">
+          <!-- Reemplazar por: <img src="img/login.png" class="img-fluid rounded-4 border" alt="Login"> -->
+          <div class="screenshot">Login (placeholder)</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="install" class="py-5">
+    <div class="container">
+      <div class="row g-4 align-items-start">
+        <div class="col-lg-6">
+          <h2 class="h1 section-title">Instalación</h2>
+          <p class="text-secondary">
+            Instalación típica en Raspberry Pi con ASL3. ChileMon vive en <span class="kbd">/opt/chilemon</span> y se expone como <span class="kbd">/chilemon</span>.
+          </p>
+
+          <h3 class="h5 mt-4">Requisitos</h3>
+          <ul class="text-secondary">
+            <li>Apache + PHP 8.x</li>
+            <li>SQLite habilitado en PHP</li>
+            <li>Permisos de escritura en <span class="kbd">/opt/chilemon/data</span> y <span class="kbd">/opt/chilemon/logs</span></li>
+          </ul>
+
+          <div class="mt-3">
+            <a class="btn btn-outline-primary me-2" href="https://github.com/gismodes37/Chilemon/blob/main/README.md" target="_blank" rel="noreferrer">
+              <i class="bi bi-file-earmark-text"></i> README
+            </a>
+            <a class="btn btn-outline-secondary" href="https://github.com/gismodes37/Chilemon/blob/main/CHANGELOG.md" target="_blank" rel="noreferrer">
+              <i class="bi bi-clock-history"></i> CHANGELOG
+            </a>
+          </div>
+        </div>
+
+        <div class="col-lg-6">
+          <div class="card shadow-sm">
+            <div class="card-body p-4">
+              <h3 class="h5 mb-3"><i class="bi bi-terminal"></i> Pasos (resumen)</h3>
+              <div class="code">
+                <div><span class="text-secondary">$</span> cd /opt</div>
+                <div><span class="text-secondary">$</span> sudo git clone https://github.com/gismodes37/Chilemon.git chilemon</div>
+                <div><span class="text-secondary">$</span> cd chilemon</div>
+                <div><span class="text-secondary">$</span> sudo sqlite3 data/chilemon.sqlite &lt; install/sql/schema.sql</div>
+                <div><span class="text-secondary">$</span> sudo chown -R www-data:www-data data logs</div>
+              </div>
+
+              <div class="mt-3 small text-secondary">
+                Apache debe mapear <span class="kbd">/chilemon</span> → <span class="kbd">/opt/chilemon/public</span>.
+              </div>
+            </div>
+          </div>
+
+          <div class="alert alert-warning mt-3 mb-0">
+            <i class="bi bi-exclamation-triangle"></i>
+            Tip: evita duplicar Alias/VHost en Apache. Mantén <strong>una</strong> ruta oficial hacia <span class="kbd">public/</span>.
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="architecture" class="py-5 bg-body-tertiary">
+    <div class="container">
+      <h2 class="h1 section-title mb-3">Arquitectura (hoy)</h2>
+      <div class="row g-4">
+        <div class="col-lg-6">
+          <div class="card shadow-sm h-100">
+            <div class="card-body p-4">
+              <h3 class="h5 mb-3"><i class="bi bi-diagram-3"></i> Componentes</h3>
+              <ul class="text-secondary mb-0">
+                <li><strong>UI</strong>: <span class="kbd">public/index.php</span></li>
+                <li><strong>Auth</strong>: login/logout + sesión</li>
+                <li><strong>API</strong>: <span class="kbd">public/api/*</span> (connect/disconnect/favorites)</li>
+                <li><strong>DB</strong>: SQLite en <span class="kbd">data/chilemon.sqlite</span></li>
+                <li><strong>Esquema</strong>: <span class="kbd">install/sql/schema.sql</span></li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-lg-6">
+          <div class="card shadow-sm h-100">
+            <div class="card-body p-4">
+              <h3 class="h5 mb-3"><i class="bi bi-folder"></i> Estructura sugerida</h3>
+              <div class="code mb-0">
+                <div>chilemon/</div>
+                <div>├─ app/</div>
+                <div>├─ config/</div>
+                <div>├─ data/</div>
+                <div>├─ install/sql/</div>
+                <div>├─ logs/</div>
+                <div>├─ public/</div>
+                <div>│  ├─ index.php</div>
+                <div>│  ├─ login.php / logout.php</div>
+                <div>│  └─ api/</div>
+                <div>└─ docs/ (GitHub Pages)</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="alert alert-info mt-4">
+        <i class="bi bi-lightbulb"></i>
+        Milestone siguiente: estado real de enlaces y llamadas desde PC (sobre Asterisk/ASL), sin romper el core.
+      </div>
+    </div>
+  </section>
+
+  <section id="milestones" class="py-5">
+    <div class="container">
+      <h2 class="h1 section-title mb-3">Roadmap</h2>
+
+      <div class="row g-4">
+        <div class="col-lg-4">
+          <div class="card h-100 shadow-sm">
+            <div class="card-body p-4">
+              <h3 class="h5"><span class="badge text-bg-success">Milestone 2</span> Core</h3>
+              <ul class="text-secondary mb-0">
+                <li>Login + sesión</li>
+                <li>SQLite estándar</li>
+                <li>Conectar/Desconectar</li>
+                <li>Favoritos</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-lg-4">
+          <div class="card h-100 shadow-sm">
+            <div class="card-body p-4">
+              <h3 class="h5"><span class="badge text-bg-primary">Milestone 3</span> Supermon+</h3>
+              <ul class="text-secondary mb-0">
+                <li>Cabecera personalizable (include header.php)</li>
+                <li>Favoritos arriba (acceso rápido)</li>
+                <li>Mejor UX de tabla y acciones</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-lg-4">
+          <div class="card h-100 shadow-sm">
+            <div class="card-body p-4">
+              <h3 class="h5"><span class="badge text-bg-danger">Milestone 4</span> Voice</h3>
+              <ul class="text-secondary mb-0">
+                <li>Integración real con Asterisk/ASL</li>
+                <li>Estado real de enlaces / usuarios</li>
+                <li>Base para llamadas desde PC</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <section id="faq" class="py-5 bg-body-tertiary">
+    <div class="container">
+      <h2 class="h1 section-title mb-4">FAQ</h2>
+
+      <div class="accordion" id="faqAcc">
+
+        <div class="accordion-item">
+          <h2 class="accordion-header">
+            <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#q1">
+              ¿ChileMon reemplaza Supermon?
+            </button>
+          </h2>
+          <div id="q1" class="accordion-collapse collapse show" data-bs-parent="#faqAcc">
+            <div class="accordion-body text-secondary">
+              No necesariamente. ChileMon mantiene la esencia de Supermon, pero con core y persistencia para evolucionar sin romper ASL3.
+            </div>
+          </div>
+        </div>
+
+        <div class="accordion-item">
+          <h2 class="accordion-header">
+            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#q2">
+              ¿Por qué SQLite?
+            </button>
+          </h2>
+          <div id="q2" class="accordion-collapse collapse" data-bs-parent="#faqAcc">
+            <div class="accordion-body text-secondary">
+              Por portabilidad y simplicidad: cero servicios extra. Ideal para RPi y entornos ASL3.
+            </div>
+          </div>
+        </div>
+
+        <div class="accordion-item">
+          <h2 class="accordion-header">
+            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#q3">
+              ¿Se podrán hacer llamadas desde el PC?
+            </button>
+          </h2>
+          <div id="q3" class="accordion-collapse collapse" data-bs-parent="#faqAcc">
+            <div class="accordion-body text-secondary">
+              Sí, está en el roadmap. Se hará por etapas para mantener estabilidad y evitar afectar servicios ASL3.
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="footer py-4">
+  <div class="container">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-2">
+      <div>
+        <div class="fw-semibold">ChileMon</div>
+        <div class="text-secondary small">
+          Dashboard estilo Supermon para ASL3 — con base moderna y extensible.
+        </div>
+      </div>
+      <div class="text-secondary small">
+        <div><i class="bi bi-github"></i> Repo: <a href="https://github.com/gismodes37/Chilemon" target="_blank" rel="noreferrer">gismodes37/Chilemon</a></div>
+        <div><i class="bi bi-person-badge"></i> Autor: Guillermo (CA2IIG)</div>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

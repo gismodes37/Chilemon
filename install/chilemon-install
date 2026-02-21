@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+echo "=== ChileMon Installer (SQLite) ==="
+echo "Root: $ROOT"
+echo
+
+# Comprobaciones mínimas
+php -v >/dev/null
+php -m | grep -qi pdo_sqlite || { echo "ERROR: falta pdo_sqlite"; exit 1; }
+
+php "$ROOT/install/setup.php"

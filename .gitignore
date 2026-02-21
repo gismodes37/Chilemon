@@ -1,0 +1,58 @@
+# ==========================
+# ChileMon - Git Ignore
+# ==========================
+
+# --------------------------
+# Base de datos SQLite
+# --------------------------
+data/
+*/data/*.sqlite
+*/data/*.db
+*/data/*.sqlite3
+chilemon/storage/data/
+chilemon/legacy/storage/data/
+
+# --------------------------
+# Logs
+# --------------------------
+logs/
+*/logs/
+*.log
+
+# --------------------------
+# Archivos temporales
+# --------------------------
+*.tmp
+*.cache
+*.bak
+*.swp
+
+# --------------------------
+# Entornos y variables
+# --------------------------
+.env
+.env.local
+
+# --------------------------
+# Dependencias (si usas Composer futuro)
+# --------------------------
+vendor/
+
+# --------------------------
+# Archivos de sistema
+# --------------------------
+.DS_Store
+Thumbs.db
+
+# --------------------------
+# IDE
+# --------------------------
+.vscode/
+.idea/
+
+# --------------------------
+# Archivos comprimidos
+# --------------------------
+*.zip
+*.tar
+*.gz

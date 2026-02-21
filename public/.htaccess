@@ -1,0 +1,15 @@
+RewriteEngine On
+
+# Si existe archivo o carpeta, servirlo directo
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# Rutas API limpias
+# /chilemon/api/stats  -> public/api/stats.php
+# /chilemon/api/nodes  -> public/api/nodes.php
+RewriteRule ^api/stats$ api/stats.php [L,QSA]
+RewriteRule ^api/nodes$ api/nodes.php [L,QSA]
+
+# (Opcional) Redirigir /api/ -> /api (evita dobles slash)
+RewriteRule ^api/$ api [R=301,L]
