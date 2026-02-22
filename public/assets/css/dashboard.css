@@ -1,0 +1,237 @@
+ /*  CSS Supermon Style */
+
+        :root {
+            --asl-green: #28a745;
+            --asl-blue: #007bff;
+            --asl-red: #dc3545;
+            --asl-yellow: #ffc107;
+            --asl-dark: #343a40;
+            --chile-blue: #0039A6;
+            --chile-red: #D52B1E;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bs-body-bg);
+            color: var(--bs-body-color);
+            min-height: 100vh;
+            padding-top: 140px; /* Espacio para header fijo */
+        }
+        
+        /* HEADER estilo Supermon - FIJADO */
+        .supermon-header {
+            background: linear-gradient(135deg, var(--chile-blue) 0%, #00155a 100%);
+            color: white;
+            border-bottom: 3px solid var(--chile-red);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1030; /* Mayor que Bootstrap modales (1050) */
+            width: 100%;
+            transition: all 0.3s ease;
+        }
+        
+        /* Header compacto al hacer scroll */
+        .supermon-header.scrolled {
+            padding-top: 5px;
+            padding-bottom: 5px;
+        }
+        
+        .supermon-header.scrolled .header-title {
+            font-size: 1.2rem;
+        }
+        
+        .supermon-header.scrolled .quick-info {
+            font-size: 0.75em;
+        }
+        
+        .header-badge {
+            background: rgba(255,255,255,0.2);
+            border-radius: 20px;
+            padding: 2px 10px;
+            font-size: 0.8em;
+        }
+        
+        /* Panel de control */
+        .control-panel {
+            background: var(--bs-tertiary-bg);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-left: 4px solid var(--asl-green);
+        }
+        
+        /* Tabla estilo Supermon */
+        .supermon-table {
+            font-size: 0.9em;
+        }
+        
+        .supermon-table th {
+            background: var(--bs-secondary-bg);
+            border-bottom: 2px solid var(--bs-border-color);
+            font-weight: 600;
+        }
+        
+        .status-online {
+            color: var(--asl-green);
+            font-weight: bold;
+        }
+        
+        .status-idle {
+            color: var(--asl-yellow);
+            font-weight: bold;
+        }
+        
+        .status-offline {
+            color: var(--asl-red);
+            font-weight: bold;
+        }
+        
+        /* Botones de acción */
+        .btn-connect {
+            background: var(--asl-green);
+            color: white;
+            border: none;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 0.85em;
+        }
+        
+        .btn-connect:hover {
+            background: #218838;
+        }
+        
+        .btn-monitor {
+            background: var(--asl-blue);
+            color: white;
+            border: none;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 0.85em;
+        }
+        
+        /* Número de nodo entrada */
+        .node-input {
+            max-width: 150px;
+            font-family: monospace;
+        }
+        
+        /* Footer */
+        .footer-info {
+            font-size: 0.8em;
+            color: var(--bs-secondary-color);
+            border-top: 1px solid var(--bs-border-color);
+            padding-top: 10px;
+        }
+        
+        /* Toggle theme */
+        .theme-toggle-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: var(--asl-blue);
+            color: white;
+            border: none;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
+        }
+        
+        .theme-toggle-btn:hover {
+            transform: scale(1.1);
+        }
+        
+        /* Tarjetas de sistema */
+        .system-card {
+            border-radius: 8px;
+            border: none;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            transition: all 0.3s ease;
+        }
+        
+        .system-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        .temp-display {
+            font-size: 1.8rem;
+            font-weight: bold;
+            line-height: 1;
+        }
+        
+        .temp-low { color: #28a745; }
+        .temp-medium { color: #ffc107; }
+        .temp-high { color: #dc3545; }
+        
+        .code-ip {
+            font-family: 'Courier New', monospace;
+            background: var(--bs-tertiary-bg);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.9em;
+            border: 1px solid var(--bs-border-color);
+        }
+        
+        /* Información rápida en header */
+        .quick-info {
+            font-size: 0.8em;
+            opacity: 0.9;
+            transition: all 0.3s ease;
+        }
+        
+        .quick-info-item {
+            display: inline-block;
+            margin-right: 15px;
+        }
+        
+        /* Animaciones */
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+        
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            body {
+                padding-top: 160px; /* Más espacio en móviles */
+            }
+            
+            .quick-info {
+                font-size: 0.7em;
+            }
+            
+            .temp-display {
+                font-size: 1.5rem;
+            }
+            
+            .supermon-header.scrolled {
+                padding-top: 8px;
+                padding-bottom: 8px;
+            }
+            
+            /* Ocultar algunos elementos en móvil al hacer scroll */
+            .supermon-header.scrolled .quick-info-item:nth-child(n+3) {
+                display: none;
+            }
+        }
+        
+        @media (max-width: 576px) {
+            body {
+                padding-top: 180px; /* Más espacio en móviles pequeños */
+            }
+            
+            .supermon-header.scrolled .quick-info-item:nth-child(n+2) {
+                display: none;
+            }
+        }

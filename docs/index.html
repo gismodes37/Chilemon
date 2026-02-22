@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>ChileMon — Supermon mejorado para AllStarLink (ASL3)</title>
-  <meta name="description" content="ChileMon es un dashboard estilo Supermon para ASL3: login, favoritos, SQLite, conectar/desconectar y base para control/llamadas desde PC por etapas." />
+  <meta name="description" content="ChileMon es un dashboard estilo Supermon para AllStarLink (ASL3): login, favoritos, SQLite por defecto, panel moderno y base para control/llamadas desde PC por etapas." />
 
   <!-- Canonical / URL (ajusta si cambias repo o Pages) -->
   <link rel="canonical" href="https://gismodes37.github.io/Chilemon/" />
@@ -14,8 +14,8 @@
   <meta property="og:title" content="ChileMon — Supermon mejorado para ASL3" />
   <meta property="og:description" content="Dashboard estilo Supermon, con login, favoritos, SQLite y APIs protegidas. Instalación como /chilemon en ASL3." />
   <meta property="og:type" content="website" />
-  <!-- (Opcional) Cuando tengas imagen real: docs/img/og.png -->
-  <!-- <meta property="og:image" content="https://gismodes37.github.io/Chilemon/img/og.png" /> -->
+  <meta property="og:image" content="https://gismodes37.github.io/Chilemon/img/dashboard-main.png" />
+  <meta name="twitter:card" content="summary_large_image" />
 
   <!-- Bootstrap 5 -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -300,32 +300,90 @@
     </div>
   </section>
 
-  <section id="screens" class="py-5 bg-body-tertiary">
-    <div class="container">
-      <div class="d-flex align-items-end justify-content-between flex-wrap gap-2 mb-3">
-        <div>
-          <h2 class="h1 section-title mb-1">Screenshots</h2>
-          <p class="text-secondary mb-0">Sube imágenes a <span class="kbd">docs/img/</span> y reemplaza estos placeholders.</p>
+ <section id="screens" class="py-5 bg-body-tertiary">
+  <div class="container">
+
+    <div class="text-center mb-5">
+      <h2 class="h1 section-title">Screenshots</h2>
+      <p class="text-secondary mb-0">
+        Vista real del dashboard ChileMon en entorno ASL3.
+      </p>
+    </div>
+
+    <div class="row g-4">
+
+      <!-- Dashboard Principal -->
+      <div class="col-lg-6">
+        <div class="card shadow-sm h-100 border-0">
+          <div class="card-body p-3">
+            <img src="img/dashboard-main.png"
+                 class="img-fluid rounded-4 border"
+                 alt="ChileMon Dashboard principal">
+          </div>
+          <div class="card-footer bg-transparent border-0 text-secondary small">
+            <i class="bi bi-layout-text-window-reverse"></i>
+            Vista principal — nodos monitoreados, conexión rápida y estado del sistema.
+          </div>
         </div>
-        <a class="btn btn-outline-primary" href="https://github.com/gismodes37/Chilemon/tree/main/docs" target="_blank" rel="noreferrer">
-          <i class="bi bi-folder2-open"></i> Carpeta docs
-        </a>
       </div>
 
-      <div class="row g-4">
-        <div class="col-md-6">
-          <img src="img/screenshot01.png" class="img-fluid rounded-4 border" alt="ChileMon Dashboard">
-        </div>
-        
-        <div class="col-md-6">
-          <!--
-          <img src="img/login.png" class="img-fluid rounded-4 border" alt="ChileMon Login">
-          -->
-          <div class="screenshot">Login (placeholder)</div>
+      <!-- Login -->
+      <div class="col-lg-6">
+        <div class="card shadow-sm h-100 border-0">
+          <div class="card-body p-3">
+            <img src="img/login-screen.png"
+                 class="img-fluid rounded-4 border"
+                 alt="ChileMon Login">
+          </div>
+          <div class="card-footer bg-transparent border-0 text-secondary small">
+            <i class="bi bi-shield-lock"></i>
+            Pantalla de autenticación con control de sesión.
+          </div>
         </div>
       </div>
+
+      <!-- Nodo conectado -->
+      <div class="col-lg-6">
+        <div class="card shadow-sm h-100 border-0">
+          <div class="card-body p-3">
+            <img src="img/node-online.png"
+                 class="img-fluid rounded-4 border"
+                 alt="Nodo conectado">
+          </div>
+          <div class="card-footer bg-transparent border-0 text-secondary small">
+            <i class="bi bi-broadcast"></i>
+            Nodo en línea con temporizador activo.
+          </div>
+        </div>
+      </div>
+
+      <!-- Favoritos -->
+      <div class="col-lg-6">
+        <div class="card shadow-sm h-100 border-0">
+          <div class="card-body p-3">
+            <img src="img/favorites.png"
+                 class="img-fluid rounded-4 border"
+                 alt="Favoritos por usuario">
+          </div>
+          <div class="card-footer bg-transparent border-0 text-secondary small">
+            <i class="bi bi-star"></i>
+            Gestión de favoritos por usuario autenticado.
+          </div>
+        </div>
+      </div>
+
     </div>
-  </section>
+
+    <div class="text-center mt-5">
+      <a class="btn btn-outline-primary"
+         href="https://github.com/gismodes37/Chilemon/tree/main/docs/img"
+         target="_blank">
+        <i class="bi bi-folder2-open"></i> Ver carpeta completa en GitHub
+      </a>
+    </div>
+
+  </div>
+</section>
 
   <section id="install" class="py-5">
     <div class="container">
@@ -391,7 +449,7 @@
             <div class="card-body p-4">
               <h3 class="h5 mb-3"><i class="bi bi-diagram-3"></i> Componentes</h3>
               <ul class="text-secondary mb-0">
-                <li><strong>UI</strong>: <span class="kbd">public/index.php</span></li>
+                <li><strong>UI</strong>: <span class="kbd">public/views/*</span> (partials + dashboard)</li>
                 <li><strong>Auth</strong>: login/logout + sesión</li>
                 <li><strong>API</strong>: <span class="kbd">public/api/*</span> (connect/disconnect/favorites)</li>
                 <li><strong>DB</strong>: SQLite en <span class="kbd">data/chilemon.sqlite</span></li>
@@ -404,9 +462,30 @@
         <div class="col-lg-6">
           <div class="card shadow-sm h-100">
             <div class="card-body p-4">
-              <h3 class="h5 mb-3"><i class="bi bi-folder"></i> Estructura</h3>
+              <h3 class="h5 mb-3"><i class="bi bi-folder"></i> Estructura (actual)</h3>
               <div class="code mb-0">
                 <div>chilemon/</div>
+                <div>├─ app/</div>
+                <div>│  ├─ Auth/</div>
+                <div>│  ├─ Core/</div>
+                <div>│  └─ Helpers/</div>
+                <div>├─ config/</div>
+                <div>├─ data/ <span class="text-secondary">(SQLite por defecto)</span></div>
+                <div>├─ install/sql/</div>
+                <div>├─ logs/</div>
+                <div>├─ public/</div>
+                <div>│  ├─ index.php <span class="text-secondary">(controlador)</span></div>
+                <div>│  ├─ login.php / logout.php</div>
+                <div>│  ├─ views/</div>
+                <div>│  │  ├─ dashboard.php</div>
+                <div>│  │  └─ partials/ <span class="text-secondary">(head/header/footer/scripts)</span></div>
+                <div>│  ├─ assets/</div>
+                <div>│  │  ├─ css/ (dashboard.css)</div>
+                <div>│  │  ├─ js/  (dashboard.js)</div>
+                <div>│  │  └─ img/ (bandera, logos)</div>
+                <div>│  └─ api/ <span class="text-secondary">(endpoints protegidos)</span></div>
+                <div>└─ docs/ <span class="text-secondary">(GitHub Pages)</span></div>
+              </div>
                 <div>├─ app/</div>
                 <div>├─ config/</div>
                 <div>├─ data/</div>
@@ -455,10 +534,10 @@
             <div class="card-body p-4">
               <h3 class="h5"><span class="badge text-bg-primary">Milestone 2</span> Supermon+</h3>
               <ul class="text-secondary mb-0">
-                <li>Cabecera personalizable (include header.php)</li>
-                <li>Favoritos arriba (acceso rápido)</li>
-                <li>Mejor UX de tabla y acciones</li>
-                <li>Botón “Llamar” (flujo real, aunque sea externo al inicio)</li>
+                <li>Cabecera estilo Supermon+ (bandera/logo, estado, usuario/logout)</li>
+                <li>Favoritos arriba + panel rápido</li>
+                <li>UX de tabla/acciones + layout modular (partials, assets)</li>
+                <li>Botón “Llamar” (primero stub/externo; luego integración real)</li>
               </ul>
             </div>
           </div>
@@ -471,7 +550,7 @@
               <ul class="text-secondary mb-0">
                 <li>Integración real con Asterisk/ASL</li>
                 <li>Estado real de enlaces / usuarios</li>
-                <li>Llamadas desde navegador (WebRTC) si el stack lo permite</li>
+                <li>Llamadas desde navegador (WebRTC) y/o integración SIP (por etapas)</li>
               </ul>
             </div>
           </div>
@@ -481,7 +560,60 @@
     </div>
   </section>
 
-  <section id="faq" class="py-5 bg-body-tertiary">
+  
+  <section id="contribute" class="py-5">
+    <div class="container">
+      <h2 class="h1 section-title mb-3">Colaborar</h2>
+      <div class="row g-4">
+        <div class="col-lg-6">
+          <div class="card shadow-sm h-100">
+            <div class="card-body p-4">
+              <h3 class="h5 mb-3"><i class="bi bi-people"></i> Buscamos colaboradores</h3>
+              <p class="text-secondary mb-3">
+                ChileMon es un proyecto comunitario para radioaficionados y nodos AllStarLink. Si quieres aportar,
+                hay tareas para todos los niveles: UI, PHP, Asterisk/ASL, documentación y pruebas.
+              </p>
+              <ul class="text-secondary mb-0">
+                <li><strong>Issues</strong>: reporta bugs y mejoras con pasos para reproducir</li>
+                <li><strong>PRs</strong>: cambios pequeños y revisables (una mejora por PR)</li>
+                <li><strong>Testing</strong>: validar en ASL3 real (Raspberry/VM) y reportar resultados</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-6">
+          <div class="card shadow-sm h-100">
+            <div class="card-body p-4">
+              <h3 class="h5 mb-3"><i class="bi bi-envelope"></i> Contacto</h3>
+              <p class="text-secondary mb-3">
+                Para coordinar aportes, integraciones o pruebas en nodos:
+              </p>
+              <ul class="text-secondary mb-0">
+                <li>GitHub: usar el repo (Issues / Discussions)</li>
+                <li>Email: <a href="mailto:ca2iig@qsl.net">ca2iig@qsl.net</a> (CA2IIG)</li>
+              </ul>
+              <div class="mt-3">
+                <a class="btn btn-primary" style="background:var(--chile-blue);border-color:var(--chile-blue);"
+                   href="https://github.com/gismodes37/Chilemon/issues" target="_blank" rel="noreferrer">
+                  <i class="bi bi-bug"></i> Abrir Issue
+                </a>
+                <a class="btn btn-outline-secondary ms-2"
+                   href="https://github.com/gismodes37/Chilemon/pulls" target="_blank" rel="noreferrer">
+                  <i class="bi bi-git"></i> Pull Requests
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="alert alert-warning mt-4 mb-0">
+        <i class="bi bi-shield-check"></i>
+        Principio del proyecto: <strong>SQLite es la DB por defecto</strong>. Cambios que rompan esto se discuten primero.
+      </div>
+    </div>
+  </section>
+<section id="faq" class="py-5 bg-body-tertiary">
     <div class="container">
       <h2 class="h1 section-title mb-4">FAQ</h2>
 

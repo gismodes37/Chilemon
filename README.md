@@ -78,7 +78,7 @@ Su objetivo es proporcionar monitoreo, visualización y herramientas adicionales
 
 ---
 
-## 🔐 Autenticación
+##   Autenticación
  - Sistema de login propio con:
  - Tabla users
  - Passwords con password_hash()

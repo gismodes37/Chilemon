@@ -56,3 +56,5 @@ Thumbs.db
 *.zip
 *.tar
 *.gz
+
+/stubs/
