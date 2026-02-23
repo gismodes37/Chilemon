@@ -1,8 +1,8 @@
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT NOT NULL UNIQUE,
-    password TEXT NOT NULL,
-    created_at TEXT NOT NULL
+    username   TEXT NOT NULL UNIQUE,
+    password   TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS nodes (
@@ -13,10 +13,10 @@ CREATE TABLE IF NOT EXISTS nodes (
 );
 
 CREATE TABLE IF NOT EXISTS calls (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  node_id TEXT NOT NULL,
-  action TEXT NOT NULL,
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    node_id TEXT NOT NULL,
+    action TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS favorites (
