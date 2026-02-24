@@ -63,7 +63,7 @@ ChileMon:
 - Debian 12 (ASL3 Pi Appliance recomendado)
 - PHP 8.2+
 - Apache2
-- Extensión `pdo_sqlite`
+- Extensiones PHP: `pdo_sqlite` / `sqlite3`
 
 ---
 
@@ -75,7 +75,7 @@ ChileMon:
  
       ```ruby
       sudo apt update
-      sudo apt install -y git php php-cli libapache2-mod-php php-sqlite3 sqlite3
+      sudo apt install -y git apache2 php libapache2-mod-php php-cli php-sqlite3 sqlite3
       ```
 
   - Reinicia Apache :
@@ -195,6 +195,9 @@ Este script:
 ---
 
 ## 6️⃣ Crear usuario adicionales (Opcional)
+
+>Opcional, porque el instalador del paso 5 ya crea el primer usuario.
+>Usa este paso solo si quieres agregar más usuarios.
 
   - Crear usuario:   
       ```ruby
