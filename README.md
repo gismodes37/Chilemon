@@ -71,8 +71,7 @@ ChileMon:
 
 ### 0️⃣ Preparar entorno
 
-  -  ![alt text](image-1.png)
-  - <span style="color:#666699">Instalar PHP completo e instalar dependencias necesarias :</span> 
+  - <span style="color:#666699">Instalar PHP completo y dependencias necesarias :</span> 
  
       ```ruby
       sudo apt update
