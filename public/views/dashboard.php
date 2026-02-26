@@ -46,7 +46,7 @@ $ipv6_list = $ipv6_list ?? [];
                         <button class="btn btn-sm btn-outline-info" onclick="refreshSystemInfo()">
                             <i class="bi bi-arrow-clockwise"></i> Actualizar
                         </button>
-                        <button class="btn btn-sm btn-outline-dark" onclick="toggleTheme()">
+                        <button class="btn btn-sm btn-outline-info" onclick="toggleTheme()">
                             <i class="bi <?= $darkMode ? 'bi-sun' : 'bi-moon-stars' ?>"></i>
                         </button>
                     </div>

@@ -19,10 +19,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Completa usuario y contraseña.';
     } else {
         if (Auth::attemptLogin($u, $p)) {
-            header('Location: index.php');
+            header('Location: ' . rtrim(BASE_PATH, '/') . '/index.php');
             exit;
         }
-        $error = 'Usuario o contraseña incorrectos.';
+        $error = Auth::getLastError() ?? 'Usuario o contraseña incorrectos.';
     }
 }
 ?>

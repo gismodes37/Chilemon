@@ -5,7 +5,7 @@
       <div class="row">
         <div class="col-md-6">
           <strong><?= APP_NAME ?> v<?= APP_VERSION ?></strong>
-          <span class="text-muted">- Dashboard Chilemon administrado en La Serena - Chile por Guillermo Ismodes - <a href="mailto:ca2iig@qsl.net">CA2IIG</a> </span>
+          <span class="text-muted">- Dashboard Chilemon administrado por Guillermo Ismodes - <a href="mailto:ca2iig@qsl.net">CA2IIG</a> en La Serena - Chile   </span>
         </div>
         <div class="col-md-6 text-md-end">
           <small>

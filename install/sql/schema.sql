@@ -1,3 +1,10 @@
+CREATE TABLE IF NOT EXISTS login_attempts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT,
+    ip_address TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username      TEXT NOT NULL UNIQUE,
@@ -26,3 +33,5 @@ CREATE TABLE IF NOT EXISTS favorites (
     UNIQUE(user_id, node_id),
     FOREIGN KEY(user_id) REFERENCES users(id)
 );
+
+
