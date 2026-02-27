@@ -1,4 +1,4 @@
-## 🇨🇱 ChileMon — Avance Técnico
+# 🇨🇱 ChileMon — Avance Técnico
 ## 🔐 Security Phase 1 (Hardening Base)
 
 ## 1. Objetivo

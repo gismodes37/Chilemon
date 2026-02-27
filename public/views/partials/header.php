@@ -73,9 +73,13 @@ $protoLabel = ($port === 80) ? 'HTTP' : (($port === 443) ? 'HTTPS' : "Port $port
           <div class="d-flex flex-column align-items-end">
             <small class="opacity-75 mb-1"><?= htmlspecialchars($username ?? '') ?></small>
 
-            <a href="<?= rtrim(BASE_URL, '/') ?>/logout.php" class="btn btn-outline-light btn-sm">
-              <i class="bi bi-box-arrow-right"></i> Logout
-            </a>
+            <form method="post" action="<?= rtrim(BASE_PATH, '/') ?>/logout.php" class="d-inline">
+                <input type="hidden" name="csrf_token"
+                      value="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
+                <button type="submit" class="btn btn-outline-danger btn-sm">
+                    Salir
+                </button>
+            </form>
           </div>
 
         </div>

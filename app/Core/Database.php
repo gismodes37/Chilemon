@@ -16,7 +16,6 @@ final class Database
             return self::$instance;
         }
 
-        // Carga config (DEBE retornar array)
         $config = require __DIR__ . '/../../config/database.php';
 
         if (($config['driver'] ?? '') !== 'sqlite') {
@@ -24,11 +23,13 @@ final class Database
         }
 
         $dbPath = $config['sqlite']['path'] ?? null;
-        if (!$dbPath) {
+        if (!$dbPath || !is_string($dbPath)) {
             throw new \RuntimeException('SQLite path no configurado.');
         }
 
-        // Crear carpeta si no existe
+        // Normaliza path (muy importante en Windows)
+        $dbPath = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $dbPath);
+
         $dir = dirname($dbPath);
         if (!is_dir($dir) && !mkdir($dir, 0755, true) && !is_dir($dir)) {
             throw new \RuntimeException('No se pudo crear directorio DB: ' . $dir);
@@ -39,6 +40,10 @@ final class Database
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
             ]);
+
+            // Recomendado: integridad referencial
+            self::$instance->exec('PRAGMA foreign_keys = ON;');
+
         } catch (PDOException $e) {
             throw new \RuntimeException('Error SQLite: ' . $e->getMessage(), 0, $e);
         }
@@ -46,9 +51,6 @@ final class Database
         return self::$instance;
     }
 
-    /**
-     * Compatibilidad con código legacy que llama getConnection()
-     */
     public static function getConnection(): PDO
     {
         return self::getInstance();

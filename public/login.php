@@ -9,64 +9,48 @@ use App\Auth\Auth;
 
 Auth::startSession();
 
+if (empty($_SESSION['csrf_token']) || !is_string($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
 $error = null;
+$oldUser = '';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $u = trim((string)($_POST['username'] ?? ''));
-    $p = (string)($_POST['password'] ?? '');
+$bp = defined('BASE_PATH') ? rtrim((string)BASE_PATH, '/') : '';
+if ($bp === '/') $bp = '';
 
-    if ($u === '' || $p === '') {
-        $error = 'Completa usuario y contraseña.';
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
+    $oldUser = (string)($_POST['username'] ?? '');
+
+    $csrf = (string)($_POST['csrf_token'] ?? '');
+    if (!hash_equals((string)$_SESSION['csrf_token'], $csrf)) {
+        $error = 'Solicitud inválida. Intenta nuevamente.';
     } else {
-        if (Auth::attemptLogin($u, $p)) {
-            header('Location: ' . rtrim(BASE_PATH, '/') . '/index.php');
-            exit;
+        $u = trim((string)($_POST['username'] ?? ''));
+        $p = (string)($_POST['password'] ?? '');
+
+        if ($u === '' || $p === '') {
+            $error = 'Completa usuario y contraseña.';
+        } else {
+            if (Auth::attemptLogin($u, $p)) {
+                $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+                header('Location: ' . $bp . '/index.php');
+                exit;
+            }
+
+            $last = Auth::getLastError();
+            $error = ($last && stripos($last, 'Demasiados intentos') !== false)
+                ? $last
+                : 'Usuario o contraseña incorrectos.';
         }
-        $error = Auth::getLastError() ?? 'Usuario o contraseña incorrectos.';
     }
 }
-?>
-<!doctype html>
-<html lang="es">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ChileMon - Login</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body class="bg-body-tertiary">
-  <div class="container py-5">
-    <div class="row justify-content-center">
-      <div class="col-md-5">
-        <div class="card shadow-sm">
-          <div class="card-header bg-dark text-white">
-            <strong>ChileMon</strong> <span class="opacity-75">Login</span>
-          </div>
-          <div class="card-body">
-            <?php if ($error): ?>
-              <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
-            <?php endif; ?>
 
-            <form method="post" autocomplete="off">
-              <div class="mb-3">
-                <label class="form-label">Usuario</label>
-                <input class="form-control" name="username" required>
-              </div>
-              <div class="mb-3">
-                <label class="form-label">Contraseña</label>
-                <input class="form-control" type="password" name="password" required>
-              </div>
-              <button class="btn btn-success w-100">Ingresar</button>
-            </form>
+$view = ROOT_PATH . '/app/Views/auth/login.view.php';
+if (!is_file($view)) {
+    http_response_code(500);
+    echo 'Vista no encontrada: ' . htmlspecialchars($view, ENT_QUOTES, 'UTF-8');
+    exit;
+}
 
-            <hr class="my-4">
-            <small class="text-muted">
-              Si no tienes usuario, ejecuta el instalador por consola en ASL3.
-            </small>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</body>
-</html>
+require $view;
