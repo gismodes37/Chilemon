@@ -214,19 +214,6 @@ Este script:
       ```
 ---      
 
-## 🚀 Estado del Proyecto
-### Milestone 1 – ✅ Completado
- - Base de datos SQLite estable
- - Eliminación total de MySQL/MariaDB
- - Dashboard estilo Supermon funcional
- - Soporte sub-path /chilemon
- - Información del sistema (CPU, IP, Hostname, etc.)
- - Login de usuarios implementado
- - Logout funcional
- - Permisos productivos configurados
- - Flujo Local → GitHub → Producción definido
----
-
 ## 🔐 Autenticación
  - Sistema de login propio con:
  - Tabla users
@@ -304,6 +291,22 @@ Este script:
      - v1.0.0
 ---
 
+## 🚀 Estado del Proyecto
+
+### Milestone 1 – ✅ Completado
+
+ - Base de datos SQLite estable
+ - Eliminación total de MySQL/MariaDB
+ - Dashboard estilo Supermon funcional
+ - Soporte sub-path /chilemon
+ - Información del sistema (CPU, IP, Hostname, etc.)
+ - Login de usuarios implementado
+ - Logout funcional
+ - Permisos productivos configurados
+ - Flujo Local → GitHub → Producción definido
+
+---
+
 ## 🧩 Milestone 2 (En Desarrollo)
 
 ### Objetivos inmediatos:
@@ -317,6 +320,34 @@ Este script:
 </ul>
 
 ---
+
+## 🔮 Proyección Futura – Sistema de Versionado y Actualización
+
+ChileMon contempla, en fases posteriores de desarrollo, la incorporación de un sistema formal de versionado visible y detección de nuevas versiones disponibles.
+
+Este sistema podría incluir:
+
+ - Visualización de versión instalada en la interfaz.
+
+ - Verificación controlada de versiones disponibles.
+
+ - Notificación discreta de actualizaciones.
+
+ - Mecanismo seguro y supervisado de actualización.
+
+Esta funcionalidad no será implementada hasta que exista una infraestructura clara de distribución y control, priorizando siempre:
+
+ - Estabilidad del nodo.
+
+ - No interferencia con ASL.
+
+ - Control total por parte del administrador.
+
+ - Integridad del repositorio y del sistema instalado.
+
+ChileMon no incorporará mecanismos automáticos que comprometan el entorno productivo sin consentimiento explícito del administrador.
+
+Esta característica formará parte de un milestone específico dedicado al ciclo de vida del producto.
 
 ## 👨‍💻 Autor
 
