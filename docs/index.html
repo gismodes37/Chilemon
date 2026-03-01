@@ -228,7 +228,7 @@
                 <div class="feature-icon"><i class="bi bi-plug"></i></div>
                 <div>
                   <h3 class="h5 mb-1">Conectar/Desconectar</h3>
-                  <p class="text-secondary mb-0">Registro de eventos para estado operativo básico.</p>
+                  <p class="text-secondary mb-0">Acciones operativas básicas con registro de eventos.</p>
                 </div>
               </div>
             </div>
@@ -242,7 +242,7 @@
                 <div class="feature-icon"><i class="bi bi-star"></i></div>
                 <div>
                   <h3 class="h5 mb-1">Favoritos por usuario</h3>
-                  <p class="text-secondary mb-0">Acceso rápido a nodos frecuentes.</p>
+                  <p class="text-secondary mb-0">Acceso rápido a nodos frecuentes (alias + descripción editable).</p>
                 </div>
               </div>
             </div>
@@ -281,11 +281,8 @@
 
       <div class="alert alert-info mt-4">
         <i class="bi bi-lightbulb"></i>
-<<<<<<< HEAD
-        Estado: <strong>core + seguridad base listos</strong>. Siguiente enfoque: Milestone 2 (UX y consistencia local/ASL3).
-=======
-        Estado: <strong>Milestone 2 completado</strong> (Favoritos + Conectar/Desconectar + Actividad). Siguiente enfoque: <strong>Milestone 3</strong> (integración real con Asterisk/ASL).
->>>>>>> 0c1fc43 (Close Milestone 2: favorites modal + connect/disconnect + recent activity; update docs roadmap)
+        Estado: <strong>Milestone 2 completado</strong> (Favoritos + Conectar/Desconectar + Actividad).
+        Siguiente enfoque: <strong>Milestone 3</strong> (integración real con Asterisk/ASL para “online real” y primera llamada mínima).
       </div>
     </div>
   </section>
@@ -499,11 +496,7 @@
 
       <div class="alert alert-info mt-4">
         <i class="bi bi-lightbulb"></i>
-<<<<<<< HEAD
-        Milestone 2: consolidar UX Supermon+ y cerrar “paridad local vs ASL3” sin romper seguridad.
-=======
-        Milestone 3: integrar Asterisk/ASL para estado real (links/usuarios) y preparar la primera llamada por etapas, manteniendo estabilidad y seguridad.
->>>>>>> 0c1fc43 (Close Milestone 2: favorites modal + connect/disconnect + recent activity; update docs roadmap)
+        Próximo objetivo: <strong>Milestone 3</strong> — integrar Asterisk/ASL para estado real (links/usuarios), “online real” y primera llamada mínima, manteniendo estabilidad y seguridad.
       </div>
     </div>
   </section>
@@ -513,7 +506,7 @@
       <h2 class="h1 section-title mb-3">Roadmap</h2>
 
       <div class="row g-4">
-        <div class="col-lg-4">
+        <div class="col-lg-3">
           <div class="card h-100 shadow-sm">
             <div class="card-body p-4">
               <h3 class="h5"><span class="badge text-bg-success">Milestone 1</span> Core (hecho)</h3>
@@ -521,63 +514,64 @@
                 <li>Login + sesión</li>
                 <li>CSRF</li>
                 <li>SQLite estándar</li>
-<<<<<<< HEAD
-                <li>Conectar/Desconectar</li>
-                <li>Favoritos</li>
-                <li>BASE_PATH/BASE_URL dinámicos</li>
-=======
                 <li>BASE_PATH/BASE_URL dinámicos</li>
                 <li>API protegida (requiere login)</li>
->>>>>>> 0c1fc43 (Close Milestone 2: favorites modal + connect/disconnect + recent activity; update docs roadmap)
               </ul>
             </div>
           </div>
         </div>
 
-        <div class="col-lg-4">
+        <div class="col-lg-3">
           <div class="card h-100 shadow-sm">
             <div class="card-body p-4">
-              <h3 class="h5"><span class="badge text-bg-primary">Milestone 2</span> Supermon+</h3>
+              <h3 class="h5"><span class="badge text-bg-success">Milestone 2</span> Supermon+ (hecho)</h3>
               <ul class="text-secondary mb-0">
-<<<<<<< HEAD
-                <li>UX final de dashboard (tabla, acciones, favoritos)</li>
-                <li>Cabecera consistente (usuario/logout/estado)</li>
-                <li>Paridad local vs ASL3 (sesión/config/db)</li>
-                <li>Instalación/upgrade reproducible</li>
-=======
                 <li>UX final de dashboard (tabla + acciones)</li>
-                <li>Favoritos por usuario (modal + CRUD: nodo/alias/descripcion)</li>
+                <li>Favoritos por usuario (modal + CRUD: nodo/alias/descripción)</li>
                 <li>Conectar/Desconectar operativo (con confirmación)</li>
                 <li>Actividad reciente (event log)</li>
                 <li>Cabecera consistente (usuario/logout/estado + botón favoritos)</li>
                 <li>Paridad local vs ASL3 (sesión/config/db)</li>
->>>>>>> 0c1fc43 (Close Milestone 2: favorites modal + connect/disconnect + recent activity; update docs roadmap)
               </ul>
             </div>
           </div>
         </div>
 
-        <div class="col-lg-4">
+        <div class="col-lg-3">
           <div class="card h-100 shadow-sm">
             <div class="card-body p-4">
-              <h3 class="h5"><span class="badge text-bg-danger">Milestone 3</span> Voice</h3>
+              <h3 class="h5"><span class="badge text-bg-primary">Milestone 3</span> Asterisk/ASL (online real)</h3>
               <ul class="text-secondary mb-0">
-<<<<<<< HEAD
-                <li>Integración con Asterisk/ASL</li>
-                <li>Estado real de enlaces/usuarios</li>
-                <li>Llamadas (por etapas: externo → SIP → WebRTC)</li>
-=======
                 <li>Integración real con Asterisk/ASL</li>
                 <li>Estado real de enlaces/usuarios (no solo DB)</li>
-                <li>Primera conexión “online real”</li>
-                <li>Primera llamada / puente de audio (por etapas)</li>
->>>>>>> 0c1fc43 (Close Milestone 2: favorites modal + connect/disconnect + recent activity; update docs roadmap)
+                <li>“Online real” (validado desde Asterisk)</li>
+                <li>Primera llamada mínima / puente básico</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-lg-3">
+          <div class="card h-100 shadow-sm">
+            <div class="card-body p-4">
+              <h3 class="h5"><span class="badge text-bg-danger">Milestone 4</span> Voice (etapas)</h3>
+              <ul class="text-secondary mb-0">
+                <li>Flujos de llamada por etapas: externo → SIP → WebRTC</li>
+                <li>Monitor/Transmit (UI + control) con permisos</li>
+                <li>Mejoras de telemetría y estado</li>
+                <li>Hardening extra (según experiencia ASL3 real)</li>
               </ul>
             </div>
           </div>
         </div>
 
       </div>
+
+      <div class="alert alert-secondary mt-4 mb-0">
+        <i class="bi bi-info-circle"></i>
+        Nota: el enfoque es <strong>controlado por etapas</strong> para no afectar el nodo ASL3: primero “online real”, luego audio/llamadas.
+      </div>
+
     </div>
   </section>
 
@@ -643,29 +637,29 @@
           </h2>
           <div id="q1" class="accordion-collapse collapse show" data-bs-parent="#faqAcc">
             <div class="accordion-body text-secondary">
-              <p class="text-justify">ChileMon no fue creado para reemplazar ni desplazar herramientas existentes dentro 
-              del ecosistema ASL3. Reconoce el valor histórico y operativo de proyectos como Supermon 
+              <p class="text-justify">ChileMon no fue creado para reemplazar ni desplazar herramientas existentes dentro
+              del ecosistema ASL3. Reconoce el valor histórico y operativo de proyectos como Supermon
               y otros sistemas que han servido a la comunidad durante años.</p>
 
-              <p class="text-justify">La evolución y modernización de ASL3 representa un hito importante dentro de AllStarLink. 
-              No solo mejora aspectos técnicos y de seguridad, sino que consolida una base tecnológica 
-              que proyecta estabilidad y permanencia en el tiempo. Esa renovación estructural demuestra 
-              que el ecosistema continúa avanzando, y al mismo tiempo abre espacio para nuevas propuestas 
+              <p class="text-justify">La evolución y modernización de ASL3 representa un hito importante dentro de AllStarLink.
+              No solo mejora aspectos técnicos y de seguridad, sino que consolida una base tecnológica
+              que proyecta estabilidad y permanencia en el tiempo. Esa renovación estructural demuestra
+              que el ecosistema continúa avanzando, y al mismo tiempo abre espacio para nuevas propuestas
               que acompañen ese crecimiento.</p>
 
-              <p class="text-justify">ChileMon nace en ese contexto de madurez tecnológica. No es una adaptación ni una modificación 
-              de proyectos existentes. Es un desarrollo completamente independiente, construido desde cero, 
-              con su propia arquitectura, estructura de seguridad y modelo de funcionamiento. No reutiliza 
-              código externo ni deriva de implementaciones previas; su diseño responde a una visión técnica 
+              <p class="text-justify">ChileMon nace en ese contexto de madurez tecnológica. No es una adaptación ni una modificación
+              de proyectos existentes. Es un desarrollo completamente independiente, construido desde cero,
+              con su propia arquitectura, estructura de seguridad y modelo de funcionamiento. No reutiliza
+              código externo ni deriva de implementaciones previas; su diseño responde a una visión técnica
               orientada a mantenibilidad, claridad estructural y evolución controlada.</p>
 
-              <p class="text-justify">La inspiración proviene de conceptos y buenas prácticas observadas en el ecosistema, pero la 
-              implementación es original. Esto permite que ChileMon pueda crecer de manera ordenada, 
-              incorporar nuevas funcionalidades progresivamente y mantener estabilidad sin depender de 
+              <p class="text-justify">La inspiración proviene de conceptos y buenas prácticas observadas en el ecosistema, pero la
+              implementación es original. Esto permite que ChileMon pueda crecer de manera ordenada,
+              incorporar nuevas funcionalidades progresivamente y mantener estabilidad sin depender de
               decisiones externas.</p>
 
-              <p class="text-justify">El propósito es aportar una alternativa sólida, moderna y sostenible, diseñada para evolucionar 
-              junto a ASL3 y contribuir de manera responsable al desarrollo continuo de la comunidad global de 
+              <p class="text-justify">El propósito es aportar una alternativa sólida, moderna y sostenible, diseñada para evolucionar
+              junto a ASL3 y contribuir de manera responsable al desarrollo continuo de la comunidad global de
               radioaficionados.</p>
             </div>
           </div>
