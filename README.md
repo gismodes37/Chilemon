@@ -292,7 +292,6 @@ Este script:
 ---
 
 ## 🚀 Estado del Proyecto
-<<<<<<< HEAD
 
 ### Milestone 1 – ✅ Completado
 
@@ -308,26 +307,6 @@ Este script:
 
 ---
 
-## 🧩 Milestone 2 (En Desarrollo)
-=======
->>>>>>> 0c1fc43 (Close Milestone 2: favorites modal + connect/disconnect + recent activity; update docs roadmap)
-
-### Milestone 1 – ✅ Completado
-
- - Base de datos SQLite estable
- - Eliminación total de MySQL/MariaDB
- - Dashboard estilo Supermon funcional
- - Soporte sub-path /chilemon
- - Información del sistema (CPU, IP, Hostname, etc.)
- - Login de usuarios implementado
- - Logout funcional
- - Permisos productivos configurados
- - Flujo Local → GitHub → Producción definido
-
----
-
-<<<<<<< HEAD
-=======
 ### Milestone 2 – ✅ Completado (Supermon+ UX)
 
  - Botón y ventana modal de Favoritos desde el header
@@ -341,6 +320,7 @@ Este script:
 ---
 
 ### Milestone 3 – 🧭 En planificación / Inicio (Integración real con Asterisk)
+
 Objetivo: pasar de “estado lógico” (DB/UI) a “estado real” con ASL/Asterisk.
 
  - Primera integración real con Asterisk (consulta de estado real del link)
@@ -348,9 +328,8 @@ Objetivo: pasar de “estado lógico” (DB/UI) a “estado real” con ASL/Aste
  - Primera llamada / primer puente de audio (por etapas)
  - Base para monitoreo real (usuarios, links, rx/tx) desde Asterisk
 
---- 
+---
 
->>>>>>> 0c1fc43 (Close Milestone 2: favorites modal + connect/disconnect + recent activity; update docs roadmap)
 ## 🔮 Proyección Futura – Sistema de Versionado y Actualización
 
 ChileMon contempla, en fases posteriores de desarrollo, la incorporación de un sistema formal de versionado visible y detección de nuevas versiones disponibles.
