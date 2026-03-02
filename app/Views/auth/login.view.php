@@ -243,7 +243,7 @@ $serverLabelEsc = htmlspecialchars($serverLabel, ENT_QUOTES, 'UTF-8');
         </div>
 
         <div class="mt-3 text-white-50 small">
-          © <?= date('Y') ?> ChileMon
+          © <?= date('Y') ?> ChileMon - CA2IIG
         </div>
       </div>
     </section>
