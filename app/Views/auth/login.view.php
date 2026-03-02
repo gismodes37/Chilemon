@@ -1,6 +1,6 @@
 <?php
+// Archivo: public/views/auth/login.view.php  (o donde tengas esta vista)
 // Variables esperadas: $error, $oldUser, $_SESSION['csrf_token']
-// Si usas controlador + vista, esto ya viene desde login.php
 
 $csrfEsc = htmlspecialchars((string)($_SESSION['csrf_token'] ?? ''), ENT_QUOTES, 'UTF-8');
 $errorEsc = $error ? htmlspecialchars((string)$error, ENT_QUOTES, 'UTF-8') : '';
@@ -25,6 +25,7 @@ $serverLabelEsc = htmlspecialchars($serverLabel, ENT_QUOTES, 'UTF-8');
       --cm-cyan-2:#36d7ff;
       --cm-cyan-3:#50dbe8;
     }
+
     body{
       min-height:100vh;
       margin:0;
@@ -36,54 +37,51 @@ $serverLabelEsc = htmlspecialchars($serverLabel, ENT_QUOTES, 'UTF-8');
       color:#fff;
     }
 
-/* Base: sigue dividido y centrado */
-.split{
-  min-height:100vh;
-  display:flex;
-}
+    /* Layout split */
+    .split{
+      min-height:100vh;
+      display:flex;
+    }
 
-.left,
-.right{
-  display:flex;
-  align-items:center;
-  padding: 40px;
-}
+    .left,
+    .right{
+      display:flex;
+      align-items:center;
+      padding: 40px;
+    }
 
-/* En pantallas grandes: estilo ASL (login más al centro óptico) */
-@media (min-width: 1200px){
-  .left{
-    flex: 0 0 42%;
-    justify-content: flex-end;   /* empuja el card hacia el centro */
-    padding-right: 72px;         /* separa del centro */
-  }
-  .right{
-  flex: 0 0 45%;
-  display:flex;
-  align-items:center;
-  justify-content:flex-end; /* <-- clave */
-  padding-right:10%;
-  padding-left:40px;
-  position:relative;
-}
-}
+    /* Desktop grande: login hacia centro óptico */
+    @media (min-width: 1200px){
+      .left{
+        flex: 0 0 42%;
+        justify-content: flex-end;
+        padding-right: 72px;
+      }
+      .right{
+        flex: 0 0 58%;
+        justify-content:center;
+        position:relative;
+        overflow:hidden;
+      }
+    }
 
-/* En pantallas medianas: 50/50 centrado */
-@media (min-width: 992px) and (max-width: 1199px){
-  .left, .right{
-    flex: 0 0 50%;
-    justify-content:center;
-  }
-  .right{ position:relative; overflow:hidden; }
-}
+    /* Desktop/Tablet */
+    @media (min-width: 992px) and (max-width: 1199px){
+      .left, .right{
+        flex: 0 0 50%;
+        justify-content:center;
+      }
+      .right{ position:relative; overflow:hidden; }
+    }
 
-/* Mobile: apila como ya lo tienes */
-@media (max-width: 992px){
-  .split{ flex-direction: column; }
-  .left{ flex: 0 0 auto; justify-content:center; }
-  .right{ min-height: 46vh; justify-content:center; position:relative; overflow:hidden; }
-  .bigTitle{ font-size: 44px; }
-}
+    /* Mobile */
+    @media (max-width: 992px){
+      .split{ flex-direction: column; }
+      .left{ justify-content:center; padding: 28px 18px; }
+      .right{ min-height: 44vh; justify-content:center; padding: 18px; position:relative; overflow:hidden; }
+    }
 
+    /* Card glass */
     .glass{
       width:100%;
       max-width:420px;
@@ -95,11 +93,7 @@ $serverLabelEsc = htmlspecialchars($serverLabel, ENT_QUOTES, 'UTF-8');
       box-shadow: 0 12px 38px rgba(0,0,0,.35);
     }
 
-    .brand{
-      font-weight:800;
-      letter-spacing:.3px;
-    }
-
+    .brand{ font-weight:800; letter-spacing:.3px; }
     .muted{ opacity:.8; }
 
     .logoMark{
@@ -122,45 +116,13 @@ $serverLabelEsc = htmlspecialchars($serverLabel, ENT_QUOTES, 'UTF-8');
     }
     .btn-chilemon:hover{ filter: brightness(1.05); }
 
-    .right .bigLogo{
-      text-align:center;
-      max-width: 680px;
-    }
-
-    .bigLogo img{
-      transform: scale(0.70);
-    }
-    .bigTitle{
-      font-size: 110px;      /* antes era 64 */
-      font-weight: 750;
-      letter-spacing: 1px;
-      line-height:1.05;
-      margin: 0;
-    }
-    .pill{
-      display:inline-block;
-      padding: 6px 12px;
-      border-radius: 999px;
-      background: rgba(255,255,255,.10);
-      border: 1px solid rgba(255,255,255,.18);
-      font-weight:600;
-      margin-top: 12px;
-    }
-    .tagline{
-      margin-top: 14px;
-      font-size: 22px;
-      font-style: bold;
-      opacity: 0.7;
-    }
-
-    /* Detalle gráfico sutil */
+    /* Orbs */
     .orb{
       position:absolute;
       width:520px;height:520px;
       border-radius:50%;
       background: radial-gradient(circle, rgba(54,215,255,.25), transparent 60%);
       right:-160px; top:-120px;
-      filter: blur(0px);
       pointer-events:none;
     }
     .orb2{
@@ -172,27 +134,71 @@ $serverLabelEsc = htmlspecialchars($serverLabel, ENT_QUOTES, 'UTF-8');
       pointer-events:none;
     }
 
-    /* Responsive: en móvil apila */
-    @media (max-width: 992px){
-      .split{ flex-direction: column; }
-      .left{ max-width: none; flex: 0 0 auto; }
-      .right{ min-height: 46vh; }
-      .bigTitle{ font-size: 44px; }
+    /* Branding (derecha) */
+    .brandStage{
+      position:relative;
+      width: min(760px, 100%);   /* un poco más ancho */
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      text-align:center;
+      padding: 12px;
     }
 
-.brand-bg{
-  transform: scale(.70);
-  transform-origin: center;
-}
+    .brand-bg{
+      width: min(520px, 90vw);
+      height: auto;
+      opacity: .95;
+      filter: drop-shadow(0 12px 26px rgba(0,0,0,.25));
+    }
 
-.overlay-text{
-  position: absolute;
-  inset: 0;
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  justify-content:center;
-}
+    .overlay-text{
+      position:absolute;
+      inset:0;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:flex-end;   /* baja el contenido */
+      padding-bottom: 10%;        /* controla cuánto baja */
+      gap: 10px;
+      text-align:center;
+      width: 115%;           /* sobresale un poco */
+      left: -7.5%;           /* lo centra visualmente */
+    }
+
+    .bigTitle{
+      font-size: clamp(42px, 6vw, 96px);
+      font-weight: 800;
+      letter-spacing: 3.10px;
+      line-height: 1.05;
+      margin: 0;
+      text-shadow: 0 10px 30px rgba(0,0,0,.35);
+    }
+
+    .tagline{
+      font-size: clamp(14px, 1.6vw, 20px);
+      opacity: .95;
+      margin: 0;
+      max-width: 46ch;
+    }
+
+    .asl-badge{
+      font-size: clamp(14px, 1.6vw, 20px);
+      max-width: 60ch;    /* antes estaba más corto */
+      display:inline-block;
+      padding: .15rem .5rem;
+      border-radius: .65rem;
+      font-weight: 700;
+      background-color:#66A01B;
+      color:#111;
+      vertical-align: middle;
+    }
+
+    /* En mobile baja un poco el peso visual */
+    @media (max-width: 992px){
+      .brandStage{ width: min(520px, 100%); }
+      .brand-bg{ width: min(420px, 92vw); }
+    }
   </style>
 </head>
 
@@ -244,25 +250,23 @@ $serverLabelEsc = htmlspecialchars($serverLabel, ENT_QUOTES, 'UTF-8');
 
     <!-- DERECHA: BRANDING -->
     <section class="right">
-  <div class="orb"></div>
-  <div class="orb2"></div>
+      <div class="orb"></div>
+      <div class="orb2"></div>
 
-  <div class="bigLogo position-relative text-center">
-    
-    <img src="<?= BASE_PATH ?>/assets/img/chile-flag-brush.png"
-         alt="Chile"
-         class="brand-bg">
+      <div class="brandStage">
+        <img src="<?= BASE_PATH ?>/assets/img/chile-flag-brush.png" alt="Chile" class="brand-bg">
 
-    <div class="overlay-text">
-      <h1 class="bigTitle">ChileMon</h1>
-      <div class="pill">Supermon Style</div>
-      <div class="tagline">
-        Dashboard para nodos <strong class="badge text-dark" style="background-color:#66A01B;">AllStarLink</strong> Ham Radio
+        <div class="overlay-text">
+          <h1 class="bigTitle">ChileMon</h1>
+
+          <p class="tagline">
+            Dashboard para nodos
+            <span class="asl-badge">AllStarLink</span>
+            Ham Radio
+          </p>
+        </div>
       </div>
-    </div>
-
-  </div>
-</section>
+    </section>
   </div>
 </body>
 </html>

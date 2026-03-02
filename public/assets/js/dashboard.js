@@ -1,10 +1,20 @@
 const base = window.CHILEMON_BASE || "./";
 
-// ejemplo:
-fetch(base + "api/nodes.php", {
-  /* ... */
-});
+// Si tienes fetchs futuros, puedes usar "base" así:
+// fetch(base + "api/nodes.php", { /* ... */ });
 
+// -------------------------
+// Refresh del dashboard
+// -------------------------
+function refreshSystemInfo() {
+  // Opción estable: recargar el dashboard completo
+  // (también actualiza tablas y “online/offline”)
+  window.location.reload();
+}
+
+// -------------------------
+// Tema (tu código intacto)
+// -------------------------
 function setThemeUI(isDark) {
   // Actualiza TODOS los iconos dentro de botones/links que usen Bootstrap Icons
   document.querySelectorAll("[data-theme-icon] i").forEach((icon) => {
