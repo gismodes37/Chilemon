@@ -235,3 +235,127 @@
                 display: none;
             }
         }
+
+        /* ==============================
+            ChileMon - Modal Favoritos
+        ============================== */
+
+/* Fondo azul tipo cabecera */
+#favoritesModal .modal-content {
+    background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+    border: none;
+    color: #ffffff;
+    backdrop-filter: blur(4px);
+}
+
+/* Opacidad ligera elegante */
+#favoritesModal .modal-content {
+    background-color: rgba(13, 110, 253, 0.95);
+}
+
+/* Header más oscuro */
+#favoritesModal .modal-header {
+    background-color: rgba(0, 0, 0, 0.15);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+/* Inputs sobre azul */
+#favoritesModal .form-control {
+    background-color: rgba(255, 255, 255, 0.9);
+    border: none;
+}
+
+/* Tabla */
+#favoritesModal table {
+    color: #ffffff;
+}
+
+#favoritesModal thead {
+    background-color: rgba(0, 0, 0, 0.15);
+}
+
+/* Botón guardar más visible */
+#favoritesModal .btn-warning {
+    font-weight: 600;
+}
+
+/* Fondo del backdrop más elegante */
+.modal-backdrop.show {
+    opacity: 0.6;
+}
+
+/* Fondo del backdrop más suave */
+.modal-backdrop.show {
+  opacity: 0.55;
+}
+
+/* Modal Favoritos estilo cabecera */
+#favoritesModal .modal-content {
+  background: rgba(0, 92, 185, 0.92); /* azul + opacidad */
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(6px);
+  color: #fff;
+}
+
+#favoritesModal .modal-header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+#favoritesModal .modal-body .table {
+  color: #fff;
+}
+
+#favoritesModal .modal-body .table thead {
+  color: #e8f2ff;
+}
+
+#favoritesModal input.form-control {
+  background: rgba(255, 255, 255, 0.92);
+}
+
+/* -------------------------
+   ChileMon - Favorites Modal (glass + azul)
+-------------------------- */
+#favoritesModal .modal-content{
+  background: rgba(4, 18, 85, 0.88); /* #041255 con opacidad */
+  border: 1px solid rgba(255,255,255,0.18);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: #fff;
+  border-radius: 16px;
+  box-shadow: 0 18px 55px rgba(0,0,0,0.45);
+}
+
+#favoritesModal .modal-header{
+  background: rgba(0,0,0,0.18);
+  border-bottom: 1px solid rgba(255,255,255,0.12);
+}
+
+#favoritesModal .modal-title{
+  font-weight: 700;
+}
+
+#favoritesModal .btn-close{
+  filter: invert(1);
+  opacity: 0.85;
+}
+
+#favoritesModal .table,
+#favoritesModal .table thead,
+#favoritesModal .table tbody,
+#favoritesModal .table td,
+#favoritesModal .table th{
+  color: #fff;
+}
+
+#favoritesModal .table thead{
+  opacity: 0.9;
+}
+
+#favoritesModal .form-label{
+  color: rgba(255,255,255,0.85);
+}
+
+#favoritesModal .text-muted{
+  color: rgba(255,255,255,0.65) !important;
+}

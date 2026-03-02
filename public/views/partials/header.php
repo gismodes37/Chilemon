@@ -37,8 +37,13 @@ $protoLabel = ($port === 80) ? 'HTTP' : (($port === 443) ? 'HTTPS' : "Port $port
       <div class="col-md-6 text-md-end">
         <div class="d-flex justify-content-md-end align-items-center gap-3">
 
+        
+
           <div class="text-end">
             <div class="mb-1">
+              <button class="btn btn-sm btn-outline-warning" data-bs-toggle="modal" data-bs-target="#favoritesModal">
+                <i class="bi bi-star"></i> Favoritos
+              </button>
               <span class="badge bg-success">
                 <i class="bi bi-check-circle"></i> <?= (int)$estadisticas['nodos_online'] ?> Online
               </span>

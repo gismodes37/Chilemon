@@ -242,4 +242,31 @@ final class Auth
 
         session_destroy();
     }
+
+        /**
+     * Obtiene (y crea si no existe) el token CSRF de la sesión.
+     */
+    public static function csrfToken(): string
+    {
+        self::startSession();
+
+        if (empty($_SESSION['csrf_token']) || !is_string($_SESSION['csrf_token'])) {
+            $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+        }
+        return (string)$_SESSION['csrf_token'];
+    }
+
+    /**
+     * Valida token CSRF (timing-safe).
+     */
+    public static function validateCsrf(string $token): bool
+    {
+        self::startSession();
+
+        $sessionToken = (string)($_SESSION['csrf_token'] ?? '');
+        if ($sessionToken === '' || $token === '') {
+            return false;
+        }
+        return hash_equals($sessionToken, $token);
+    }
 }
