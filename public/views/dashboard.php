@@ -150,25 +150,30 @@ if (class_exists(\App\Core\NodeLogger::class)) {
                                     <span class="badge bg-secondary"><?= htmlspecialchars($nodo['mode'] ?: 'ASL') ?></span>
                                 </td>
                                 <td>
-                                    <div class="btn-group btn-group-sm">
-                                        <button class="btn btn-connect"
-                                                onclick="connectToSpecificNode('<?= htmlspecialchars((string)$nodo['node_id'], ENT_QUOTES, 'UTF-8') ?>')">
-                                            <i class="bi bi-telephone"></i> Conectar
-                                        </button>
+                                <div class="btn-group btn-group-sm">
+                                    <button class="btn btn-connect"
+                                            onclick="connectToSpecificNode('<?= htmlspecialchars((string)$nodo['node_id'], ENT_QUOTES, 'UTF-8') ?>')">
+                                    <i class="bi bi-telephone"></i> Conectar
+                                    </button>
 
-                                        <button class="btn btn-outline-danger"
-                                                onclick="disconnectFromNodeConfirm('<?= htmlspecialchars((string)$nodo['node_id'], ENT_QUOTES, 'UTF-8') ?>')">
-                                            <i class="bi bi-telephone-x"></i> Desconectar
-                                        </button>
+                                    <button class="btn btn-outline-danger"
+                                         onclick="disconnectFromNodeConfirm('<?= htmlspecialchars((string)$nodo['node_id'], ENT_QUOTES, 'UTF-8') ?>')">
+                                    <i class="bi bi-telephone-x"></i> Desconectar
+                                    </button>
 
-                                        <button class="btn btn-monitor">
-                                            <i class="bi bi-headphones"></i>
-                                        </button>
+                                    <button class="btn btn-outline-warning"
+                                         onclick="deleteNodeConfirm('<?= htmlspecialchars((string)$nodo['node_id'], ENT_QUOTES, 'UTF-8') ?>')">
+                                    <i class="bi bi-trash"></i> Eliminar
+                                    </button>
 
-                                        <button class="btn btn-outline-secondary">
-                                            <i class="bi bi-info-circle"></i>
-                                        </button>
-                                    </div>
+                                    <button class="btn btn-monitor">
+                                    <i class="bi bi-headphones"></i>
+                                    </button>
+
+                                    <button class="btn btn-outline-secondary">
+                                    <i class="bi bi-info-circle"></i>
+                                    </button>
+                                </div>
                                 </td>
                             </tr>
                             <?php endforeach; ?>

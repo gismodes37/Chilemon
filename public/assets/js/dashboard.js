@@ -12,7 +12,6 @@ async function postForm(url, dataObj) {
   const form = new URLSearchParams();
   Object.entries(dataObj).forEach(([k, v]) => form.append(k, v));
 
-  // incluir CSRF siempre (si está)
   const csrf = getCsrfToken();
   if (csrf) form.append("csrf_token", csrf);
 
@@ -28,9 +27,7 @@ async function postForm(url, dataObj) {
   let json = null;
   try {
     json = await res.json();
-  } catch (e) {
-    // Si no es JSON, devolvemos error genérico
-  }
+  } catch (e) {}
 
   if (!res.ok) {
     const msg =
@@ -65,7 +62,7 @@ async function getJson(url) {
 }
 
 // -------------------------
-// Tema (tu código intacto)
+// Tema
 // -------------------------
 function setThemeUI(isDark) {
   document.querySelectorAll("[data-theme-icon] i").forEach((icon) => {
@@ -98,26 +95,31 @@ document.addEventListener("DOMContentLoaded", () => {
     document.documentElement.getAttribute("data-bs-theme") === "dark";
   setThemeUI(isDark);
 
-  // Wireup favoritos (si existe el modal en esta vista)
   setupFavoritesModal();
 });
 
 // -------------------------
-// Acciones: Connect / Disconnect
+// Post-acción: refresco automático (sin que el usuario recargue)
+// Hoy: fallback seguro = recarga completa.
+// Más adelante lo cambiamos por refresh parcial con endpoints.
+// -------------------------
+function afterNodeAction() {
+  // Si quieres “sin recarga” real, aquí luego hacemos refresh parcial.
+  // Por ahora es la forma más estable de asegurar tabla/estadísticas/actividad.
+  window.location.reload();
+}
+
+// -------------------------
+// Acciones: Connect / Disconnect / Delete
 // -------------------------
 async function connectToNode() {
   const input = document.getElementById("node-number");
   const node = input ? (input.value || "").trim() : "";
-  if (!node) {
-    alert("Ingresa un número de nodo.");
-    return;
-  }
+  if (!node) return alert("Ingresa un número de nodo.");
 
   try {
     await postForm("api/connect.php", { node });
-    alert(`Conectado a ${node}`);
-    // Si quieres: auto refresh
-    // location.reload();
+    afterNodeAction();
   } catch (e) {
     alert(`Error al conectar: ${e.message}`);
   }
@@ -129,8 +131,7 @@ async function connectToSpecificNode(nodeId) {
 
   try {
     await postForm("api/connect.php", { node });
-    alert(`Conectado a ${node}`);
-    // location.reload();
+    afterNodeAction();
   } catch (e) {
     alert(`Error al conectar: ${e.message}`);
   }
@@ -142,45 +143,50 @@ async function disconnectFromNode(nodeId) {
 
   try {
     await postForm("api/disconnect.php", { node });
-    alert(`Desconectado de ${node}`);
-    // location.reload();
+    afterNodeAction();
   } catch (e) {
     alert(`Error al desconectar: ${e.message}`);
   }
 }
 
-/**
- * ✅ Esta faltaba: tu dashboard.php llama disconnectFromNodeConfirm()
- * Si no existe, te queda el modal/alert “raro” o error JS silencioso.
- */
 function disconnectFromNodeConfirm(nodeId) {
   const node = (nodeId || "").toString().trim();
   if (!node) return;
-
-  const ok = confirm(`¿Seguro que deseas desconectar el nodo ${node}?`);
-  if (!ok) return;
-
+  if (!confirm(`¿Seguro que deseas desconectar el nodo ${node}?`)) return;
   disconnectFromNode(node);
+}
+
+async function deleteNode(nodeId) {
+  const node = (nodeId || "").toString().trim();
+  if (!node) return;
+
+  try {
+    await postForm("api/delete_node.php", { node });
+    afterNodeAction();
+  } catch (e) {
+    alert(`Error al eliminar: ${e.message}`);
+  }
+}
+
+function deleteNodeConfirm(nodeId) {
+  const node = (nodeId || "").toString().trim();
+  if (!node) return;
+  if (!confirm(`⚠️ Esto eliminará el nodo ${node} del dashboard.\n¿Confirmas?`))
+    return;
+  deleteNode(node);
 }
 
 // -------------------------
 // Favoritos: Modal + CRUD + conectar desde favorito
-// Requiere:
-// - Modal con id favoritesModal
-// - Form id favForm y tbody id fav_tbody
-// - Botones: #fav_reload, #fav_clear
-// - Endpoint: api/favorites.php
 // -------------------------
 function setupFavoritesModal() {
   const modalEl = document.getElementById("favoritesModal");
   if (!modalEl) return;
 
-  // Cargar al abrir
   modalEl.addEventListener("show.bs.modal", () => {
     favoritesReload();
   });
 
-  // Reload manual
   const btnReload = document.getElementById("fav_reload");
   if (btnReload) {
     btnReload.addEventListener("click", (e) => {
@@ -189,7 +195,6 @@ function setupFavoritesModal() {
     });
   }
 
-  // Clear
   const btnClear = document.getElementById("fav_clear");
   if (btnClear) {
     btnClear.addEventListener("click", (e) => {
@@ -198,7 +203,6 @@ function setupFavoritesModal() {
     });
   }
 
-  // Submit upsert
   const form = document.getElementById("favForm");
   if (form) {
     form.addEventListener("submit", async (e) => {
@@ -212,10 +216,7 @@ function setupFavoritesModal() {
         document.getElementById("fav_desc")?.value || ""
       ).trim();
 
-      if (!node_id) {
-        alert("Nodo requerido.");
-        return;
-      }
+      if (!node_id) return alert("Nodo requerido.");
 
       try {
         await postForm("api/favorites.php", {
@@ -250,6 +251,8 @@ async function favoritesReload() {
 
   try {
     const json = await getJson("api/favorites.php");
+
+    // OJO: tu favorites.php responde { success:true, items:[...] }
     const items = json && json.items ? json.items : [];
     renderFavorites(items);
   } catch (err) {
@@ -292,24 +295,21 @@ function renderFavorites(items) {
     })
     .join("");
 
-  // Wire buttons
   tbody.querySelectorAll("[data-fav-connect]").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const node = btn.getAttribute("data-fav-connect") || "";
-      const ok = confirm(`¿Conectar al nodo ${node}?`);
-      if (!ok) return;
+      if (!confirm(`¿Conectar al nodo ${node}?`)) return;
 
       try {
         await postForm("api/connect.php", { node });
-        // Cierra modal y vuelve “conectado”
+
         const modalEl = document.getElementById("favoritesModal");
         if (modalEl && window.bootstrap) {
           const inst = window.bootstrap.Modal.getInstance(modalEl);
           if (inst) inst.hide();
         }
-        alert(`Conectado a ${node}`);
-        // Si quieres refrescar tabla automáticamente:
-        // location.reload();
+
+        afterNodeAction();
       } catch (err) {
         alert(`Error al conectar: ${err.message}`);
       }
@@ -319,8 +319,7 @@ function renderFavorites(items) {
   tbody.querySelectorAll("[data-fav-delete]").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const node = btn.getAttribute("data-fav-delete") || "";
-      const ok = confirm(`¿Eliminar favorito ${node}?`);
-      if (!ok) return;
+      if (!confirm(`¿Eliminar favorito ${node}?`)) return;
 
       try {
         await postForm("api/favorites.php", {
@@ -342,4 +341,12 @@ function escapeHtml(s) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+// -------------------------
+// Dashboard: botón Actualizar
+// -------------------------
+function refreshSystemInfo() {
+  // Fallback seguro
+  window.location.reload();
 }

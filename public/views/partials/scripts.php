@@ -4,6 +4,10 @@
   window.CHILEMON_BASE = "<?= rtrim(BASE_URL, '/') ?>/";
 </script>
 
-<script src="<?= rtrim(BASE_URL, '/') ?>/assets/js/dashboard.js?v=<?= APP_VERSION ?>"></script>
+<?php
+  $jsPath = dirname(__DIR__, 2) . '/assets/js/dashboard.js'; // public/assets/js/dashboard.js
+  $jsVer  = file_exists($jsPath) ? (string)filemtime($jsPath) : (string)APP_VERSION;
+?>
+<script src="<?= rtrim(BASE_URL, '/') ?>/assets/js/dashboard.js?v=<?= $jsVer ?>"></script>
 </body>
 </html>
