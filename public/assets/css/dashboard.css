@@ -17,6 +17,13 @@
             min-height: 100vh;
             padding-top: 140px; /* Espacio para header fijo */
         }
+
+        @media (max-width: 768px){
+        body{ padding-top: 160px; }
+        }
+        @media (max-width: 576px){
+        body{ padding-top: 180px; }
+        }
         
         /* HEADER estilo Supermon - FIJADO */
         .supermon-header {
@@ -358,4 +365,83 @@
 
 #favoritesModal .text-muted{
   color: rgba(255,255,255,0.65) !important;
+}
+
+/* Quita la franja gris superior (margen por defecto del navegador) */
+html, body{
+  margin: 0;
+  padding: 0;
+}
+
+/* ===============================
+   Header con imagen personalizable 
+   La imagen es de : 1920x400 de 300kb
+   =============================== */
+.supermon-header{
+  padding-top: 2rem !important;
+  padding-bottom: 0.5rem !important;
+}   
+
+@media (min-width: 992px){
+  .supermon-header{
+    min-height: 110px;
+  }
+}
+
+.supermon-header.has-header-bg{
+  position: relative;
+  overflow: hidden;
+  color: #fff;
+  
+}
+
+.supermon-header.has-header-bg::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  background-image: var(--header-bg);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  transform: scale(1.03);
+  z-index: 0;
+  filter: brightness(1.8) contrast(1.05);
+
+}
+
+/* Overlay azul corporativo */
+.supermon-header.has-header-bg::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  background: linear-gradient(
+      90deg,
+      rgba(4,18,85,.92),
+      rgba(4,18,85,.75)
+  );
+  z-index: 1;
+}
+
+/* Asegura que el contenido esté sobre el fondo */
+.supermon-header.has-header-bg .container{
+  position: relative;
+  z-index: 2;
+}
+
+/* Texto personalizable bajo el logo/título */
+.header-tagline{
+  font-size: 20px;
+  font-weight: 600;
+  font-style: italic;
+  line-height: 1.15;
+  opacity: .92;
+  text-shadow: 0 1px 2px rgba(0,0,0,.25);
+  margin-left: 0px; /* alinea con el texto después de la bandera (40px + gap) */
+  margin-top: 30px;
+}
+
+@media (max-width: 576px){
+  .header-tagline{
+    margin-left: 0;
+  }
 }

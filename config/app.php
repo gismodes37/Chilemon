@@ -19,6 +19,13 @@ if (!defined('LOG_PATH')) {
     define('LOG_PATH', ROOT_PATH . '/logs');
 }
 
+if (!defined('HEADER_TAGLINE')) {
+    // Texto personalizable debajo del logo/título
+    define('HEADER_TAGLINE', getenv('CHILEMON_HEADER_TAGLINE')
+    // Acá pon tu Texto personalizado, respeta las comillas
+    ?: 'Primer nodo de La Serena - Chile 61916 CA2IIG');
+}
+
 if (!defined('APP_NAME')) {
     define('APP_NAME', 'ChileMon');
 }
