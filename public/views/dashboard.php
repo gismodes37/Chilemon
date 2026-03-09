@@ -107,26 +107,29 @@ $systemInfo = $systemInfo ?? [
                         <i class="bi bi-globe"></i> Web Site Chilemon
                     </button>
                     <button class="btn btn-outline-warning" onclick="window.open('https://github.com/gismodes37/Chilemon', '_blank')">
-                        <i class="bi bi-github"></i> Repo Chilemon
+                        <i class="bi bi-github"></i> Repositorio Chilemon
+                    </button>
+                    <button class="btn btn-outline-warning" onclick="window.open('#', '_blank')">
+                        <i class="bi bi-github"></i> Manual / Usuario Chilemon
+                    </button>
+                    <button class="btn btn-outline-primary" onclick="window.open('https://github.com/gismodes37/Chilemon/blob/main/docs/soporte.md', '_blank')">
+                        <i class="bi bi-globe"></i> Soporte
                     </button>
                     <button class="btn btn-outline-primary" onclick="window.open('https://www.qsl.net/ca2iig/', '_blank')">
                         <i class="bi bi-globe"></i> Web Site Desarrollador
                     </button>
-                    <button class="btn btn-outline-primary" onclick="window.open('https://#', '_blank')">
-                        <i class="bi bi-globe"></i> Soporte
-                    </button>
                     <button class="btn btn-outline-danger" id="btn-restart-asterisk"
-                        onclick="confirmarReinicio('Asterisk', 'https://ejemplo5.com')"
+                        onclick="confirmarReinicio('Asterisk', '#')"
                         title="Reiniciar el servicio Asterisk">
                         <i class="bi bi-arrow-repeat"></i> Reiniciar Asterisk
                     </button>
                     <button class="btn btn-outline-danger" id="btn-restart-apache"
-                        onclick="confirmarReinicio('Apache', 'https://ejemplo6.com')"
+                        onclick="confirmarReinicio('Apache', '#')"
                         title="Reiniciar el servicio Apache">
                         <i class="bi bi-arrow-repeat"></i> Reiniciar Apache
                     </button>
                     <button class="btn btn-outline-danger" id="btn-restart-apache"
-                        onclick="confirmarReinicio('Apache', 'https://ejemplo6.com')"
+                        onclick="confirmarReinicio('Apache', '#')"
                         title="Reiniciar el servicio Apache">
                         <i class="bi bi-power"></i> Apagar Nodo
                     </button>
