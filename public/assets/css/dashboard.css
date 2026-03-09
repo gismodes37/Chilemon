@@ -69,6 +69,28 @@
             margin-bottom: 20px;
             border-left: 4px solid var(--asl-green);
         }
+
+         /* Accesos Rapidos */
+        .acceso-rapido {
+            background: var(--bs-tertiary-bg);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-left: 4px solid var(--asl-skyblue);
+        }
+
+        .btn-outline-custom {
+            color: #6FAE1E; /* Tu color */
+            border-color: #6FAE1E;
+        }
+
+        .btn-outline-custom:hover {
+            background-color: #6FAE1E; /* Color al pasar el ratón */
+            border-color: #6FAE1E;
+            color: black;
+        }
+        /* Fin bloque accesos rapidos*/
+
         
         /* Tabla estilo Supermon */
         .supermon-table {

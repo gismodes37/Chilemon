@@ -137,3 +137,31 @@ if (APP_ENV === 'dev') {
 } else {
     ini_set('display_errors', '0');
 }
+
+/**
+ * -----------------------------------------------------
+ * Asterisk AMI Configuration
+ * -----------------------------------------------------
+ * Parámetros de conexión al Asterisk Manager Interface.
+ * Usado por ChileMon para controlar nodos ASL.
+ */
+
+if (!defined('AMI_HOST')) {
+    define('AMI_HOST', getenv('CHILEMON_AMI_HOST') ?: '127.0.0.1');
+}
+
+if (!defined('AMI_PORT')) {
+    define('AMI_PORT', (int)(getenv('CHILEMON_AMI_PORT') ?: 5038));
+}
+
+if (!defined('AMI_USER')) {
+    define('AMI_USER', getenv('CHILEMON_AMI_USER') ?: 'admin');
+}
+
+if (!defined('AMI_PASS')) {
+    define('AMI_PASS', getenv('CHILEMON_AMI_PASS') ?: 'angE29angE64');
+}
+
+if (!defined('AMI_TIMEOUT')) {
+    define('AMI_TIMEOUT', 3);
+}

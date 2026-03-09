@@ -109,7 +109,7 @@ $serverLabelEsc = htmlspecialchars($serverLabel, ENT_QUOTES, 'UTF-8');
     }
 
     .btn-chilemon{
-      background: linear-gradient(90deg, rgba(54,215,255,.95), rgba(1,254,253,.95));
+      background: linear-gradient(90deg, rgba(62, 252, 37, 0.92), rgba(1, 254, 1, 0.95));
       border:0;
       color:#07203b;
       font-weight:700;
