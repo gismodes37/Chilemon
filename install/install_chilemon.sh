@@ -97,6 +97,39 @@ ensure_package() {
     fi
 }
 
+validate_php_sqlite() {
+    info "Validando módulos PHP requeridos para SQLite"
+
+    local missing=0
+
+    if ! php -m | grep -q '^PDO$'; then
+        echo "[ERROR] PHP no tiene cargado el módulo PDO."
+        missing=1
+    fi
+
+    if ! php -m | grep -q '^pdo_sqlite$'; then
+        echo "[ERROR] PHP no tiene cargado el módulo pdo_sqlite."
+        missing=1
+    fi
+
+    if ! php -m | grep -q '^sqlite3$'; then
+        echo "[ERROR] PHP no tiene cargado el módulo sqlite3."
+        missing=1
+    fi
+
+    if [[ "$missing" -ne 0 ]]; then
+        echo
+        echo "[ERROR] La instalación no puede continuar porque PHP/SQLite no está listo."
+        echo "[ERROR] Revise la configuración de PHP en este nodo."
+        echo "[ERROR] Sugerencia inicial:"
+        echo "        sudo apt install --reinstall -y php8.4-common php8.4-cli libapache2-mod-php8.4 php8.4-sqlite3 php-sqlite3"
+        echo "        php -m | grep -E 'PDO|pdo_sqlite|sqlite3'"
+        exit 1
+    fi
+
+    ok "PHP tiene cargados PDO, pdo_sqlite y sqlite3"
+}
+
 escape_php_string() {
     local value="$1"
     value="${value//\\/\\\\}"
@@ -365,7 +398,7 @@ main() {
     chmod -R 775 "$DATA_DIR" "$LOG_DIR"
     ok "Carpetas preparadas y permisos aplicados"
 
-    step "5 de 8" "Generando configuración local "
+    step "5 de 8" "Generando configuración local"
     write_local_config \
         "$local_node" \
         "$server_host" \
@@ -383,7 +416,8 @@ main() {
     step "7 de 8" "Configurando Apache"
     write_apache_config
 
-    step "8 de 8" "Inicializando ChileMon"
+    step "8 de 8" "Validando PHP e inicializando ChileMon"
+    validate_php_sqlite
     run_php_installer
 
     validate_installation "$local_node" "$server_host"
