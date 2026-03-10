@@ -25,6 +25,12 @@ DATA_DIR="$REPO_DIR/data"
 PUBLIC_DIR="$REPO_DIR/public"
 INSTALLER_PHP="$REPO_DIR/bin/install.php"
 
+# Valores recomendados por defecto para AMI.
+DEFAULT_AMI_HOST="127.0.0.1"
+DEFAULT_AMI_PORT="5038"
+DEFAULT_AMI_USER="admin"
+DEFAULT_AMI_TIMEOUT="3"
+
 # ------------------------------------------------------------------------------
 # Manejo centralizado de errores para mostrar mensajes claros al usuario final.
 # ------------------------------------------------------------------------------
@@ -91,6 +97,13 @@ ensure_package() {
     fi
 }
 
+escape_php_string() {
+    local value="$1"
+    value="${value//\\/\\\\}"
+    value="${value//\'/\\\'}"
+    printf '%s' "$value"
+}
+
 write_local_config() {
     local local_node="$1"
     local server_host="$2"
@@ -104,6 +117,20 @@ write_local_config() {
     mkdir -p "$(dirname "$LOCAL_CONFIG")"
     backup_if_exists "$LOCAL_CONFIG"
 
+    local safe_local_node safe_server_host safe_header_tagline
+    local safe_ami_host safe_ami_user safe_ami_pass
+    local safe_repo_dir safe_db_path safe_wrapper_path
+
+    safe_local_node="$(escape_php_string "$local_node")"
+    safe_server_host="$(escape_php_string "$server_host")"
+    safe_header_tagline="$(escape_php_string "$header_tagline")"
+    safe_ami_host="$(escape_php_string "$ami_host")"
+    safe_ami_user="$(escape_php_string "$ami_user")"
+    safe_ami_pass="$(escape_php_string "$ami_pass")"
+    safe_repo_dir="$(escape_php_string "$REPO_DIR")"
+    safe_db_path="$(escape_php_string "${DATA_DIR}/chilemon.sqlite")"
+    safe_wrapper_path="$(escape_php_string "$WRAPPER_PATH")"
+
     cat > "$LOCAL_CONFIG" <<PHP
 <?php
 /**
@@ -115,28 +142,28 @@ write_local_config() {
 
 return [
     // Nodo local ASL configurado para este servidor.
-    'local_node' => '${local_node}',
+    'local_node' => '${safe_local_node}',
 
     // Texto mostrado bajo el título principal de la aplicación.
-    'header_tagline' => '${header_tagline}',
+    'header_tagline' => '${safe_header_tagline}',
 
     // Host sugerido para construir URLs del dashboard.
-    'server_host' => '${server_host}',
+    'server_host' => '${safe_server_host}',
 
     // Ruta raíz del proyecto instalada en el servidor.
-    'project_root' => '${REPO_DIR}',
+    'project_root' => '${safe_repo_dir}',
 
     // Ruta de la base de datos SQLite.
-    'database_path' => '${DATA_DIR}/chilemon.sqlite',
+    'database_path' => '${safe_db_path}',
 
     // Ruta del wrapper seguro de Asterisk.
-    'wrapper_path' => '${WRAPPER_PATH}',
+    'wrapper_path' => '${safe_wrapper_path}',
 
     // Parámetros de conexión AMI.
-    'ami_host' => '${ami_host}',
+    'ami_host' => '${safe_ami_host}',
     'ami_port' => ${ami_port},
-    'ami_user' => '${ami_user}',
-    'ami_pass' => '${ami_pass}',
+    'ami_user' => '${safe_ami_user}',
+    'ami_pass' => '${safe_ami_pass}',
     'ami_timeout' => ${ami_timeout},
 ];
 PHP
@@ -295,7 +322,7 @@ main() {
     ensure_package sudo
     ok "Dependencias instaladas o ya presentes"
 
-    step "3 de 8" "Solicitando datos del nodo local"
+    step "3 de 8" "Solicitando datos básicos del nodo"
     local local_node=""
     while [[ -z "$local_node" ]]; do
         read -r -p "Ingrese su nodo ASL local: " local_node
@@ -310,35 +337,25 @@ main() {
     read -r -p "Ingrese texto descriptivo del nodo [Nodo local ChileMon]: " header_tagline
     header_tagline="${header_tagline:-Nodo local ChileMon}"
 
-    local ami_host=""
-    read -r -p "Ingrese host AMI [127.0.0.1]: " ami_host
-    ami_host="${ami_host:-127.0.0.1}"
+    echo
+    info "Se aplicará la configuración AMI recomendada para una instalación local:"
+    info "  Host    : ${DEFAULT_AMI_HOST}"
+    info "  Puerto  : ${DEFAULT_AMI_PORT}"
+    info "  Usuario : ${DEFAULT_AMI_USER}"
+    info "  Timeout : ${DEFAULT_AMI_TIMEOUT} segundos"
+    echo
 
-    local ami_port=""
-    while [[ -z "$ami_port" ]]; do
-        read -r -p "Ingrese puerto AMI [5038]: " ami_port
-        ami_port="${ami_port:-5038}"
-        [[ "$ami_port" =~ ^[0-9]+$ ]] || { echo "Debe ingresar solo números."; ami_port=""; }
-    done
-
-    local ami_user=""
-    read -r -p "Ingrese usuario AMI [admin]: " ami_user
-    ami_user="${ami_user:-admin}"
+    local ami_host="$DEFAULT_AMI_HOST"
+    local ami_port="$DEFAULT_AMI_PORT"
+    local ami_user="$DEFAULT_AMI_USER"
+    local ami_timeout="$DEFAULT_AMI_TIMEOUT"
 
     local ami_pass=""
-    echo
-    echo "Nota: ingrese la clave AMI configurada en su instalación de ASL/Asterisk."
+    echo "Ingrese la clave AMI configurada en su instalación de ASL/Asterisk."
     echo "Si la cambió durante la instalación, debe usar esa misma clave."
     read -r -s -p "Ingrese clave AMI [Enter para usar valor por defecto actual]: " ami_pass
     echo
     ami_pass="${ami_pass:-angE29angE64}"
-
-    local ami_timeout=""
-    while [[ -z "$ami_timeout" ]]; do
-        read -r -p "Ingrese timeout AMI en segundos [3]: " ami_timeout
-        ami_timeout="${ami_timeout:-3}"
-        [[ "$ami_timeout" =~ ^[0-9]+$ ]] || { echo "Debe ingresar solo números."; ami_timeout=""; }
-    done
 
     ok "Nodo local capturado: $local_node"
 
