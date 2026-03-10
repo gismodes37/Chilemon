@@ -365,7 +365,7 @@ main() {
     chmod -R 775 "$DATA_DIR" "$LOG_DIR"
     ok "Carpetas preparadas y permisos aplicados"
 
-    step "5 de 8" "Generando configuración local"
+    step "5 de 8" "Generando configuración local "
     write_local_config \
         "$local_node" \
         "$server_host" \
