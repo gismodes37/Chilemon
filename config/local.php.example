@@ -1,0 +1,50 @@
+<?php
+/**
+ * ChileMon - Ejemplo de configuración local.
+ *
+ * Copie este archivo como config/local.php o permita que el instalador lo genere.
+ * Este archivo NO debe subirse al repositorio como local.php real.
+ */
+
+return [
+    /**
+     * Nodo local ASL del servidor donde se instala ChileMon.
+     * Debe coincidir con el nodo configurado en este equipo.
+     */
+    'local_node' => '12345',
+
+    /**
+     * Texto opcional mostrado debajo del nombre de la aplicación.
+     */
+    'header_tagline' => 'Nodo local ChileMon',
+
+    /**
+     * IP o nombre DNS del servidor donde quedará publicado el dashboard.
+     * Se usa como referencia para construir la URL de acceso.
+     */
+    'server_host' => 'localhost',
+
+    /**
+     * Ruta raíz del proyecto.
+     */
+    'project_root' => '/opt/chilemon',
+
+    /**
+     * Base de datos SQLite principal.
+     */
+    'database_path' => '/opt/chilemon/data/chilemon.sqlite',
+
+    /**
+     * Wrapper seguro para comandos rpt.
+     */
+    'wrapper_path' => '/usr/local/bin/chilemon-rpt',
+
+    /**
+     * Parámetros de conexión al Asterisk Manager Interface (AMI).
+     */
+    'ami_host' => '127.0.0.1',
+    'ami_port' => 5038,
+    'ami_user' => 'admin',
+    'ami_pass' => 'REEMPLAZAR_CON_TU_CLAVE_AMI_REAL',
+    'ami_timeout' => 3,
+];

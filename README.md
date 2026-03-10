@@ -67,152 +67,91 @@ ChileMon:
 
 ---
 
-## 🛠 Instalación en Raspberry (Producción)
+## 🛠 Instalación en Raspberry / Nodo ASL3 (Producción)
 
-### 0️⃣ Preparar entorno
+### El usuario entra al nodo y abre la terminal o entra por SSH:
 
-  - <span style="color:#666699">Instalar PHP completo y dependencias necesarias :</span> 
- 
-      ```ruby
-      sudo apt update
-      sudo apt install -y git apache2 php libapache2-mod-php php-cli php-sqlite3 sqlite3
-      ```
+### 1. Conectarse al nodo
+Abra la terminal local del nodo o conéctese por SSH desde otro equipo:
 
-  - Reinicia Apache :
-      ```ruby
-      sudo systemctl restart apache2
-      ```
+```php
+ssh usuario@IP_DEL_NODO
+```
+---
+### 2. Instalar Git
 
-  - Habilitar módulo rewrite (requerido para sub-path y .htaccess) :
-      ```ruby
-      sudo a2enmod rewrite
-      sudo systemctl restart apache2
-      ```
+Actualice los paquetes:
 
-  - Verificar que SQLite esté activo en PHP :
-      ```ruby
-      php -m | grep sqlite
-      ```
+```php    
+ sudo apt update
+ ```
+Instale Git si aún no está disponible:
 
-  - Debe mostrar :
-      ```ruby
-      pdo_sqlite
-      sqlite3
-      ```
-> Si no aparecen, revisa que php-sqlite3 esté instalado.
+```php
+ sudo apt install -y git
+```
+---
+### 3. Descargar ChileMon desde el repositorio oficial
+
+Ubíquese en /opt y clone el proyecto:
+
+```php
+ cd /opt
+ sudo git clone https://github.com/gismodes37/chilemon.git
+```
+
+### 4. Entrar a la carpeta del proyecto
+
+```php
+ cd /opt/chilemon
+```
+---
+
+### 5. Ejecutar el instalador automático
+
+```php
+ sudo bash install/install_chilemon.sh
+```
+---
+
+### 6. Responder los datos solicitados por el instalador
+
+Durante la instalación se solicitarán los siguientes datos:
+
+ - Numero de nodo ASL local
+ - IP o nombre del servidor
+
+   Ejemplo:
+     - Nodo local: `12345`
+     - Servidor: `192.168.1.20`  ó  `node12345`
+
+ - Texto descriptivo del nodo
+ - Host AMI
+ - Puerto AMI
+ - Usuario AMI
+ - Clave AMI
+ - Timeout AMI
+
+La clave AMI se ingresa de forma oculta por seguridad. Esta clave es la misma que puso a la hora de configurar su nodo ASL.
 
 ---
 
-### 1️⃣ Clonar repositorio
+### 7. Validar acceso al sistema desde el navegador
 
-  - Clonar repositorio
-      ```ruby
-      cd /opt
-      sudo git clone https://github.com/gismodes37/chilemon.git
-      ```
----
+Al finalizar, el instalador mostrará la URL sugerida para abrir ChileMon en el navegador,
 
-### 2️⃣ Crear carpetas necesarias
+ - por ejemplo:
+     ```php
+     http://IP_DEL_NODO/chilemon
+     ```
 
- - Crear carpetas
-      ```ruby
-      sudo mkdir -p /opt/chilemon/data
-      sudo mkdir -p /opt/chilemon/logs
-      ```
----
-
-### 3️⃣ Configurar permisos (seguro para ASL3 limpio)
-
- - Permisos
-      ```ruby
-      sudo chown -R www-data:www-data /opt/chilemon
-      sudo find /opt/chilemon -type d -exec chmod 2775 {} \;
-      sudo find /opt/chilemon -type f -exec chmod 664 {} \;
-      ```    
----
-
-### 4️⃣ Configuración Apache (Sub-path)
-
- - Editar el VirtualHost SSL de ASL3:
-      ```ruby
-      sudo nano /etc/apache2/sites-available/default-ssl.conf
-      ```
- - Dentro del bloque:
-      ```ruby
-      <VirtualHost *:443>
-      ```
-
- - Agrega esto (antes de cerrar el bloque):
-      ```ruby
-      Alias /chilemon "/opt/chilemon/public"
-
-      <Directory "/opt/chilemon/public">
-          AllowOverride All
-          Require all granted
-      </Directory>
-      ``` 
-
-## 💾 Cómo guardar en nano
-
- - Presionar :
-      ```ruby
-      CTRL + O
-      ```
- - confirmar con Enter:
-      ```ruby
-      ENTER
-      ```
- - Luego presionar :
-      ```ruby
-      CTRL + X 
-      ```
- - Reiniciar Apache :
-      ```ruby
-      sudo systemctl restart apache2
-      ```      
----
-
-### 5️⃣ Inicializar sistema (OBLIGATORIO)
-
- - Inicializar
-      ```ruby
-      cd /opt/chilemon
-      sudo -u www-data php bin/install.php
-      ```
-Este script:
-
- - Crea la base de datos SQLite
- - Genera tablas necesarias
- - Verifica permisos
- - Crea el usuario administrador
- - El sistema solicitará:
-      ```ruby
-      Username     (Usuario)
-      Password     (Contraseña)
-      Confirmación (Confirmar contraseña)
-      ```
+ - Si su servidor ya tiene HTTPS activo, también puede probar:
+     ```php
+     https://IP_DEL_NODO/chilemon
+     ```
 
 ---
 
-## 6️⃣ Crear usuario adicionales (Opcional)
-
->Opcional, porque el instalador del paso 5 ya crea el primer usuario.
->Usa este paso solo si quieres agregar más usuarios.
-
-  - Crear usuario:   
-      ```ruby
-      sudo -u www-data php bin/create-user.php
-      ```
-
----
-
-### 7️⃣ Acceso al sistema desde el navegador
-
- - Accedemos :
-      ```ruby
-      https://nodeXXXXX.local/chilemon/
-      ```
----      
 
 ## 🔐 Autenticación
  - Sistema de login propio con:

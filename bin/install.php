@@ -2,16 +2,16 @@
 declare(strict_types=1);
 
 /**
- * ChileMon Installer v1.0.2 (portable)
+ * ChileMon Installer v1.0.3 (portable)
  * - Producción (Raspberry): default /opt/chilemon
  * - Dev (Windows/XAMPP): soporta CHILEMON_BASE_PATH
  * - Crea DB SQLite si no existe
  * - Aplica schema.sql SIEMPRE (IF NOT EXISTS) para soportar upgrades
  * - Crea carpetas data/logs/backups
- * - Crea usuario admin interactivo
+ * - Crea usuario admin interactivo solo si hay terminal disponible
  */
 
-echo "\n🇨🇱 ChileMon Installer v1.0.2\n";
+echo "\n🇨🇱 ChileMon Installer v1.0.3\n";
 echo "----------------------------------\n";
 
 function isWindows(): bool
@@ -52,7 +52,9 @@ function currentUser(): string
 {
     if (function_exists('posix_geteuid') && function_exists('posix_getpwuid')) {
         $info = posix_getpwuid(posix_geteuid());
-        if (is_array($info) && isset($info['name'])) return (string) $info['name'];
+        if (is_array($info) && isset($info['name'])) {
+            return (string) $info['name'];
+        }
     }
     return get_current_user() ?: 'unknown';
 }
@@ -60,9 +62,35 @@ function currentUser(): string
 function env(string $key): ?string
 {
     $v = getenv($key);
-    if ($v === false) return null;
+    if ($v === false) {
+        return null;
+    }
     $v = trim($v);
     return $v === '' ? null : $v;
+}
+
+/**
+ * Detecta si el script puede interactuar con una terminal real.
+ */
+function isInteractiveCli(): bool
+{
+    if (PHP_SAPI !== 'cli') {
+        return false;
+    }
+
+    if (!defined('STDIN')) {
+        return false;
+    }
+
+    if (function_exists('stream_isatty')) {
+        return @stream_isatty(STDIN);
+    }
+
+    if (function_exists('posix_isatty')) {
+        return @posix_isatty(STDIN);
+    }
+
+    return false;
 }
 
 /**
@@ -81,11 +109,13 @@ if (isWindows()) {
 
 $dbPath = $basePath . (isWindows() ? '\\data\\chilemon.sqlite' : '/data/chilemon.sqlite');
 $schema = $basePath . (isWindows() ? '\\install\\sql\\schema.sql' : '/install/sql/schema.sql');
+$interactive = isInteractiveCli();
 
 echo "📌 BasePath : {$basePath}\n";
 echo "📌 DB Path  : {$dbPath}\n";
 echo "📌 Schema   : {$schema}\n";
-echo "📌 Usuario actual (CLI): " . currentUser() . "\n\n";
+echo "📌 Usuario actual (CLI): " . currentUser() . "\n";
+echo "📌 Modo interactivo: " . ($interactive ? 'sí' : 'no') . "\n\n";
 
 // Extensiones requeridas
 if (!extension_loaded('pdo_sqlite') || !extension_loaded('sqlite3')) {
@@ -144,17 +174,34 @@ try {
     // Aplicar schema SIEMPRE (soporta upgrades sin romper)
     echo "📦 Aplicando schema.sql (upgrade-safe)...\n";
     $sql = file_get_contents($schema);
-    if ($sql === false || trim($sql) === '') fail("schema.sql está vacío o no se pudo leer.");
+    if ($sql === false || trim($sql) === '') {
+        fail("schema.sql está vacío o no se pudo leer.");
+    }
 
     $pdo->beginTransaction();
     try {
         $pdo->exec($sql);
         $pdo->commit();
     } catch (Throwable $e) {
-        if ($pdo->inTransaction()) $pdo->rollBack();
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
         throw $e;
     }
     echo "✅ Schema aplicado.\n";
+
+    /**
+     * Si no hay terminal interactiva, no intentamos crear usuario.
+     * Esto permite que install/install_chilemon.sh ejecute este script
+     * como www-data sin quedarse bloqueado esperando input.
+     */
+    if (!$interactive) {
+        echo "ℹ️  No hay terminal interactiva disponible.\n";
+        echo "ℹ️  Se omite la creación de usuario en este paso.\n";
+        echo "ℹ️  Luego puede crear el usuario admin ejecutando este script manualmente en terminal.\n";
+        echo "🚀 Instalación/upgrade finalizado\n\n";
+        exit(0);
+    }
 
     // ¿Ya existe algún usuario?
     $hasAnyUser = (int)($pdo->query("SELECT COUNT(*) FROM users")->fetchColumn() ?: 0);
@@ -173,20 +220,30 @@ try {
     echo "\n👤 Crear usuario\n";
 
     $username = prompt("Usuario (min 3 chars): ");
-    if (strlen($username) < 3) fail("El usuario debe tener al menos 3 caracteres.");
+    if (strlen($username) < 3) {
+        fail("El usuario debe tener al menos 3 caracteres.");
+    }
 
     $stmt = $pdo->prepare("SELECT id FROM users WHERE username = ?");
     $stmt->execute([$username]);
-    if ($stmt->fetch()) fail("El usuario '{$username}' ya existe.");
+    if ($stmt->fetch()) {
+        fail("El usuario '{$username}' ya existe.");
+    }
 
     $password = promptHidden("Contraseña (min 8 chars): ");
-    if (strlen($password) < 8) fail("La contraseña debe tener mínimo 8 caracteres.");
+    if (strlen($password) < 8) {
+        fail("La contraseña debe tener mínimo 8 caracteres.");
+    }
 
     $confirm = promptHidden("Confirmar contraseña: ");
-    if ($password !== $confirm) fail("Las contraseñas no coinciden.");
+    if ($password !== $confirm) {
+        fail("Las contraseñas no coinciden.");
+    }
 
     $hash = password_hash($password, PASSWORD_DEFAULT);
-    if ($hash === false) fail("No se pudo generar hash de contraseña.");
+    if ($hash === false) {
+        fail("No se pudo generar hash de contraseña.");
+    }
 
     $insert = $pdo->prepare("INSERT INTO users (username, password_hash) VALUES (?, ?)");
     $insert->execute([$username, $hash]);
@@ -198,6 +255,8 @@ try {
         echo "Accede en: http://localhost/chilemon/\n\n";
     } else {
         echo "Accede en: https://<tu-nodo>/chilemon/\n\n";
+        echo "Si su servidor ya tiene HTTPS activo, pruebe también: https://<tu-nodo>/chilemon/\n\n";
+
     }
 
 } catch (Throwable $e) {

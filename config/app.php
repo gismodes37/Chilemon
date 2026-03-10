@@ -19,11 +19,31 @@ if (!defined('LOG_PATH')) {
     define('LOG_PATH', ROOT_PATH . '/logs');
 }
 
+/**
+ * Carga configuración local del nodo si existe.
+ * Este archivo NO debe versionarse.
+ */
+$localConfig = [];
+$localConfigFile = ROOT_PATH . '/config/local.php';
+
+if (file_exists($localConfigFile)) {
+    $loadedLocalConfig = require $localConfigFile;
+    if (is_array($loadedLocalConfig)) {
+        $localConfig = $loadedLocalConfig;
+    }
+}
+
 if (!defined('HEADER_TAGLINE')) {
-    // Texto personalizable debajo del logo/título
-    define('HEADER_TAGLINE', getenv('CHILEMON_HEADER_TAGLINE')
-    // Acá pon tu Texto personalizado, respeta las comillas
-    ?: 'Primer nodo de La Serena - Chile 61916 CA2IIG');
+    // Texto personalizable debajo del logo/título.
+    // Prioridad:
+    // 1. Variable de entorno
+    // 2. config/local.php
+    // 3. Texto por defecto actual
+    define(
+        'HEADER_TAGLINE',
+        getenv('CHILEMON_HEADER_TAGLINE')
+            ?: ($localConfig['header_tagline'] ?? 'Puedes perzonalizar esta linea de cabecera')
+    );
 }
 
 if (!defined('APP_NAME')) {
@@ -34,7 +54,23 @@ if (!defined('APP_ENV')) {
     define('APP_ENV', getenv('CHILEMON_ENV') ?: 'prod');
 }
 if (!defined('ASL_NODE')) {
-    define('ASL_NODE', getenv('CHILEMON_NODE') ?: '61916');
+    /**
+     * Prioridad:
+     * 1. Variable de entorno CHILEMON_NODE
+     * 2. config/local.php => local_node
+     * 3. Fallback temporal de compatibilidad
+     *
+     * Nota:
+     * El valor '61916' debería eliminarse en la fase final,
+     * cuando el instalador genere siempre config/local.php.
+     */
+    define(
+        'ASL_NODE',
+        (string) (
+            getenv('CHILEMON_NODE')
+                ?: ($localConfig['local_node'] ?? '61916')
+        )
+    );
 }
 
 $isCli = (PHP_SAPI === 'cli' || PHP_SAPI === 'phpdbg');
@@ -147,21 +183,42 @@ if (APP_ENV === 'dev') {
  */
 
 if (!defined('AMI_HOST')) {
-    define('AMI_HOST', getenv('CHILEMON_AMI_HOST') ?: '127.0.0.1');
+    define(
+        'AMI_HOST',
+        getenv('CHILEMON_AMI_HOST')
+            ?: ($localConfig['ami_host'] ?? '127.0.0.1')
+    );
 }
 
 if (!defined('AMI_PORT')) {
-    define('AMI_PORT', (int)(getenv('CHILEMON_AMI_PORT') ?: 5038));
+    define(
+        'AMI_PORT',
+        (int) (
+            getenv('CHILEMON_AMI_PORT')
+                ?: ($localConfig['ami_port'] ?? 5038)
+        )
+    );
 }
 
 if (!defined('AMI_USER')) {
-    define('AMI_USER', getenv('CHILEMON_AMI_USER') ?: 'admin');
+    define(
+        'AMI_USER',
+        getenv('CHILEMON_AMI_USER')
+            ?: ($localConfig['ami_user'] ?? 'admin')
+    );
 }
 
 if (!defined('AMI_PASS')) {
-    define('AMI_PASS', getenv('CHILEMON_AMI_PASS') ?: 'angE29angE64');
+    define(
+        'AMI_PASS',
+        getenv('CHILEMON_AMI_PASS')
+            ?: ($localConfig['ami_pass'] ?? 'angE29angE64')
+    );
 }
 
 if (!defined('AMI_TIMEOUT')) {
-    define('AMI_TIMEOUT', 3);
+    define(
+        'AMI_TIMEOUT',
+        (int) ($localConfig['ami_timeout'] ?? 3)
+    );
 }
