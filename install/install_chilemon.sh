@@ -306,7 +306,8 @@ run_php_installer() {
         warn "No existe bin/install.php. Se omite inicialización PHP."
         return
     fi
-    sudo -u www-data php "$INSTALLER_PHP"
+
+    sudo -u www-data env CHILEMON_NON_INTERACTIVE=1 php "$INSTALLER_PHP" </dev/null
     ok "Inicialización PHP ejecutada correctamente"
 }
 
@@ -393,9 +394,9 @@ main() {
     ok "Nodo local capturado: $local_node"
 
     step "4 de 8" "Preparando carpetas y permisos"
-    mkdir -p "$DATA_DIR" "$LOG_DIR" "$REPO_DIR/config"
-    chown -R www-data:www-data "$DATA_DIR" "$LOG_DIR"
-    chmod -R 775 "$DATA_DIR" "$LOG_DIR"
+    mkdir -p "$DATA_DIR" "$LOG_DIR" "$BACKUP_DIR" "$REPO_DIR/config"
+    chown -R www-data:www-data "$DATA_DIR" "$LOG_DIR" "$BACKUP_DIR"
+    chmod -R 775 "$DATA_DIR" "$LOG_DIR" "$BACKUP_DIR"
     ok "Carpetas preparadas y permisos aplicados"
 
     step "5 de 8" "Generando configuración local"

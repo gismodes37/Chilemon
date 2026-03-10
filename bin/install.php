@@ -74,6 +74,10 @@ function env(string $key): ?string
  */
 function isInteractiveCli(): bool
 {
+    if (getenv('CHILEMON_NON_INTERACTIVE') === '1') {
+        return false;
+    }
+
     if (PHP_SAPI !== 'cli') {
         return false;
     }
