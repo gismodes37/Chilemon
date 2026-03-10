@@ -99,7 +99,7 @@ function isInteractiveCli(): bool
 
 /**
  * BasePath:
- * - Si CHILEMON_BASE_PATH está definido, úsalo (dev/local).
+ * - Si CHILEMON_BASE_PATH está definido, úsalo ( dev/local ).
  * - Si no, default /opt/chilemon (producción).
  */
 $basePath = env('CHILEMON_BASE_PATH') ?? '/opt/chilemon';

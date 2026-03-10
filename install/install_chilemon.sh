@@ -22,8 +22,11 @@ WRAPPER_PATH="/usr/local/bin/chilemon-rpt"
 LOCAL_CONFIG="$REPO_DIR/config/local.php"
 LOG_DIR="$REPO_DIR/logs"
 DATA_DIR="$REPO_DIR/data"
+BACKUP_DIR="$REPO_DIR/backups"
 PUBLIC_DIR="$REPO_DIR/public"
 INSTALLER_PHP="$REPO_DIR/bin/install.php"
+MANAGER_CONF="/etc/asterisk/manager.conf"
+DEFAULT_NODE_PROTO="https"
 
 # Valores recomendados por defecto para AMI.
 DEFAULT_AMI_HOST="127.0.0.1"
@@ -128,6 +131,78 @@ validate_php_sqlite() {
     fi
 
     ok "PHP tiene cargados PDO, pdo_sqlite y sqlite3"
+}
+
+detect_server_host() {
+    local detected=""
+
+    detected="$(hostname -f 2>/dev/null || true)"
+    if [[ -z "$detected" || "$detected" == "(none)" ]]; then
+        detected="$(hostname 2>/dev/null || true)"
+    fi
+    if [[ -z "$detected" ]]; then
+        detected="localhost"
+    fi
+
+    printf '%s' "$detected"
+}
+
+detect_ami_user() {
+    local detected=""
+
+    if [[ -f "$MANAGER_CONF" ]]; then
+        detected="$(awk '
+            /^\[/ {
+                section=$0
+                gsub(/^\[/, "", section)
+                gsub(/\]$/, "", section)
+                if (section != "general" && section != "") {
+                    print section
+                    exit
+                }
+            }
+        ' "$MANAGER_CONF")"
+    fi
+
+    printf '%s' "${detected:-$DEFAULT_AMI_USER}"
+}
+
+detect_ami_host() {
+    local detected=""
+
+    if [[ -f "$MANAGER_CONF" ]]; then
+        detected="$(awk -F= '
+            /^[[:space:]]*bindaddr[[:space:]]*=/ {
+                gsub(/^[[:space:]]+|[[:space:]]+$/, "", $2)
+                sub(/[[:space:]]*;.*/, "", $2)
+                print $2
+                exit
+            }
+        ' "$MANAGER_CONF")"
+    fi
+
+    printf '%s' "${detected:-$DEFAULT_AMI_HOST}"
+}
+
+detect_ami_port() {
+    local detected=""
+
+    if [[ -f "$MANAGER_CONF" ]]; then
+        detected="$(awk -F= '
+            /^[[:space:]]*port[[:space:]]*=/ {
+                gsub(/^[[:space:]]+|[[:space:]]+$/, "", $2)
+                sub(/[[:space:]]*;.*/, "", $2)
+                print $2
+                exit
+            }
+        ' "$MANAGER_CONF")"
+    fi
+
+    if [[ ! "${detected:-}" =~ ^[0-9]+$ ]]; then
+        detected="$DEFAULT_AMI_PORT"
+    fi
+
+    printf '%s' "$detected"
 }
 
 escape_php_string() {
@@ -308,27 +383,75 @@ run_php_installer() {
     fi
 
     sudo -u www-data env CHILEMON_NON_INTERACTIVE=1 php "$INSTALLER_PHP" </dev/null
-    ok "Inicialización PHP ejecutada correctamente"
+    ok "Inicialización PHP ejecutada correctamente como www-data"
 }
+
+
+print_final_banner() {
+    local local_node="$1"
+    local server_host="$2"
+    local ami_user="$3"
+    local web_user="${4:-no definido}"
+
+    local C_RESET="\033[0m"
+    local C_CYAN="\033[1;36m"
+    local C_GREEN="\033[1;32m"
+    local C_YELLOW="\033[1;33m"
+    local C_WHITE="\033[1;37m"
+
+    echo
+    echo -e "${C_CYAN}================================================================${C_RESET}"
+    echo
+    echo -e "${C_GREEN}   ██████╗██╗  ██╗██╗██╗     ███████╗███╗   ███╗ ██████╗ ███╗   ██╗${C_RESET}"
+    echo -e "${C_GREEN}  ██╔════╝██║  ██║██║██║     ██╔════╝████╗ ████║██╔═══██╗████╗  ██║${C_RESET}"
+    echo -e "${C_GREEN}  ██║     ███████║██║██║     █████╗  ██╔████╔██║██║   ██║██╔██╗ ██║${C_RESET}"
+    echo -e "${C_GREEN}  ██║     ██╔══██║██║██║     ██╔══╝  ██║╚██╔╝██║██║   ██║██║╚██╗██║${C_RESET}"
+    echo -e "${C_GREEN}  ╚██████╗██║  ██║██║███████╗███████╗██║ ╚═╝ ██║╚██████╔╝██║ ╚████║${C_RESET}"
+    echo -e "${C_GREEN}   ╚═════╝╚═╝  ╚═╝╚═╝╚══════╝╚══════╝╚═╝     ╚═╝ ╚═════╝ ╚═╝  ╚═══╝${C_RESET}"
+    echo
+    echo -e "${C_YELLOW}                     ChileMon instalado correctamente${C_RESET}"
+    echo -e "${C_CYAN}================================================================${C_RESET}"
+    echo
+    echo -e "${C_WHITE}Tome nota de los siguientes datos importantes:${C_RESET}"
+    echo
+    echo -e " ${C_GREEN}Nodo ASL local :${C_RESET} ${local_node}"
+    echo -e " ${C_GREEN}Usuario AMI    :${C_RESET} ${ami_user}"
+    echo
+    echo -e " ${C_GREEN}Dirección nodo :${C_RESET} ${DEFAULT_NODE_PROTO}://${server_host}"
+    echo -e " ${C_GREEN}Acceso ChileMon:${C_RESET} ${DEFAULT_NODE_PROTO}://${server_host}/chilemon"
+    echo
+    echo -e " ${C_GREEN}Usuario web    :${C_RESET} ${web_user}"
+    echo
+    echo -e "${C_CYAN}----------------------------------------------------------------${C_RESET}"
+    echo -e "${C_WHITE}Pruebas rápidas:${C_RESET}"
+    echo
+    echo " sudo -u www-data sudo -n ${WRAPPER_PATH} nodes ${local_node}"
+    echo
+    echo " Abra en su navegador:"
+    echo " ${DEFAULT_NODE_PROTO}://${server_host}/chilemon"
+    echo -e "${C_CYAN}----------------------------------------------------------------${C_RESET}"
+    echo
+    echo -e "${C_YELLOW} Gracias por usar ChileMon 🇨🇱${C_RESET}"
+    echo -e "${C_CYAN}================================================================${C_RESET}"
+}
+
 
 validate_installation() {
     local local_node="$1"
     local server_host="$2"
+    local ami_user="$3"
+    local web_user="$4"
 
     echo
-    echo "Resumen final"
-    echo "-------------"
+    echo "Resumen técnico"
+    echo "---------------"
     echo "Proyecto : $REPO_DIR"
-    echo "Nodo ASL : $local_node"
-    echo "URL      : http://${server_host}/chilemon"
     echo "Wrapper  : $WRAPPER_PATH"
     echo "Config   : $LOCAL_CONFIG"
-    echo
-    echo "Pruebas rápidas sugeridas:"
-    echo "  sudo -u www-data sudo -n ${WRAPPER_PATH} nodes ${local_node}"
-    echo "  sudo -u www-data php ${INSTALLER_PHP}"
-    echo "  abrir en navegador: http://${server_host}/chilemon"
+
+    print_final_banner "$local_node" "$server_host" "$ami_user" "$web_user"
 }
+
 
 main() {
     require_root
@@ -356,42 +479,54 @@ main() {
     ensure_package sudo
     ok "Dependencias instaladas o ya presentes"
 
-    step "3 de 8" "Solicitando datos básicos del nodo"
+    step "3 de 8" "Detectando datos del nodo y solicitando confirmación"
+
     local local_node=""
     while [[ -z "$local_node" ]]; do
         read -r -p "Ingrese su nodo ASL local: " local_node
         [[ "$local_node" =~ ^[0-9]+$ ]] || { echo "Debe ingresar solo números."; local_node=""; }
     done
 
+    local detected_server_host=""
+    detected_server_host="$(detect_server_host)"
+
     local server_host=""
-    read -r -p "Ingrese IP o nombre del servidor [localhost]: " server_host
-    server_host="${server_host:-localhost}"
+    read -r -p "Nombre DNS o IP del servidor [${detected_server_host}]: " server_host
+    server_host="${server_host:-$detected_server_host}"
 
     local header_tagline=""
     read -r -p "Ingrese texto descriptivo del nodo [Nodo local ChileMon]: " header_tagline
     header_tagline="${header_tagline:-Nodo local ChileMon}"
 
-    echo
-    info "Se aplicará la configuración AMI recomendada para una instalación local:"
-    info "  Host    : ${DEFAULT_AMI_HOST}"
-    info "  Puerto  : ${DEFAULT_AMI_PORT}"
-    info "  Usuario : ${DEFAULT_AMI_USER}"
-    info "  Timeout : ${DEFAULT_AMI_TIMEOUT} segundos"
-    echo
+    local ami_host=""
+    ami_host="$(detect_ami_host)"
 
-    local ami_host="$DEFAULT_AMI_HOST"
-    local ami_port="$DEFAULT_AMI_PORT"
-    local ami_user="$DEFAULT_AMI_USER"
+    local ami_port=""
+    ami_port="$(detect_ami_port)"
+
+    local ami_user=""
+    ami_user="$(detect_ami_user)"
+
     local ami_timeout="$DEFAULT_AMI_TIMEOUT"
 
+    echo
+    info "Se detectó la siguiente configuración AMI:"
+    info "  Host    : ${ami_host}"
+    info "  Puerto  : ${ami_port}"
+    info "  Usuario : ${ami_user}"
+    info "  Timeout : ${ami_timeout} segundos"
+    echo
+
     local ami_pass=""
-    echo "Ingrese la clave AMI configurada en su instalación de ASL/Asterisk."
-    echo "Si la cambió durante la instalación, debe usar esa misma clave."
+    echo "Ingrese la clave AMI configurada en /etc/asterisk/manager.conf."
+    echo "El usuario AMI corresponde al nombre del bloque detectado, por ejemplo: [admin] => usuario admin."
     read -r -s -p "Ingrese clave AMI [Enter para usar valor por defecto actual]: " ami_pass
     echo
     ami_pass="${ami_pass:-angE29angE64}"
 
     ok "Nodo local capturado: $local_node"
+    ok "Servidor detectado/configurado: $server_host"
+    ok "Usuario AMI detectado: $ami_user"
 
     step "4 de 8" "Preparando carpetas y permisos"
     mkdir -p "$DATA_DIR" "$LOG_DIR" "$BACKUP_DIR" "$REPO_DIR/config"
@@ -421,7 +556,7 @@ main() {
     validate_php_sqlite
     run_php_installer
 
-    validate_installation "$local_node" "$server_host"
+    validate_installation "$local_node" "$server_host" "$ami_user" "definido durante inicialización"
 }
 
 main "$@"
