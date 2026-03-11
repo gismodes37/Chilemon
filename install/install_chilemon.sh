@@ -386,6 +386,20 @@ run_php_installer() {
     ok "Inicialización PHP ejecutada correctamente como www-data"
 }
 
+run_php_user_creation() {
+    if [[ ! -f "$INSTALLER_PHP" ]]; then
+        warn "No existe bin/install.php. Se omite creación de usuario."
+        return
+    fi
+
+    echo
+    echo "Se creará el primer usuario administrador de ChileMon."
+    echo
+
+    php "$INSTALLER_PHP"
+    ok "Creación de usuario completada"
+}
+
 
 print_final_banner() {
     local local_node="$1"
@@ -402,12 +416,12 @@ print_final_banner() {
     echo
     echo -e "${C_CYAN}================================================================${C_RESET}"
     echo
-    echo -e "${C_GREEN}   ██████╗██╗  ██╗██╗██╗     ███████╗███╗   ███╗ ██████╗ ███╗   ██╗${C_RESET}"
-    echo -e "${C_GREEN}  ██╔════╝██║  ██║██║██║     ██╔════╝████╗ ████║██╔═══██╗████╗  ██║${C_RESET}"
-    echo -e "${C_GREEN}  ██║     ███████║██║██║     █████╗  ██╔████╔██║██║   ██║██╔██╗ ██║${C_RESET}"
-    echo -e "${C_GREEN}  ██║     ██╔══██║██║██║     ██╔══╝  ██║╚██╔╝██║██║   ██║██║╚██╗██║${C_RESET}"
-    echo -e "${C_GREEN}  ╚██████╗██║  ██║██║███████╗███████╗██║ ╚═╝ ██║╚██████╔╝██║ ╚████║${C_RESET}"
-    echo -e "${C_GREEN}   ╚═════╝╚═╝  ╚═╝╚═╝╚══════╝╚══════╝╚═╝     ╚═╝ ╚═════╝ ╚═╝  ╚═══╝${C_RESET}"
+    echo -e "${C_BLUE}   ██████╗██╗  ██╗██╗██╗     ███████╗███╗   ███╗ ██████╗ ███╗   ██╗${C_RESET}"
+    echo -e "${C_BLUE}  ██╔════╝██║  ██║██║██║     ██╔════╝████╗ ████║██╔═══██╗████╗  ██║${C_RESET}"
+    echo -e "${C_BLUE}  ██║     ███████║██║██║     █████╗  ██╔████╔██║██║   ██║██╔██╗ ██║${C_RESET}"
+    echo -e "${C_BLUE}  ██║     ██╔══██║██║██║     ██╔══╝  ██║╚██╔╝██║██║   ██║██║╚██╗██║${C_RESET}"
+    echo -e "${C_BLUE}  ╚██████╗██║  ██║██║███████╗███████╗██║ ╚═╝ ██║╚██████╔╝██║ ╚████║${C_RESET}"
+    echo -e "${C_BLUE}   ╚═════╝╚═╝  ╚═╝╚═╝╚══════╝╚══════╝╚═╝     ╚═╝ ╚═════╝ ╚═╝  ╚═══╝${C_RESET}"
     echo
     echo -e "${C_YELLOW}                     ChileMon instalado correctamente${C_RESET}"
     echo -e "${C_CYAN}================================================================${C_RESET}"
@@ -552,11 +566,14 @@ main() {
     step "7 de 8" "Configurando Apache"
     write_apache_config
 
-    step "8 de 8" "Validando PHP e inicializando ChileMon"
+    step "8 de 9" "Validando PHP e inicializando ChileMon"
     validate_php_sqlite
     run_php_installer
 
-    validate_installation "$local_node" "$server_host" "$ami_user" "definido durante inicialización"
-}
+    step "9 de 9" "Creando usuario administrador de ChileMon"
+    run_php_user_creation
+
+    validate_installation "$local_node" "$server_host" "$ami_user" "definido durante instalación"
+    }
 
 main "$@"
