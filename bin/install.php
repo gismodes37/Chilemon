@@ -218,7 +218,7 @@ try {
             exit(0);
         }
     } else {
-        echo "👤 No hay usuarios. Se creará el primer usuario (admin).\n";
+        echo "👤 No hay usuarios. Se creará el primer usuario de ChileMon.\n";
     }
 
     echo "\n👤 Crear usuario\n";
@@ -234,14 +234,29 @@ try {
         fail("El usuario '{$username}' ya existe.");
     }
 
-    $password = promptHidden("Contraseña (min 8 chars): ");
-    if (strlen($password) < 8) {
-        fail("La contraseña debe tener mínimo 8 caracteres.");
-    }
+    while (true) {
+        $password = promptHidden("Contraseña: ");
 
-    $confirm = promptHidden("Confirmar contraseña: ");
-    if ($password !== $confirm) {
-        fail("Las contraseñas no coinciden.");
+        if ($password === '') {
+            fail("La contraseña no puede estar vacía.");
+        }
+
+        $confirm = promptHidden("Confirmar contraseña: ");
+        if ($password !== $confirm) {
+            echo "⚠️  Las contraseñas no coinciden. Intente nuevamente.\n";
+            continue;
+        }
+
+        if (strlen($password) < 8) {
+            echo "⚠️  Advertencia: la contraseña es débil (menos de 8 caracteres).\n";
+            $weakConfirm = strtolower(prompt("¿Desea continuar con esta contraseña? [s/N]: "));
+            if ($weakConfirm !== 's') {
+                echo "Ingrese una contraseña nueva.\n";
+                continue;
+            }
+        }
+
+        break;
     }
 
     $hash = password_hash($password, PASSWORD_DEFAULT);
@@ -260,7 +275,6 @@ try {
     } else {
         echo "Accede en: https://<tu-nodo>/chilemon/\n\n";
         echo "Si su servidor ya tiene HTTPS activo, pruebe también: https://<tu-nodo>/chilemon/\n\n";
-
     }
 
 } catch (Throwable $e) {
