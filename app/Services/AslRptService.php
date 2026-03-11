@@ -7,9 +7,6 @@ use RuntimeException;
 
 /**
  * AslRptService — Wrapper PHP para chilemon-rpt.
- *
- * Usa exec() para capturar exit code correctamente.
- * shell_exec() retorna NULL en comandos silenciosos → falso error.
  */
 final class AslRptService
 {
@@ -51,7 +48,7 @@ final class AslRptService
     }
 
     /**
-     * Parsea output de "rpt nodes" → array de IDs numéricos sin prefijo T/R/L.
+     * Parsea output simple de "rpt nodes" → array de IDs numéricos sin prefijo T/R/L.
      * Ejemplo entrada: "T1001, T2450, T52764"
      * Ejemplo salida:  ["1001", "2450", "52764"]
      */
@@ -60,16 +57,50 @@ final class AslRptService
         $nodes = [];
         foreach (preg_split('/[\r\n,]+/', $raw) as $token) {
             $token = trim($token);
-            if ($token === '' || $token === '<NONE>') continue;
-            if (strpos($token, 'CONNECTED NODES') !== false) continue;
-            if (isset($token[0]) && $token[0] === '*') continue;
+            if ($token === '' || $token === '<NONE>') {
+                continue;
+            }
+            if (strpos($token, 'CONNECTED NODES') !== false) {
+                continue;
+            }
+            if (isset($token[0]) && $token[0] === '*') {
+                continue;
+            }
 
-            // Quitar prefijo de tipo: T, R, L, t, r, l
             $nodeId = ltrim($token, 'TRLtrl');
             if ($nodeId !== '' && ctype_digit($nodeId)) {
                 $nodes[] = $nodeId;
             }
         }
+
+        return array_values(array_unique($nodes));
+    }
+
+    /**
+     * Parsea stats tipo:
+     * Nodes currently connected to us..................: 54614
+     * o eventualmente múltiples nodos separados por coma.
+     */
+    public static function parseDirectNodesFromStats(string $raw): array
+    {
+        $matches = [];
+        if (!preg_match('/Nodes currently connected to us\.{3,}:\s*(.*)$/mi', $raw, $matches)) {
+            return [];
+        }
+
+        $value = trim((string)($matches[1] ?? ''));
+        if ($value === '' || strtoupper($value) === 'N/A' || strtoupper($value) === '<NONE>') {
+            return [];
+        }
+
+        $nodes = [];
+        foreach (preg_split('/[\s,]+/', $value) as $token) {
+            $token = trim($token);
+            if ($token !== '' && ctype_digit($token)) {
+                $nodes[] = $token;
+            }
+        }
+
         return array_values(array_unique($nodes));
     }
 
@@ -81,14 +112,24 @@ final class AslRptService
     {
         $data  = [];
         $lines = preg_split('/\r\n|\r|\n/', $raw);
+
         foreach ($lines as $line) {
-            if (strpos($line, '...') === false || strpos($line, ':') === false) continue;
+            if (strpos($line, '...') === false || strpos($line, ':') === false) {
+                continue;
+            }
+
             $parts = preg_split('/\.{3,}:\s*/', $line, 2);
-            if (!$parts || count($parts) < 2) continue;
+            if (!$parts || count($parts) < 2) {
+                continue;
+            }
+
             $k = trim($parts[0]);
             $v = trim($parts[1]);
-            if ($k !== '') $data[$k] = $v;
+            if ($k !== '') {
+                $data[$k] = $v;
+            }
         }
+
         return $data;
     }
 
@@ -112,6 +153,7 @@ final class AslRptService
             escapeshellarg($cmd),
             escapeshellarg($this->nodeId),
         ];
+
         if ($extraArg !== '') {
             $parts[] = escapeshellarg($extraArg);
         }

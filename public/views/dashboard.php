@@ -27,8 +27,6 @@ use App\Core\NodeLogger;
  * ---------------------------------------------------------
  * Actividad reciente
  * ---------------------------------------------------------
- * Si el logger o la tabla aún no están disponibles,
- * el dashboard sigue cargando sin romperse.
  */
 $recentEvents = [];
 
@@ -45,14 +43,12 @@ try {
  * ---------------------------------------------------------
  * Valores defensivos
  * ---------------------------------------------------------
- * Estas variables deberían venir definidas desde index.php,
- * pero dejamos fallback por estabilidad.
  */
-$ipv4_list   = $ipv4_list ?? [];
-$ipv6_list   = $ipv6_list ?? [];
-$nodos       = $nodos ?? [];
-$dbError     = $dbError ?? null;
-$darkMode    = $darkMode ?? true;
+$ipv4_list    = $ipv4_list ?? [];
+$ipv6_list    = $ipv6_list ?? [];
+$nodos        = $nodos ?? [];
+$dbError      = $dbError ?? null;
+$darkMode     = $darkMode ?? true;
 $estadisticas = $estadisticas ?? [
     'total_nodos'    => 0,
     'nodos_online'   => 0,
@@ -73,7 +69,6 @@ $systemInfo = $systemInfo ?? [
 <?php require __DIR__ . '/partials/head.php'; ?>
 <?php require __DIR__ . '/partials/header.php'; ?>
 
-<!-- Panel de control principal -->
 <main class="container mt-4">
 
     <?php if (!empty($dbError)): ?>
@@ -83,9 +78,6 @@ $systemInfo = $systemInfo ?? [
         </div>
     <?php endif; ?>
 
-    <!-- =====================================================
-         Panel de accesos rápidos
-         ===================================================== -->
     <div class="acceso-rapido">
         <div class="row align-items-center">
             <div class="col-12">
@@ -128,9 +120,9 @@ $systemInfo = $systemInfo ?? [
                         title="Reiniciar el servicio Apache">
                         <i class="bi bi-arrow-repeat"></i> Reiniciar Apache
                     </button>
-                    <button class="btn btn-outline-danger" id="btn-restart-apache"
-                        onclick="confirmarReinicio('Apache', '#')"
-                        title="Reiniciar el servicio Apache">
+                    <button class="btn btn-outline-danger" id="btn-power-node"
+                        onclick="confirmarReinicio('Nodo', '#')"
+                        title="Apagar el nodo">
                         <i class="bi bi-power"></i> Apagar Nodo
                     </button>
                 </div>
@@ -138,9 +130,6 @@ $systemInfo = $systemInfo ?? [
         </div>
     </div>
 
-    <!-- =====================================================
-         Panel de conexión rápida
-         ===================================================== -->
     <div class="control-panel">
         <div class="row align-items-center">
             <div class="col-md-4">
@@ -179,15 +168,12 @@ $systemInfo = $systemInfo ?? [
         </div>
     </div>
 
-    <!-- =====================================================
-         Tabla de nodos monitoreados
-         ===================================================== -->
     <div class="card shadow-sm">
         <div class="card-header bg-dark text-white">
             <h3 class="h5 mb-0">
                 <i class="bi bi-diagram-3"></i> Nodos ASL Monitoreados
                 <span class="badge bg-light text-dark ms-2">
-                    <?= (int)($estadisticas['total_nodos'] ?? 0) ?>
+                    <?= (int)($estadisticas['total_nodos'] ?? count($nodos)) ?>
                 </span>
             </h3>
         </div>
@@ -217,47 +203,32 @@ $systemInfo = $systemInfo ?? [
                         <?php else: ?>
                             <?php foreach ($nodos as $nodo): ?>
                                 <?php
-                                /**
-                                 * -------------------------------------------------
-                                 * Normalización defensiva por fila
-                                 * -------------------------------------------------
-                                 * Muchos de estos campos son opcionales o aún
-                                 * no existen en SQLite.
-                                 */
-                                $nodeId    = (string)($nodo['node_id'] ?? '');
-                                $nodeName  = (string)($nodo['name'] ?? ('Nodo ' . $nodeId));
-                                $frequency = (string)($nodo['frequency'] ?? '');
-                                $mode      = (string)($nodo['mode'] ?? 'ASL');
+                                $nodeId         = (string)($nodo['node'] ?? $nodo['node_id'] ?? '');
+                                $nodeInfo       = (string)($nodo['info'] ?? $nodo['name'] ?? ('Nodo ' . $nodeId));
+                                $receivedText   = (string)($nodo['received'] ?? '--');
+                                $directionText  = (string)($nodo['direction'] ?? '');
+                                $connectedText  = (string)($nodo['connected'] ?? '--');
+                                $modeText       = (string)($nodo['mode'] ?? 'ASL');
+                                $isOnline       = (bool)($nodo['online'] ?? false);
+                                $visibilityType = (string)($nodo['visibility_type'] ?? '');
 
-                                $connectionStatus = (string)($nodo['connection_status'] ?? 'offline');
-                                $minutesAgo       = (int)($nodo['minutes_ago'] ?? 9999);
-
-                                $badgeClass = $connectionStatus === 'online'
-                                    ? 'bg-success'
-                                    : ($connectionStatus === 'idle' ? 'bg-warning' : 'bg-danger');
-
-                                /**
-                                 * Tiempo "Recibido"
-                                 * Hoy sigue siendo una aproximación basada en last_seen.
-                                 */
-                                if ($minutesAgo < 0) {
-                                    $minutesAgo = 0;
+                                if ($visibilityType === 'direct') {
+                                    $badgeClass = 'bg-success';
+                                    $linkLabel  = 'DIRECTO';
+                                } elseif ($visibilityType === 'visible') {
+                                    $badgeClass = 'bg-info';
+                                    $linkLabel  = 'VISIBLE';
+                                } else {
+                                    $badgeClass = 'bg-secondary';
+                                    $linkLabel  = 'DESCONOCIDO';
                                 }
 
-                                $receivedText = ($minutesAgo < 60)
-                                    ? '00:00:' . str_pad((string)$minutesAgo, 2, '0', STR_PAD_LEFT)
-                                    : 'Nunca';
+                                if ($receivedText === '') {
+                                    $receivedText = '--';
+                                }
 
-                                /**
-                                 * Tiempo "Conectado"
-                                 * Aún es una aproximación visual.
-                                 * Más adelante se puede reemplazar por duración real.
-                                 */
-                                if ($connectionStatus === 'online') {
-                                    $connectedText = '00:' .
-                                        str_pad((string)random_int(1, 59), 2, '0', STR_PAD_LEFT) . ':' .
-                                        str_pad((string)random_int(10, 59), 2, '0', STR_PAD_LEFT);
-                                } else {
+                                if (!$isOnline && $visibilityType !== 'direct') {
+                                    $directionText = '';
                                     $connectedText = '--';
                                 }
                                 ?>
@@ -270,14 +241,7 @@ $systemInfo = $systemInfo ?? [
 
                                     <td>
                                         <div>
-                                            <strong><?= htmlspecialchars($nodeName, ENT_QUOTES, 'UTF-8') ?></strong>
-                                            <?php if ($frequency !== ''): ?>
-                                                <br>
-                                                <small class="text-muted">
-                                                    <i class="bi bi-radioactive"></i>
-                                                    <?= htmlspecialchars($frequency, ENT_QUOTES, 'UTF-8') ?> MHz
-                                                </small>
-                                            <?php endif; ?>
+                                            <strong><?= htmlspecialchars($nodeInfo, ENT_QUOTES, 'UTF-8') ?></strong>
                                         </div>
                                     </td>
 
@@ -285,19 +249,25 @@ $systemInfo = $systemInfo ?? [
 
                                     <td>
                                         <span class="badge <?= $badgeClass ?>">
-                                            <?= htmlspecialchars(strtoupper($connectionStatus), ENT_QUOTES, 'UTF-8') ?>
+                                            <?= htmlspecialchars($linkLabel, ENT_QUOTES, 'UTF-8') ?>
                                         </span>
                                     </td>
 
                                     <td>
-                                        <span class="badge bg-info">IN</span>
+                                        <?php if ($directionText !== ''): ?>
+                                            <span class="badge bg-info">
+                                                <?= htmlspecialchars($directionText, ENT_QUOTES, 'UTF-8') ?>
+                                            </span>
+                                        <?php else: ?>
+                                            <span class="text-muted">--</span>
+                                        <?php endif; ?>
                                     </td>
 
                                     <td><?= htmlspecialchars($connectedText, ENT_QUOTES, 'UTF-8') ?></td>
 
                                     <td>
                                         <span class="badge bg-secondary">
-                                            <?= htmlspecialchars($mode, ENT_QUOTES, 'UTF-8') ?>
+                                            <?= htmlspecialchars($modeText, ENT_QUOTES, 'UTF-8') ?>
                                         </span>
                                     </td>
 
@@ -336,9 +306,6 @@ $systemInfo = $systemInfo ?? [
         </div>
     </div>
 
-    <!-- =====================================================
-         Actividad reciente
-         ===================================================== -->
     <div class="card shadow-sm mt-4">
         <div class="card-header d-flex justify-content-between align-items-center">
             <h6 class="mb-0"><i class="bi bi-activity"></i> Actividad reciente</h6>
@@ -400,9 +367,6 @@ $systemInfo = $systemInfo ?? [
         </div>
     </div>
 
-    <!-- =====================================================
-         Panel de información del sistema Raspberry Pi
-         ===================================================== -->
     <div class="row mt-4" id="system-info-section">
         <div class="col-md-12">
             <div class="card system-card">
@@ -533,9 +497,6 @@ $systemInfo = $systemInfo ?? [
         </div>
     </div>
 
-    <!-- =====================================================
-         Información resumida del sistema
-         ===================================================== -->
     <div class="row mt-4">
         <div class="col-md-4">
             <div class="card system-card">
@@ -564,7 +525,7 @@ $systemInfo = $systemInfo ?? [
                 <div class="card-body">
                     <p class="mb-1">
                         <i class="bi bi-diagram-3 text-primary"></i>
-                        Nodos totales: <strong><?= (int)($estadisticas['total_nodos'] ?? 0) ?></strong>
+                        Nodos totales: <strong><?= (int)($estadisticas['total_nodos'] ?? count($nodos)) ?></strong>
                     </p>
                     <p class="mb-1">
                         <i class="bi bi-check-circle text-success"></i>
@@ -601,9 +562,6 @@ $systemInfo = $systemInfo ?? [
         </div>
     </div>
 
-    <!-- =====================================================
-         Modal Favoritos
-         ===================================================== -->
     <div class="modal fade" id="favoritesModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-lg modal-dialog-centered">
             <div class="modal-content">
@@ -671,9 +629,6 @@ $systemInfo = $systemInfo ?? [
     </div>
 </main>
 
-<!-- =====================================================
-     Modal de confirmación de reinicio
-     ===================================================== -->
 <div class="modal fade" id="modalReinicio" tabindex="-1" aria-labelledby="modalReicioLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-danger">
