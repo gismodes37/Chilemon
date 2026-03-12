@@ -193,7 +193,7 @@ $systemInfo = $systemInfo ?? [
                             <th width="150">Acciones</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="nodes-table-body">
                         <?php if (empty($nodos)): ?>
                             <tr>
                                 <td colspan="8" class="text-center py-4 text-muted">
@@ -211,6 +211,9 @@ $systemInfo = $systemInfo ?? [
                                 $modeText       = (string)($nodo['mode'] ?? 'ASL');
                                 $isOnline       = (bool)($nodo['online'] ?? false);
                                 $visibilityType = (string)($nodo['visibility_type'] ?? '');
+                                $remoteVisible  = $nodo['remote_visible'] ?? [];
+                                $remoteCount    = (int)($nodo['remote_count'] ?? 0);
+                                $canShowRemote  = (bool)($nodo['can_show_remote'] ?? false);
 
                                 if ($visibilityType === 'direct') {
                                     $badgeClass = 'bg-success';
@@ -232,17 +235,32 @@ $systemInfo = $systemInfo ?? [
                                     $connectedText = '--';
                                 }
                                 ?>
-                                <tr>
+                                <tr
+                                id="node-row-<?= htmlspecialchars($nodeId, ENT_QUOTES, 'UTF-8') ?>"
+                                class="<?= $visibilityType === 'direct' ? 'node-row-direct' : 'node-row-visible' ?>">
                                     <td>
-                                        <strong class="font-monospace">
-                                            <?= htmlspecialchars($nodeId, ENT_QUOTES, 'UTF-8') ?>
-                                        </strong>
-                                    </td>
+                                        <?php if ($canShowRemote): ?>
+                                            <button
+                                                type="button"
+                                                class="btn btn-link p-0 text-decoration-none fw-bold font-monospace"
+                                                onclick='openRemoteNodesModal(
+                                                    "<?= htmlspecialchars($nodeId, ENT_QUOTES, 'UTF-8') ?>",
+                                                    <?= json_encode(array_values($remoteVisible), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>,
+                                                    <?= json_encode($remoteScope, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>
+                                                )'
+                                                title="<?= $remoteScope === 'global' ? 'Ver topología global visible (mezcla varios enlaces)' : 'Ver nodos visibles en la red remota' ?>">
 
-                                    <td>
-                                        <div>
-                                            <strong><?= htmlspecialchars($nodeInfo, ENT_QUOTES, 'UTF-8') ?></strong>
-                                        </div>
+                                                <?= htmlspecialchars($nodeId, ENT_QUOTES, 'UTF-8') ?>
+                                            </button>
+
+                                            <?php if ($remoteCount > 0): ?>
+                                             <small class="text-info ms-1">(<?= $remoteCount ?>)</small>
+                                            <?php endif; ?>
+                                        <?php else: ?>
+                                            <span class="fw-bold font-monospace">
+                                                <?= htmlspecialchars($nodeId, ENT_QUOTES, 'UTF-8') ?>
+                                            </span>
+                                        <?php endif; ?>
                                     </td>
 
                                     <td><?= htmlspecialchars($receivedText, ENT_QUOTES, 'UTF-8') ?></td>
@@ -676,6 +694,43 @@ function confirmarReinicio(servicio, url) {
     new bootstrap.Modal(document.getElementById('modalReinicio')).show();
 }
 </script>
+
+<div class="modal fade" id="remoteNodesModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-diagram-3"></i>
+                    Red remota visible — Nodo <span id="remoteNodesModalNode">--</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+
+            <div class="modal-body">
+                <p class="text-muted mb-3" id="remoteNodesModalSummary">
+                    Sin datos.
+                </p>
+
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th style="width: 120px;">Nodo</th>
+                                <th>Relación</th>
+                            </tr>
+                        </thead>
+                        <tbody id="remoteNodesModalBody">
+                            <tr>
+                                <td colspan="2" class="text-muted">Sin nodos visibles.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 
 <?php
 require __DIR__ . '/partials/footer.php';

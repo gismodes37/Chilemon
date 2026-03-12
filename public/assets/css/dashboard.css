@@ -467,3 +467,106 @@ html, body{
     margin-left: 0;
   }
 }
+
+
+/* =========================================
+   ChileMon - Tabla principal compacta real
+========================================= */
+
+.supermon-table {
+    font-size: 0.82rem;
+}
+
+.supermon-table th,
+.supermon-table td {
+    padding: 0.22rem 0.42rem !important;
+    vertical-align: middle !important;
+    font-size: 0.82rem !important;
+    line-height: 1 !important;
+}
+
+.supermon-table th {
+    white-space: nowrap;
+    font-size: 0.74rem !important;
+}
+
+.supermon-table td > div {
+    margin: 0 !important;
+    line-height: 1 !important;
+}
+
+.supermon-table td small {
+    font-size: 0.64rem !important;
+    line-height: 1 !important;
+    display: inline;
+}
+
+.supermon-table .badge {
+    font-size: 0.62rem !important;
+    padding: 0.14rem 0.30rem !important;
+    line-height: 1 !important;
+    border-radius: 0.28rem;
+}
+
+.supermon-table .btn-group {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 0.10rem;
+    align-items: center;
+}
+
+.supermon-table .btn-group > .btn,
+.supermon-table .btn-sm,
+.supermon-table .btn-group-sm > .btn,
+.supermon-table .btn-group .btn {
+    padding: 0.12rem 0.28rem !important;
+    font-size: 0.66rem !important;
+    line-height: 1 !important;
+    min-height: unset !important;
+}
+
+.supermon-table .btn-link {
+    font-size: 0.82rem !important;
+    line-height: 1 !important;
+}
+
+.supermon-table td:last-child {
+    white-space: nowrap;
+    width: 1%;
+}
+
+
+/* =========================================
+   ChileMon - Vida visual del dashboard
+========================================= */
+
+@keyframes chilemonRowPulse {
+    0%   { box-shadow: inset 0 0 0 rgba(13, 202, 240, 0); }
+    50%  { box-shadow: inset 0 0 0 9999px rgba(13, 202, 240, 0.16); }
+    100% { box-shadow: inset 0 0 0 rgba(13, 202, 240, 0); }
+}
+
+@keyframes chilemonRowFlash {
+    0%   { background-color: rgba(40, 167, 69, 0.28); }
+    100% { background-color: transparent; }
+}
+
+.supermon-table tr.node-row-active {
+    animation: chilemonRowPulse 1.6s ease-in-out 2;
+}
+
+.supermon-table tr.node-row-new {
+    animation: chilemonRowFlash 2.2s ease-out 1;
+}
+
+.supermon-table tr.node-row-direct td:first-child {
+    border-left: 3px solid rgba(40, 167, 69, 0.85);
+}
+
+.supermon-table tr.node-row-visible td:first-child {
+    border-left: 3px solid rgba(13, 202, 240, 0.85);
+}
+
+.supermon-table tr.node-row-active td {
+    transition: background-color 0.25s ease;
+}

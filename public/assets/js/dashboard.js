@@ -41,7 +41,6 @@
  * ============================================================= */
 const base = window.CHILEMON_BASE || "./";
 
-
 /* =============================================================
  * 2. CSRF — HELPERS PARA SEGURIDAD EN FORMULARIOS
  * -------------------------------------------------------------
@@ -61,7 +60,6 @@ function getCsrfToken() {
   const meta = document.querySelector('meta[name="csrf-token"]');
   return meta ? meta.getAttribute("content") || "" : "";
 }
-
 
 /* =============================================================
  * 3. HTTP HELPERS — postForm() y getJson()
@@ -172,7 +170,6 @@ async function getJson(url) {
   return json;
 }
 
-
 /* =============================================================
  * 4. SESIÓN EXPIRADA — handleUnauthorized()
  * -------------------------------------------------------------
@@ -213,7 +210,6 @@ function handleUnauthorized() {
   const loginUrl = base.replace(/\/+$/, "/") + "login.php";
   window.location.href = loginUrl;
 }
-
 
 /* =============================================================
  * 5. HELPERS UI
@@ -268,6 +264,212 @@ function setButtonLoading(button, isLoading, loadingText = "Procesando...") {
   }
 }
 
+function renderNodes(nodes) {
+  const tbody = document.getElementById("nodes-table-body");
+  if (!tbody) return;
+
+  if (!Array.isArray(nodes) || nodes.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="8" class="text-center py-3 text-muted">
+          Sin nodos conectados
+        </td>
+      </tr>`;
+    return;
+  }
+
+  tbody.innerHTML = nodes
+    .map((n) => {
+      const nodeId = escapeHtml(n.node || "");
+      const online = n.online ? "Sí" : "--";
+
+      return `
+  <tr
+    id="node-row-${nodeId}"
+    class="${n.visibility_type === "direct" ? "node-row-direct" : "node-row-visible"}">
+
+    <td class="fw-bold font-monospace">${nodeId}</td>
+
+    <td>${escapeHtml(n.info || "")}</td>
+
+    <td>${escapeHtml(n.received || "--")}</td>
+
+    <td>
+      <span class="badge ${n.visibility_type === "direct" ? "bg-success" : "bg-info"}">
+        ${escapeHtml(
+          n.visibility_type === "direct"
+            ? "DIRECTO"
+            : n.visibility_type === "visible"
+              ? "VISIBLE"
+              : "DESCONOCIDO",
+        )}
+      </span>
+    </td>
+
+    <td>
+      ${
+        n.direction
+          ? `<span class="badge bg-info">${escapeHtml(n.direction)}</span>`
+          : `<span class="text-muted">--</span>`
+      }
+    </td>
+
+    <td>${escapeHtml(n.connected || "--")}</td>
+
+    <td>
+      <span class="badge bg-secondary">${escapeHtml(n.mode || "ASL")}</span>
+    </td>
+
+    <td>
+      <div class="btn-group btn-group-sm">
+
+        <button class="btn btn-connect"
+          onclick="connectToSpecificNode('${nodeId}')">
+          <i class="bi bi-telephone"></i>
+        </button>
+
+        <button class="btn btn-outline-danger"
+          onclick="disconnectFromNodeConfirm('${nodeId}')">
+          <i class="bi bi-telephone-x"></i>
+        </button>
+
+      </div>
+    </td>
+
+  </tr>
+`;
+    })
+    .join("");
+}
+
+let chilemonPreviousNodeMap = new Map();
+
+function buildNodeMap(nodes) {
+  const map = new Map();
+
+  if (!Array.isArray(nodes)) return map;
+
+  for (const n of nodes) {
+    const id = String(n.node || n.node_id || "").trim();
+    if (!id) continue;
+
+    map.set(id, {
+      node: id,
+      link: String(n.link || ""),
+      direction: String(n.direction || ""),
+      connected: String(n.connected || ""),
+      mode: String(n.mode || ""),
+      online: !!n.online,
+      visibility_type: String(n.visibility_type || ""),
+      remote_count: Number(n.remote_count || 0),
+    });
+  }
+
+  return map;
+}
+
+function markNodeRowAlive(nodeId, isNew = false) {
+  const row = document.getElementById(`node-row-${nodeId}`);
+  if (!row) return;
+
+  row.classList.remove("node-row-active", "node-row-new");
+
+  // Forzar reflow para reiniciar animación
+  void row.offsetWidth;
+
+  row.classList.add("node-row-active");
+  if (isNew) {
+    row.classList.add("node-row-new");
+  }
+
+  setTimeout(() => {
+    row.classList.remove("node-row-active");
+    row.classList.remove("node-row-new");
+  }, 3500);
+}
+
+function detectChangedNodes(previousMap, nextNodes) {
+  const changed = [];
+  const nextMap = buildNodeMap(nextNodes);
+
+  for (const [nodeId, nextNode] of nextMap.entries()) {
+    const prevNode = previousMap.get(nodeId);
+
+    if (!prevNode) {
+      changed.push({ nodeId, isNew: true });
+      continue;
+    }
+
+    const changedFields =
+      prevNode.link !== nextNode.link ||
+      prevNode.direction !== nextNode.direction ||
+      prevNode.connected !== nextNode.connected ||
+      prevNode.mode !== nextNode.mode ||
+      prevNode.online !== nextNode.online ||
+      prevNode.visibility_type !== nextNode.visibility_type ||
+      prevNode.remote_count !== nextNode.remote_count;
+
+    if (changedFields) {
+      changed.push({ nodeId, isNew: false });
+    }
+  }
+
+  return {
+    changed,
+    nextMap,
+  };
+}
+
+function openRemoteNodesModal(directNode, remoteNodes, remoteScope = "direct") {
+  const modalNode = document.getElementById("remoteNodesModalNode");
+  const modalBody = document.getElementById("remoteNodesModalBody");
+  const modalSummary = document.getElementById("remoteNodesModalSummary");
+  const modalEl = document.getElementById("remoteNodesModal");
+
+  if (
+    !modalNode ||
+    !modalBody ||
+    !modalSummary ||
+    !modalEl ||
+    !window.bootstrap
+  ) {
+    return;
+  }
+
+  modalNode.textContent = directNode;
+
+  const nodes = Array.isArray(remoteNodes) ? remoteNodes : [];
+  const isGlobal = remoteScope === "global";
+
+  modalSummary.textContent = isGlobal
+    ? `Hay múltiples enlaces directos. Esta lista combina ${nodes.length} nodos visibles de la topología global actual.`
+    : `${nodes.length} nodos visibles en la red remota enlazada.`;
+
+  if (nodes.length === 0) {
+    modalBody.innerHTML = `
+      <tr>
+        <td colspan="2" class="text-muted">No se detectaron nodos remotos visibles.</td>
+      </tr>
+    `;
+  } else {
+    modalBody.innerHTML = nodes
+      .map(
+        (nodeId) => `
+      <tr>
+        <td class="fw-semibold font-monospace">${escapeHtml(nodeId)}</td>
+        <td class="text-muted">${
+          isGlobal
+            ? "Visible en la topología global actual"
+            : `Visible vía enlace con ${escapeHtml(directNode)}`
+        }</td>
+      </tr>
+    `,
+      )
+      .join("");
+  }
+
+  new window.bootstrap.Modal(modalEl).show();
+}
 
 /* =============================================================
  * 6. TEMA CLARO / OSCURO
@@ -329,7 +531,6 @@ function toggleTheme() {
   setThemeUI(nextDark);
 }
 
-
 /* =============================================================
  * 7. REFRESCO DEL DASHBOARD
  * -------------------------------------------------------------
@@ -367,15 +568,12 @@ function reloadDashboard() {
  */
 async function refreshNodesLive() {
   try {
-    const json = await getJson("api/ami/nodes.php");
+    const json = await getJson("api/nodes.php");
 
-    // Solo recargar si el endpoint respondió con éxito (json.ok = true)
     if (!json || !json.ok) return;
 
     reloadDashboard();
   } catch (e) {
-    // 401 ya fue manejado dentro de getJson() → handleUnauthorized()
-    // Otros errores (red caída, timeout): loguear sin recargar
     if (e.message !== "Unauthorized") {
       console.error("Error refrescando nodos:", e);
     }
@@ -391,10 +589,13 @@ async function refreshNodesLive() {
  */
 function afterNodeActionLive() {
   setTimeout(() => {
-    refreshNodesLive();
-  }, 1200);
-}
+    reloadDashboard();
+  }, 1800);
 
+  setTimeout(() => {
+    reloadDashboard();
+  }, 4500);
+}
 
 /* =============================================================
  * 8. ACCIONES DE NODOS — connect, disconnect, delete
@@ -535,7 +736,6 @@ function deleteNodeConfirm(nodeId) {
   deleteNode(nodeId);
 }
 
-
 /* =============================================================
  * 9. FAVORITOS — Modal Bootstrap 5 + CRUD + conectar
  * -------------------------------------------------------------
@@ -610,8 +810,8 @@ function setupFavoritesModal() {
           description,
         });
 
-        favoritesClearForm();       // limpiar formulario tras guardar
-        await favoritesReload();    // refrescar tabla de favoritos
+        favoritesClearForm(); // limpiar formulario tras guardar
+        await favoritesReload(); // refrescar tabla de favoritos
       } catch (err) {
         if (err.message !== "Unauthorized") {
           alert(`Error guardando favorito: ${err.message}`);
@@ -753,7 +953,6 @@ function renderFavorites(items) {
   });
 }
 
-
 /* =============================================================
  * 10. BOTÓN ACTUALIZAR MANUAL
  * -------------------------------------------------------------
@@ -769,7 +968,6 @@ function renderFavorites(items) {
 function refreshSystemInfo() {
   reloadDashboard();
 }
-
 
 /* =============================================================
  * 11. AUTO REFRESH AUTOMÁTICO
@@ -835,7 +1033,7 @@ function startChilemonAutoRefresh() {
 
   chilemonAutoRefresh = setInterval(async () => {
     try {
-      const json = await getJson("api/ami/nodes.php");
+      const json = await getJson("api/nodes.php");
 
       // Respuesta inválida o endpoint indicó error lógico → saltar tick
       if (!json || !json.ok) return;
@@ -850,11 +1048,24 @@ function startChilemonAutoRefresh() {
 
       // Comparar snapshot: si cambió algo en los nodos → recargar
       if (nextSnapshot !== chilemonLastNodeSnapshot) {
-        chilemonLastNodeSnapshot = nextSnapshot;
-        reloadDashboard();
-      }
-      // Si el snapshot es igual → no hacer nada (estado sin cambios)
+        const { changed, nextMap } = detectChangedNodes(
+          chilemonPreviousNodeMap,
+          json.nodes,
+        );
 
+        chilemonLastNodeSnapshot = nextSnapshot;
+        renderNodes(json.nodes);
+
+        requestAnimationFrame(() => {
+          changed.forEach((item) => {
+            markNodeRowAlive(item.nodeId, item.isNew);
+          });
+        });
+
+        chilemonPreviousNodeMap = nextMap;
+      }
+
+      // Si el snapshot es igual → no hacer nada (estado sin cambios)
     } catch (e) {
       // 401 → getJson ya llamó handleUnauthorized() → clearInterval en curso
       // Otros errores (red, timeout) → solo loguear, no cancelar el intervalo
@@ -862,9 +1073,8 @@ function startChilemonAutoRefresh() {
         console.debug("Auto refresh falló:", e.message);
       }
     }
-  }, 10000); // intervalo: 10 000ms = 10 segundos
+  }, 5000); // intervalo: 5 000ms = 5 segundos
 }
-
 
 /* =============================================================
  * 12. INIT — DOMContentLoaded
@@ -879,7 +1089,6 @@ function startChilemonAutoRefresh() {
  *   4. Iniciar auto refresh
  * ============================================================= */
 document.addEventListener("DOMContentLoaded", async () => {
-
   // 1. Sincronizar iconos del botón de tema con el atributo data-bs-theme
   //    que PHP ya aplicó en el <html> según la cookie chilemon_darkmode
   const isDark =
@@ -894,19 +1103,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   //    Si la sesión ya expiró aquí, handleUnauthorized() redirige
   //    y el flujo se corta antes de llegar a startChilemonAutoRefresh().
   try {
-    const json = await getJson("api/ami/nodes.php");
+    const json = await getJson("api/nodes.php");
     chilemonLastNodeSnapshot = buildNodeSnapshot(json);
-
-    // 4. Arrancar auto refresh solo si el snapshot inicial fue exitoso
+    chilemonPreviousNodeMap = buildNodeMap(json.nodes || []);
     startChilemonAutoRefresh();
-
   } catch (e) {
     if (e.message !== "Unauthorized") {
-      // Error de red en el arranque (no de sesión):
-      // snapshot vacío es aceptable, arrancar auto refresh de todas formas
       chilemonLastNodeSnapshot = "";
       startChilemonAutoRefresh();
     }
-    // Si es "Unauthorized" → handleUnauthorized() ya redirigió, no hacer nada más
   }
 });

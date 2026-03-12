@@ -53,11 +53,11 @@ $headerStyle = $headerImgUrl
           <span class="header-badge ms-2">Supermon Style</span>
         </h1>
 
-        <p class="mb-1 opacity-75">
+        <p class="mb-1 opacity-40">
           <i class="bi bi-wifi"></i> Dashboard para nodos
           <span class="badge text-dark" style="background-color:#66A01B;">AllStar Link</span>
           Chile
-        </p>
+        </p> 
 
         <?php if ($headerTaglineEsc !== ''): ?>
           <div class="header-tagline mb-1">

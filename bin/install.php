@@ -98,6 +98,71 @@ function isInteractiveCli(): bool
 }
 
 /**
+ * Devuelve la ruta a config/local.php según el base path.
+ */
+function localConfigPath(string $basePath): string
+{
+    return $basePath . (isWindows() ? '\\config\\local.php' : '/config/local.php');
+}
+
+/**
+ * Carga config/local.php si existe y devuelve array seguro.
+ */
+function loadLocalConfig(string $basePath): array
+{
+    $path = localConfigPath($basePath);
+
+    if (!is_file($path) || !is_readable($path)) {
+        return [];
+    }
+
+    $config = require $path;
+    return is_array($config) ? $config : [];
+}
+
+/**
+ * Detecta el esquema web probable para mostrar la URL de acceso.
+ * En CLI no existe $_SERVER['HTTPS'], así que miramos Apache.
+ */
+function detectAccessScheme(): string
+{
+    if (isWindows()) {
+        return 'http';
+    }
+
+    $portsConf = '/etc/apache2/ports.conf';
+    if (is_file($portsConf) && is_readable($portsConf)) {
+        $content = @file_get_contents($portsConf);
+        if (is_string($content) && preg_match('/^[ \t]*Listen[ \t]+443\b/m', $content)) {
+            return 'https';
+        }
+    }
+
+    return 'http';
+}
+
+/**
+ * Construye la URL final de acceso.
+ */
+function buildAccessUrl(string $basePath): string
+{
+    if (isWindows()) {
+        return 'http://localhost/chilemon/';
+    }
+
+    $config = loadLocalConfig($basePath);
+    $host = trim((string)($config['server_host'] ?? ''));
+
+    if ($host === '') {
+        $host = '<tu-nodo>';
+    }
+
+    $scheme = detectAccessScheme();
+
+    return sprintf('%s://%s/chilemon/', $scheme, $host);
+}
+
+/**
  * BasePath:
  * - Si CHILEMON_BASE_PATH está definido, úsalo ( dev/local ).
  * - Si no, default /opt/chilemon (producción).
@@ -269,13 +334,7 @@ try {
 
     echo "\n✅ Usuario creado correctamente: {$username}\n";
     echo "🚀 Instalación finalizada\n\n";
-
-    if (isWindows()) {
-        echo "Accede en: http://localhost/chilemon/\n\n";
-    } else {
-        echo "Accede en: https://<tu-nodo>/chilemon/\n\n";
-        echo "Si su servidor ya tiene HTTPS activo, pruebe también: https://<tu-nodo>/chilemon/\n\n";
-    }
+    echo "Accede en: " . buildAccessUrl($basePath) . "\n\n";
 
 } catch (Throwable $e) {
     fail("Error: " . $e->getMessage());

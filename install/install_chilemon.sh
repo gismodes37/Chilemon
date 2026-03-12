@@ -28,6 +28,29 @@ INSTALLER_PHP="$REPO_DIR/bin/install.php"
 MANAGER_CONF="/etc/asterisk/manager.conf"
 DEFAULT_NODE_PROTO="https"
 
+
+# ------------------------------------------------------------------------------
+# Colores de salida (seguros para set -u)
+# ------------------------------------------------------------------------------
+if [[ -t 1 ]]; then
+    C_RESET=$'\033[0m'
+    C_RED=$'\033[1;31m'
+    C_GREEN=$'\033[1;32m'
+    C_YELLOW=$'\033[1;33m'
+    C_BLUE=$'\033[1;34m'
+    C_CYAN=$'\033[1;36m'
+    C_WHITE=$'\033[1;37m'
+else
+    C_RESET=''
+    C_RED=''
+    C_GREEN=''
+    C_YELLOW=''
+    C_BLUE=''
+    C_CYAN=''
+    C_WHITE=''
+fi
+
+
 # Valores recomendados por defecto para AMI.
 DEFAULT_AMI_HOST="127.0.0.1"
 DEFAULT_AMI_PORT="5038"
@@ -146,6 +169,19 @@ detect_server_host() {
 
     printf '%s' "$detected"
 }
+
+detect_web_proto() {
+
+    # si Apache escucha en 443 asumimos https
+    if grep -q "Listen 443" /etc/apache2/ports.conf 2>/dev/null; then
+        echo "https"
+        return
+    fi
+
+    # fallback
+    echo "http"
+}
+
 
 detect_ami_user() {
     local detected=""
@@ -406,12 +442,7 @@ print_final_banner() {
     local server_host="$2"
     local ami_user="$3"
     local web_user="${4:-no definido}"
-
-    local C_RESET="\033[0m"
-    local C_CYAN="\033[1;36m"
-    local C_GREEN="\033[1;32m"
-    local C_YELLOW="\033[1;33m"
-    local C_WHITE="\033[1;37m"
+    local web_proto="${5:-http}"
 
     echo
     echo -e "${C_CYAN}================================================================${C_RESET}"
@@ -442,7 +473,7 @@ print_final_banner() {
     echo " sudo -u www-data sudo -n ${WRAPPER_PATH} nodes ${local_node}"
     echo
     echo " Abra en su navegador:"
-    echo " ${DEFAULT_NODE_PROTO}://${server_host}/chilemon"
+    echo " ${web_proto}://${server_host}/chilemon"
     echo -e "${C_CYAN}----------------------------------------------------------------${C_RESET}"
     echo
     echo -e "${C_YELLOW} Gracias por usar ChileMon 🇨🇱${C_RESET}"
@@ -455,6 +486,7 @@ validate_installation() {
     local server_host="$2"
     local ami_user="$3"
     local web_user="$4"
+    local web_proto="$5"
 
     echo
     echo "Resumen técnico"
@@ -463,7 +495,7 @@ validate_installation() {
     echo "Wrapper  : $WRAPPER_PATH"
     echo "Config   : $LOCAL_CONFIG"
 
-    print_final_banner "$local_node" "$server_host" "$ami_user" "$web_user"
+    print_final_banner "$local_node" "$server_host" "$ami_user" "$web_user" "$web_proto"
 }
 
 
@@ -507,6 +539,9 @@ main() {
     local server_host=""
     read -r -p "Nombre DNS o IP del servidor [${detected_server_host}]: " server_host
     server_host="${server_host:-$detected_server_host}"
+
+    local web_proto=""
+    web_proto="$(detect_web_proto)"
 
     local header_tagline=""
     read -r -p "Ingrese texto descriptivo del nodo [Nodo local ChileMon]: " header_tagline
@@ -573,7 +608,7 @@ main() {
     step "9 de 9" "Creando usuario administrador de ChileMon"
     run_php_user_creation
 
-    validate_installation "$local_node" "$server_host" "$ami_user" "definido durante instalación"
+    validate_installation "$local_node" "$server_host" "$ami_user" "definido durante instalación" "$web_proto"
     }
 
 main "$@"
