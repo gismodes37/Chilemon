@@ -336,7 +336,7 @@ write_wrapper_if_missing() {
 set -Eeuo pipefail
 
 usage() {
-    echo "Uso: chilemon-rpt {nodes|stats|connect|disconnect} <nodo_local> [nodo_remoto]" >&2
+    echo "Uso: chilemon-rpt {nodes|stats|connect|disconnect|sys-restart-asterisk|sys-restart-apache|sys-poweroff} [args...]" >&2
     exit 1
 }
 
@@ -349,23 +349,39 @@ main() {
     local local_node="${2:-}"
     local remote_node="${3:-}"
 
-    [[ -n "$action" && -n "$local_node" ]] || usage
-    is_number "$local_node" || usage
+    [[ -n "$action" ]] || usage
 
     case "$action" in
         nodes)
+            [[ -n "$local_node" ]] || usage
+            is_number "$local_node" || usage
             exec /usr/sbin/asterisk -rx "rpt nodes ${local_node}"
             ;;
         stats)
+            [[ -n "$local_node" ]] || usage
+            is_number "$local_node" || usage
             exec /usr/sbin/asterisk -rx "rpt stats ${local_node}"
             ;;
         connect)
+            [[ -n "$local_node" && -n "$remote_node" ]] || usage
+            is_number "$local_node" || usage
             is_number "$remote_node" || usage
             exec /usr/sbin/asterisk -rx "rpt fun ${local_node} *3${remote_node}"
             ;;
         disconnect)
+            [[ -n "$local_node" && -n "$remote_node" ]] || usage
+            is_number "$local_node" || usage
             is_number "$remote_node" || usage
             exec /usr/sbin/asterisk -rx "rpt fun ${local_node} *1${remote_node}"
+            ;;
+        sys-restart-asterisk)
+            exec systemctl restart asterisk
+            ;;
+        sys-restart-apache)
+            exec systemctl restart apache2
+            ;;
+        sys-poweroff)
+            exec poweroff
             ;;
         *)
             usage
@@ -529,7 +545,7 @@ main() {
 
     local local_node=""
     while [[ -z "$local_node" ]]; do
-        read -r -p "Ingrese su nodo ASL local: " local_node
+        read -r -p "Ingrese su N° de nodo ASL local: " local_node
         [[ "$local_node" =~ ^[0-9]+$ ]] || { echo "Debe ingresar solo números."; local_node=""; }
     done
 
@@ -568,9 +584,10 @@ main() {
 
     local ami_pass=""
     echo "Ingrese la clave AMI configurada en /etc/asterisk/manager.conf."
-    echo "El usuario AMI corresponde al nombre del bloque detectado, por ejemplo: [admin] => usuario admin."
+    echo "El usuario AMI corresponde al nombre del bloque detectado, "
+    echo "por ejemplo: [admin] => usuario admin."
     read -r -s -p "Ingrese clave AMI [Enter para usar valor por defecto actual]: " ami_pass
-    echo
+    echo ""
     ami_pass="${ami_pass:-angE29angE64}"
 
     ok "Nodo local capturado: $local_node"

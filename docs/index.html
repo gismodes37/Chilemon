@@ -116,13 +116,15 @@
           <span class="brand-badge"><i class="bi bi-shield-lock"></i> Login seguro</span>
           <span class="brand-badge"><i class="bi bi-database"></i> SQLite</span>
           <span class="brand-badge"><i class="bi bi-terminal"></i> Instalador guiado</span>
+          <span class="brand-badge"><i class="bi bi-broadcast-pin"></i> Live SSE</span>
+          <span class="brand-badge"><i class="bi bi-cpu"></i> Control de sistema</span>
         </div>
 
         <h1 class="display-5 fw-semibold mb-3">ChileMon</h1>
         <p class="lead opacity-90 mb-4">
           Dashboard moderno para nodos <strong>AllStarLink ASL3</strong>, con instalación guiada,
-          configuración local por nodo, autenticación, SQLite por defecto y una base segura para
-          seguir creciendo por etapas sin romper el sistema.
+          configuración local por nodo, autenticación, SQLite, actualización en tiempo real (SSE),
+          controles seguros de sistema y una arquitectura profesional PSR-4 lista para crecer.
         </p>
 
         <div class="d-flex flex-wrap gap-2">
@@ -320,11 +322,81 @@
           </div>
         </div>
 
+        <div class="col-md-6 col-lg-4">
+          <div class="card h-100 shadow-sm">
+            <div class="card-body p-4">
+              <div class="d-flex gap-3">
+                <div class="feature-icon"><i class="bi bi-broadcast-pin"></i></div>
+                <div>
+                  <h3 class="h5 mb-1">Live View (SSE)</h3>
+                  <p class="text-secondary mb-0">Actualización en tiempo real de la tabla de nodos vía Server-Sent Events, sin recargar la página.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-6 col-lg-4">
+          <div class="card h-100 shadow-sm">
+            <div class="card-body p-4">
+              <div class="d-flex gap-3">
+                <div class="feature-icon"><i class="bi bi-search"></i></div>
+                <div>
+                  <h3 class="h5 mb-1">Buscador de nodos en vivo</h3>
+                  <p class="text-secondary mb-0">Filtrado instantáneo de la tabla de nodos mientras escribes, sin depender del servidor.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-6 col-lg-4">
+          <div class="card h-100 shadow-sm">
+            <div class="card-body p-4">
+              <div class="d-flex gap-3">
+                <div class="feature-icon"><i class="bi bi-cpu"></i></div>
+                <div>
+                  <h3 class="h5 mb-1">Controles de sistema seguros</h3>
+                  <p class="text-secondary mb-0">Reiniciar Asterisk, reiniciar Apache o apagar el nodo desde el dashboard, con confirmación y permisos controlados vía wrapper.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-6 col-lg-4">
+          <div class="card h-100 shadow-sm">
+            <div class="card-body p-4">
+              <div class="d-flex gap-3">
+                <div class="feature-icon"><i class="bi bi-gear"></i></div>
+                <div>
+                  <h3 class="h5 mb-1">Autoloader PSR-4 nativo</h3>
+                  <p class="text-secondary mb-0">Arquitectura profesional con cargador automático de clases sin Composer ni dependencias externas.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-6 col-lg-4">
+          <div class="card h-100 shadow-sm">
+            <div class="card-body p-4">
+              <div class="d-flex gap-3">
+                <div class="feature-icon"><i class="bi bi-magic"></i></div>
+                <div>
+                  <h3 class="h5 mb-1">Autodescubrimiento de nodo</h3>
+                  <p class="text-secondary mb-0">Detecta automáticamente el nodo ASL desde el hostname del sistema. Funciona sin configuración manual.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
 
       <div class="alert alert-info mt-4">
         <i class="bi bi-lightbulb"></i>
-        Estado actual: <strong>core, instalador y primera operación básica ya funcionales</strong>. El siguiente foco es profundizar la integración operativa con Asterisk/ASL y mejorar la experiencia de usuario.
+        Estado actual: <strong>dashboard operativo con SSE en tiempo real, controles de sistema seguros, buscador de nodos y arquitectura profesional PSR-4</strong>. El foco es profundizar funcionalidades avanzadas de voz y telemetría.
       </div>
     </div>
   </section>
@@ -356,8 +428,9 @@
             <div class="card-body p-4">
               <h3 class="h5 mb-3"><i class="bi bi-lock"></i> Operación segura en el nodo</h3>
               <ul class="text-secondary mb-0">
-                <li><strong>Wrapper seguro</strong> para comandos rpt de Asterisk.</li>
+                <li><strong>Wrapper seguro</strong> para comandos rpt de Asterisk y acciones de sistema.</li>
                 <li><strong>sudoers acotado</strong> para <span class="kbd">www-data</span>.</li>
+                <li><strong>Controles de sistema blindados</strong>: reiniciar Asterisk/Apache y apagar nodo solo a través del wrapper pre-autorizado.</li>
                 <li><strong>Configuración local no versionada</strong>: <span class="kbd">config/local.php</span>.</li>
                 <li><strong>Validación de módulos PHP/SQLite</strong> antes de inicializar ChileMon.</li>
               </ul>
@@ -451,9 +524,9 @@
             ChileMon se instala en el nodo y publica su interfaz como <span class="kbd">/chilemon</span>. El instalador actual detecta hostname y parámetros AMI del entorno real cuando es posible.
           </p>
 
-          <h3 class="h5 mt-4">Requisitos</h3>
+          <h3 class="h5 mt-4">Requisitos y Entornos Probados</h3>
           <ul class="text-secondary">
-            <li>Debian / Raspberry Pi con ASL3</li>
+            <li><strong>Sistemas probados:</strong> Raspberry Pi 3B+ (ASL3) y Máquina Virtual Proxmox con Debian 13 (ASL3)</li>
             <li>Apache + PHP 8.x</li>
             <li>Extensiones PHP: <span class="kbd">PDO</span>, <span class="kbd">pdo_sqlite</span> y <span class="kbd">sqlite3</span></li>
             <li>Git instalado en el nodo</li>
@@ -504,13 +577,14 @@
               <ul class="text-secondary mb-0">
                 <li><strong>UI</strong>: <span class="kbd">public/views/*</span></li>
                 <li><strong>Auth</strong>: login/logout + sesión + CSRF</li>
-                <li><strong>API</strong>: <span class="kbd">public/api/*</span></li>
+                <li><strong>API</strong>: <span class="kbd">public/api/*</span> (REST + SSE)</li>
+                <li><strong>Controllers</strong>: <span class="kbd">app/Controllers/*</span></li>
+                <li><strong>Services</strong>: <span class="kbd">app/Services/AslRptService.php</span></li>
+                <li><strong>Autoloader</strong>: <span class="kbd">app/autoload.php</span> (PSR-4 nativo)</li>
                 <li><strong>DB</strong>: SQLite en <span class="kbd">data/chilemon.sqlite</span></li>
-                <li><strong>Schema</strong>: <span class="kbd">install/sql/schema.sql</span></li>
                 <li><strong>Config</strong>: <span class="kbd">config/app.php</span> + <span class="kbd">config/local.php</span></li>
                 <li><strong>Instalador</strong>: <span class="kbd">install/install_chilemon.sh</span></li>
-                <li><strong>Inicialización DB/usuarios</strong>: <span class="kbd">bin/install.php</span></li>
-                <li><strong>Wrapper Asterisk</strong>: <span class="kbd">/usr/local/bin/chilemon-rpt</span></li>
+                <li><strong>Wrapper</strong>: <span class="kbd">/usr/local/bin/chilemon-rpt</span> (Asterisk + sistema)</li>
               </ul>
             </div>
           </div>
@@ -524,8 +598,11 @@
                 <div>chilemon/</div>
                 <div>├─ app/</div>
                 <div>│  ├─ Auth/</div>
+                <div>│  ├─ Controllers/</div>
                 <div>│  ├─ Core/</div>
-                <div>│  └─ Helpers/</div>
+                <div>│  ├─ Services/</div>
+                <div>│  ├─ Helpers/</div>
+                <div>│  └─ autoload.php</div>
                 <div>├─ bin/</div>
                 <div>├─ config/</div>
                 <div>├─ install/</div>
@@ -535,7 +612,7 @@
                 <div>│  ├─ login.php / logout.php</div>
                 <div>│  ├─ views/</div>
                 <div>│  ├─ assets/</div>
-                <div>│  └─ api/</div>
+                <div>│  └─ api/ (REST + SSE)</div>
                 <div>└─ docs/</div>
               </div>
             </div>
@@ -545,7 +622,7 @@
 
       <div class="alert alert-info mt-4">
         <i class="bi bi-lightbulb"></i>
-        El foco actual está en consolidar un instalador sólido, un core seguro y una operación básica fiable antes de ampliar el control directo sobre Asterisk/ASL.
+        ChileMon cuenta con arquitectura profesional PSR-4, controladores separados por dominio, un servicio centralizado para Asterisk y controles de sistema seguros a través del wrapper.
       </div>
     </div>
   </section>
@@ -589,12 +666,14 @@
         <div class="col-lg-3">
           <div class="card h-100 shadow-sm">
             <div class="card-body p-4">
-              <h3 class="h5"><span class="badge text-bg-primary">Etapa 3</span> Integración operativa</h3>
+              <h3 class="h5"><span class="badge text-bg-success">Etapa 3</span> Integración operativa</h3>
               <ul class="text-secondary mb-0">
-                <li>Estado real de nodos/enlaces</li>
-                <li>Lectura más profunda desde Asterisk/ASL</li>
-                <li>Mejoras de telemetría</li>
-                <li>Creación de usuario web integrada al instalador</li>
+                <li>Autoloader PSR-4 nativo</li>
+                <li>Controladores MVC separados</li>
+                <li>Live View con SSE</li>
+                <li>Buscador de nodos en vivo</li>
+                <li>Controles de sistema seguros</li>
+                <li>Autodescubrimiento de nodo</li>
               </ul>
             </div>
           </div>
@@ -603,11 +682,11 @@
         <div class="col-lg-3">
           <div class="card h-100 shadow-sm">
             <div class="card-body p-4">
-              <h3 class="h5"><span class="badge text-bg-danger">Etapa 4</span> Voice / control avanzado</h3>
+              <h3 class="h5"><span class="badge text-bg-primary">Etapa 4</span> Voice / control avanzado</h3>
               <ul class="text-secondary mb-0">
                 <li>Funciones de llamada por etapas</li>
                 <li>Monitor / Transmit con permisos</li>
-                <li>Mayor integración operativa</li>
+                <li>Mejoras de telemetría avanzada</li>
                 <li>Hardening extra según experiencia real</li>
               </ul>
             </div>
@@ -715,7 +794,33 @@
           </h2>
           <div id="q3" class="accordion-collapse collapse" data-bs-parent="#faqAcc">
             <div class="accordion-body text-secondary">
-              Sí. El proyecto ya cuenta con instalación guiada, configuración local por nodo, wrapper seguro, SQLite y operación básica. La integración operativa seguirá mejorando por etapas.
+              Sí. El proyecto ya cuenta con instalación guiada, configuración local por nodo, wrapper seguro, SQLite, actualización en tiempo real (SSE), buscador de nodos, controles de sistema seguros y arquitectura profesional PSR-4. La Etapa 3 está completada.
+            </div>
+          </div>
+        </div>
+
+        <div class="accordion-item">
+          <h2 class="accordion-header">
+            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#q4">
+              ¿Es seguro reiniciar servicios desde el dashboard?
+            </button>
+          </h2>
+          <div id="q4" class="accordion-collapse collapse" data-bs-parent="#faqAcc">
+            <div class="accordion-body text-secondary">
+              Sí. Los controles de sistema (Reiniciar Asterisk, Reiniciar Apache, Apagar Nodo) no dan permisos genéricos a PHP. Pasan exclusivamente a través del wrapper <span class="kbd">chilemon-rpt</span>, que solo acepta 3 comandos pre-autorizados en la regla sudoers. PHP no puede ejecutar nada que no esté pre-aprobado.
+            </div>
+          </div>
+        </div>
+
+        <div class="accordion-item">
+          <h2 class="accordion-header">
+            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#q5">
+              ¿ChileMon necesita que configure mi número de nodo manualmente?
+            </button>
+          </h2>
+          <div id="q5" class="accordion-collapse collapse" data-bs-parent="#faqAcc">
+            <div class="accordion-body text-secondary">
+              No necesariamente. Si usas el instalador automático, el nodo se configura durante la instalación. Además, ChileMon tiene autodescubrimiento inteligente: detecta el nodo ASL desde el hostname del sistema (ej: <span class="kbd">node494780</span>) o leyendo <span class="kbd">rpt.conf</span> automáticamente.
             </div>
           </div>
         </div>
