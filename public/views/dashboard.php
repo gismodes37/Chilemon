@@ -111,17 +111,17 @@ $systemInfo = $systemInfo ?? [
                         <i class="bi bi-globe"></i> Web Site Desarrollador
                     </button>
                     <button class="btn btn-outline-danger" id="btn-restart-asterisk"
-                        onclick="confirmarReinicio('Asterisk', '#')"
+                        onclick="confirmarReinicio('Asterisk', 'restart-asterisk')"
                         title="Reiniciar el servicio Asterisk">
                         <i class="bi bi-arrow-repeat"></i> Reiniciar Asterisk
                     </button>
                     <button class="btn btn-outline-danger" id="btn-restart-apache"
-                        onclick="confirmarReinicio('Apache', '#')"
+                        onclick="confirmarReinicio('Apache', 'restart-apache')"
                         title="Reiniciar el servicio Apache">
                         <i class="bi bi-arrow-repeat"></i> Reiniciar Apache
                     </button>
                     <button class="btn btn-outline-danger" id="btn-power-node"
-                        onclick="confirmarReinicio('Nodo', '#')"
+                        onclick="confirmarReinicio('Nodo (APAGAR)', 'poweroff')"
                         title="Apagar el nodo">
                         <i class="bi bi-power"></i> Apagar Nodo
                     </button>
@@ -679,20 +679,58 @@ $systemInfo = $systemInfo ?? [
 </div>
 
 <script>
-function confirmarReinicio(servicio, url) {
+function confirmarReinicio(servicio, action) {
     document.getElementById('modal-servicio-nombre').textContent = servicio;
 
     const btnConfirmar = document.getElementById('btn-confirmar-reinicio');
-    btnConfirmar.onclick = function () {
-        btnConfirmar.disabled = true;
-        btnConfirmar.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Reiniciando...';
 
-        setTimeout(() => {
+    // Cambiar texto del botón según la acción
+    const isPoweroff = action === 'poweroff';
+    const isApacheRestart = action === 'restart-apache';
+    btnConfirmar.className = isPoweroff
+        ? 'btn btn-danger px-4'
+        : 'btn btn-warning px-4';
+    btnConfirmar.innerHTML = isPoweroff
+        ? '<i class="bi bi-power"></i> Sí, apagar'
+        : '<i class="bi bi-arrow-clockwise"></i> Sí, reiniciar';
+
+    btnConfirmar.onclick = async function () {
+        btnConfirmar.disabled = true;
+        btnConfirmar.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Procesando...';
+
+        try {
+            await postForm('api/system_action.php', { action: action });
+
+            // Cerrar modal y mostrar resultado
             bootstrap.Modal.getInstance(document.getElementById('modalReinicio')).hide();
+
+            if (isPoweroff) {
+                alert('✅ Orden de apagado enviada. El nodo se apagará en unos segundos.');
+            } else {
+                alert('✅ ' + servicio + ' reiniciado correctamente.');
+                setTimeout(() => { window.location.reload(); }, 3000);
+            }
+        } catch (err) {
+            // Cerrar el modal siempre
+            try { bootstrap.Modal.getInstance(document.getElementById('modalReinicio')).hide(); } catch(e) {}
+
+            // Cuando reiniciamos Apache o apagamos el nodo, el servidor se cae
+            // ANTES de enviar la respuesta HTTP. El navegador reporta "Failed to fetch"
+            // pero eso significa que la acción SÍ se ejecutó correctamente.
+            if ((isApacheRestart || isPoweroff) && err.message !== 'Unauthorized') {
+                if (isPoweroff) {
+                    alert('✅ Orden de apagado enviada. El nodo se apagará en unos segundos.');
+                } else {
+                    alert('✅ Apache se está reiniciando. La página se recargará en unos segundos...');
+                    setTimeout(() => { window.location.reload(); }, 5000);
+                }
+            } else if (err.message !== 'Unauthorized') {
+                alert('❌ Error: ' + err.message);
+            }
+        } finally {
             btnConfirmar.disabled = false;
             btnConfirmar.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Sí, reiniciar';
-            window.open(url, '_blank');
-        }, 1200);
+        }
     };
 
     new bootstrap.Modal(document.getElementById('modalReinicio')).show();

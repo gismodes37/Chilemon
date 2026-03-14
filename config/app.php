@@ -99,7 +99,12 @@ if (!defined('BASE_PATH')) {
     } else {
         $forwardedPrefix = (string)($_SERVER['HTTP_X_FORWARDED_PREFIX'] ?? '');
         $scriptName      = (string)($_SERVER['SCRIPT_NAME'] ?? '/');
-        $scriptDir       = str_replace('\\', '/', dirname($scriptName));
+
+        // Extraer directorio base ignorando sufijos conocidos como /public y /api
+        $scriptDir = dirname($scriptName);
+        if (preg_match('#^(.*?)(?:/public)?(?:/api)?(?:/[^/]+\.php)$#i', $scriptName, $m)) {
+            $scriptDir = $m[1];
+        }
 
         $basePath = $forwardedPrefix !== '' ? $forwardedPrefix : $scriptDir;
     }
