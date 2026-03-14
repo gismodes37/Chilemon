@@ -986,8 +986,8 @@ function refreshSystemInfo() {
  *     (puede ser un corte temporal de red, no se debe cancelar)
  * ============================================================= */
 
-/** Referencia al setInterval del auto refresh. null = detenido. */
-let chilemonAutoRefresh = null;
+/** EventSource connection for Server-Sent Events. null = detenido. */
+let chilemonEventSource = null;
 
 /** Snapshot del último estado de nodos conocido (JSON serializado). */
 let chilemonLastNodeSnapshot = "";
@@ -1006,47 +1006,37 @@ function buildNodeSnapshot(json) {
 }
 
 /**
- * Detiene el intervalo de auto refresh.
+ * Detiene EventSource de auto refresh.
  * Llamado desde handleUnauthorized() o si se necesita pausar el refresh.
- * Es seguro llamarlo aunque el intervalo ya esté detenido.
  */
 function stopChilemonAutoRefresh() {
-  if (chilemonAutoRefresh !== null) {
-    clearInterval(chilemonAutoRefresh);
-    chilemonAutoRefresh = null;
+  if (chilemonEventSource !== null) {
+    chilemonEventSource.close();
+    chilemonEventSource = null;
   }
 }
 
 /**
- * Inicia el auto refresh cada 10 segundos.
- * Guarda referencia en chilemonAutoRefresh para poder detenerlo.
- * Si ya hay un intervalo activo, no crea uno nuevo (idempotente).
- *
- * Lógica del tick:
- *   1. Consultar api/ami/nodes.php
- *   2. Si primer tick → guardar snapshot inicial, no recargar
- *   3. Si snapshot cambió → actualizar snapshot + recargar dashboard
- *   4. Si snapshot igual → no hacer nada (sin ruido de red)
+ * Inicia conexión SSE para recibir actualizaciones en tiempo real.
+ * Reemplaza el polling antiguo mediante fetch interval.
  */
 function startChilemonAutoRefresh() {
-  if (chilemonAutoRefresh) return; // ya activo, no duplicar
+  if (chilemonEventSource) return; // ya activo, no duplicar
 
-  chilemonAutoRefresh = setInterval(async () => {
+  chilemonEventSource = new EventSource(base + "api/stream_nodes.php", { withCredentials: true });
+
+  chilemonEventSource.onmessage = function(event) {
     try {
-      const json = await getJson("api/nodes.php");
-
-      // Respuesta inválida o endpoint indicó error lógico → saltar tick
+      const json = JSON.parse(event.data);
       if (!json || !json.ok) return;
 
       const nextSnapshot = buildNodeSnapshot(json);
 
-      // Primer tick tras arrancar: solo inicializar snapshot, no recargar
       if (chilemonLastNodeSnapshot === "") {
         chilemonLastNodeSnapshot = nextSnapshot;
         return;
       }
 
-      // Comparar snapshot: si cambió algo en los nodos → recargar
       if (nextSnapshot !== chilemonLastNodeSnapshot) {
         const { changed, nextMap } = detectChangedNodes(
           chilemonPreviousNodeMap,
@@ -1056,6 +1046,13 @@ function startChilemonAutoRefresh() {
         chilemonLastNodeSnapshot = nextSnapshot;
         renderNodes(json.nodes);
 
+        // Redispara el filtrado de busqueda si es que esta escrito
+        const searchInput = document.getElementById("node-search-filter");
+        if (searchInput && searchInput.value.length > 0) {
+            // Gatillamos un input event para re-filtrar
+            searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+
         requestAnimationFrame(() => {
           changed.forEach((item) => {
             markNodeRowAlive(item.nodeId, item.isNew);
@@ -1064,16 +1061,30 @@ function startChilemonAutoRefresh() {
 
         chilemonPreviousNodeMap = nextMap;
       }
-
-      // Si el snapshot es igual → no hacer nada (estado sin cambios)
     } catch (e) {
-      // 401 → getJson ya llamó handleUnauthorized() → clearInterval en curso
-      // Otros errores (red, timeout) → solo loguear, no cancelar el intervalo
-      if (e.message !== "Unauthorized") {
-        console.debug("Auto refresh falló:", e.message);
-      }
+      console.debug("Error procesando SSE data:", e.message);
     }
-  }, 5000); // intervalo: 5 000ms = 5 segundos
+  };
+
+  chilemonEventSource.onerror = function(event) {
+     if (this.readyState == EventSource.CLOSED) {
+         console.debug("SSE Connection closed");
+     } else {
+         console.debug("SSE error, attempting to reconnect", event);
+     }
+  };
+
+  chilemonEventSource.addEventListener("error", function(e) {
+      if (e.data) {
+          try {
+             const jsonError = JSON.parse(e.data);
+             if (jsonError.error === "Unauthorized") {
+                 handleUnauthorized();
+             }
+          } catch(err){}
+      }
+  });
+
 }
 
 /* =============================================================
@@ -1112,5 +1123,56 @@ document.addEventListener("DOMContentLoaded", async () => {
       chilemonLastNodeSnapshot = "";
       startChilemonAutoRefresh();
     }
+  }
+  // 4. Implementar buscador de nodos en tiempo real (Live Search)
+  const searchInput = document.getElementById("node-search-filter");
+  const nodesTableBody = document.getElementById("nodes-table-body");
+  const totalNodesBadge = document.getElementById("total-nodes-badge");
+
+  if (searchInput && nodesTableBody) {
+    searchInput.addEventListener("input", function (e) {
+      const searchTerm = e.target.value.toLowerCase().trim();
+      const rows = nodesTableBody.querySelectorAll("tr:not(.no-results-row)");
+      
+      let visibleCount = 0;
+
+      rows.forEach(row => {
+        // Obtenemos el texto de toda la fila para poder buscar por nodo, alias, IP, etc.
+        const rowText = row.textContent.toLowerCase();
+        
+        if (rowText.includes(searchTerm)) {
+          row.style.display = "";
+          visibleCount++;
+        } else {
+          row.style.display = "none";
+        }
+      });
+
+      // Manejar el caso de 0 resultados
+      let noResultsRow = document.getElementById("no-results-search-row");
+      if (visibleCount === 0 && rows.length > 0) {
+        if (!noResultsRow) {
+          noResultsRow = document.createElement("tr");
+          noResultsRow.id = "no-results-search-row";
+          noResultsRow.className = "no-results-row text-center py-4 text-muted";
+          noResultsRow.innerHTML = `<td colspan="8"><i class="bi bi-search"></i> No se encontraron nodos que coincidan con "${escapeHtml(searchTerm)}"</td>`;
+          nodesTableBody.appendChild(noResultsRow);
+        } else {
+          noResultsRow.innerHTML = `<td colspan="8"><i class="bi bi-search"></i> No se encontraron nodos que coincidan con "${escapeHtml(searchTerm)}"</td>`;
+          noResultsRow.style.display = "";
+        }
+      } else if (noResultsRow) {
+        noResultsRow.style.display = "none";
+      }
+
+      // Actualizar el contador en el badge superior si existe
+      if (totalNodesBadge) {
+        if (searchTerm === "") {
+           totalNodesBadge.textContent = rows.length;
+        } else {
+           totalNodesBadge.textContent = visibleCount + " / " + rows.length;
+        }
+      }
+    });
   }
 });

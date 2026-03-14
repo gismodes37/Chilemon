@@ -1,0 +1,23 @@
+<svg width="1200" height="320" viewBox="0 0 1200 320" xmlns="http://www.w3.org/2000/svg">
+
+<rect width="1200" height="320" fill="#0b1220"></rect>
+
+<rect x="0" y="0" width="1200" height="6" fill="#0039A6"></rect>
+<rect x="0" y="314" width="1200" height="6" fill="#D52B1E"></rect>
+
+<circle cx="120" cy="160" r="60" fill="#0039A6"></circle>
+<text x="120" y="175" font-size="60" text-anchor="middle" fill="white">★</text>
+
+<text x="250" y="140" font-family="Segoe UI, Arial" font-size="64" fill="white" font-weight="bold">
+ChileMon
+</text>
+
+<text x="250" y="190" font-family="Segoe UI, Arial" font-size="26" fill="#cbd5e1">
+Modern Dashboard for AllStarLink (ASL3)
+</text>
+
+<text x="250" y="230" font-family="Segoe UI, Arial" font-size="18" fill="#94a3b8">
+Node Monitoring • Secure Control • Lightweight • SQLite
+</text>
+
+</svg>

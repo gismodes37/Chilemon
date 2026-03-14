@@ -169,13 +169,17 @@ $systemInfo = $systemInfo ?? [
     </div>
 
     <div class="card shadow-sm">
-        <div class="card-header bg-dark text-white">
+        <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center flex-wrap gap-2">
             <h3 class="h5 mb-0">
                 <i class="bi bi-diagram-3"></i> Nodos ASL Monitoreados
-                <span class="badge bg-light text-dark ms-2">
+                <span class="badge bg-light text-dark ms-2" id="total-nodes-badge">
                     <?= (int)($estadisticas['total_nodos'] ?? count($nodos)) ?>
                 </span>
             </h3>
+            <div class="input-group" style="max-width: 250px;">
+                <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+                <input type="text" id="node-search-filter" class="form-control border-start-0 ps-0" placeholder="Filtrar nodos...">
+            </div>
         </div>
 
         <div class="card-body p-0">

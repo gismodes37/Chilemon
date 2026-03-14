@@ -2,43 +2,94 @@
 # ChileMon - Git Ignore
 # ==========================
 
-# Configuración local por nodo
+# --------------------------
+# Configuración local
+# --------------------------
+
+# configuración generada por instalador
 config/local.php
+
+# variables de entorno
 .env
 .env.local
+.env.*
 
+# --------------------------
 # Datos de ejecución
+# --------------------------
+
+# base de datos generada en instalación
 data/
+
+# logs del sistema
 logs/
 *.log
 
+# respaldos
+backups/
+
+# --------------------------
 # Bases de datos
+# --------------------------
+
 *.sqlite
 *.sqlite3
 *.db
 
-# Temporales y respaldos
+# --------------------------
+# Temporales
+# --------------------------
+
 *.tmp
 *.cache
 *.bak
 *.bak.*
 *.swp
+*.lock
 
+# --------------------------
 # Dependencias
+# --------------------------
+
 vendor/
 
-# Archivos de sistema
+# --------------------------
+# Sistema operativo
+# --------------------------
+
 .DS_Store
 Thumbs.db
 
+# --------------------------
 # IDE
+# --------------------------
+
 .vscode/
 .idea/
 
-# Artefactos comprimidos
+# --------------------------
+# Archivos comprimidos
+# --------------------------
+
 *.zip
 *.tar
 *.gz
+*.tgz
 
-# Stubs
+# --------------------------
+# Archivos de desarrollo
+# --------------------------
+
 /stubs/
+
+# --------------------------
+# Seguridad extra
+# --------------------------
+
+# dumps accidentales
+*.sql
+*.dump
+
+# archivos de prueba local
+test.php
+debug.php

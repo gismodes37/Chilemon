@@ -1,16 +1,16 @@
 <!doctype html>
-<html lang="es">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>ChileMon — Dashboard moderno para AllStarLink (ASL3)</title>
-  <meta name="description" content="ChileMon es un dashboard moderno para AllStarLink (ASL3): instalación automática, login seguro, SQLite por defecto, wrapper seguro para Asterisk y operación básica funcional en nodos reales." />
+  <title>ChileMon — Modern Dashboard for AllStarLink (ASL3)</title>
+  <meta name="description" content="ChileMon is a modern dashboard for AllStarLink (ASL3): automatic installation, secure login, SQLite by default, secure Asterisk wrapper, and functional basic operation on real nodes." />
 
   <link rel="canonical" href="https://gismodes37.github.io/Chilemon/" />
   <meta property="og:url" content="https://gismodes37.github.io/Chilemon/" />
 
-  <meta property="og:title" content="ChileMon — Dashboard moderno para ASL3" />
-  <meta property="og:description" content="Primer release funcional: instalación automática, SQLite, login seguro, wrapper seguro y operación básica real sobre nodos AllStarLink." />
+  <meta property="og:title" content="ChileMon — Modern Dashboard for ASL3" />
+  <meta property="og:description" content="First functional release: automatic installation, SQLite, secure login, secure wrapper, and real basic operation on AllStarLink nodes." />
   <meta property="og:type" content="website" />
   <meta property="og:image" content="https://gismodes37.github.io/Chilemon/img/dashboard-main.png" />
   <meta name="twitter:card" content="summary_large_image" />
@@ -70,8 +70,8 @@
     .footer{ border-top: 1px solid rgba(0,0,0,.08); }
 
     .btn-group .btn.disabled {
-       opacity: 1;
-      pointer-events: none;
+        opacity: 1;
+        pointer-events: none;
     }
   </style>
 </head>
@@ -81,7 +81,7 @@
   <div class="container">
     <a class="navbar-brand d-flex align-items-center gap-2" href="#">
       <span class="badge text-bg-primary" style="background:var(--chile-blue)!important;">ChileMon</span>
-      <span class="text-secondary small d-none d-md-inline">Dashboard moderno para AllStarLink ASL3</span>
+      <span class="text-secondary small d-none d-md-inline">Modern Dashboard for AllStarLink ASL3</span>
     </a>
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#nav">
@@ -90,29 +90,29 @@
 
     <div id="nav" class="collapse navbar-collapse">
       <ul class="navbar-nav ms-auto">
-        <li class="nav-item"><a class="nav-link" href="#features">Características</a></li>
-        <li class="nav-item"><a class="nav-link" href="#security">Seguridad</a></li>
+        <li class="nav-item"><a class="nav-link" href="#features">Features</a></li>
+        <li class="nav-item"><a class="nav-link" href="#security">Security</a></li>
         <li class="nav-item"><a class="nav-link" href="#screens">Screenshots</a></li>
-        <li class="nav-item"><a class="nav-link" href="#install">Instalación</a></li>
-        <li class="nav-item"><a class="nav-link" href="#architecture">Arquitectura</a></li>
+        <li class="nav-item"><a class="nav-link" href="#install">Installation</a></li>
+        <li class="nav-item"><a class="nav-link" href="#architecture">Architecture</a></li>
         <li class="nav-item"><a class="nav-link" href="#milestones">Roadmap</a></li>
         <li class="nav-item"><a class="nav-link" href="#faq">FAQ</a></li>
       </ul>
 
-      <div class="d-flex flex-wrap gap-2 ms-lg-3 mt-3 mt-lg-0 align-items-center">
-  <div class="btn-group" role="group" aria-label="Selector de idioma">
-    <a class="btn btn-sm btn-dark disabled" aria-current="page" href="index.html">🇪🇸 ES</a>
-    <a class="btn btn-sm btn-outline-secondary" href="index_en.html">🇬🇧 EN</a>
-  </div>
+        <div class="d-flex flex-wrap gap-2 ms-lg-3 mt-3 mt-lg-0 align-items-center">
+            <div class="btn-group" role="group" aria-label="Language selector">
+                <a class="btn btn-sm btn-outline-secondary" href="index.html">🇪🇸 ES</a>
+                <a class="btn btn-sm btn-dark disabled" aria-current="page" href="index_en.html">🇬🇧 EN</a>
+            </div>
 
-  <a class="btn btn-outline-primary" href="https://github.com/gismodes37/Chilemon" target="_blank" rel="noreferrer">
-    <i class="bi bi-github"></i> Repo
-  </a>
-  <a class="btn btn-primary" style="background:var(--chile-red);border-color:var(--chile-red);"
-     href="https://github.com/gismodes37/Chilemon/releases" target="_blank" rel="noreferrer">
-    <i class="bi bi-box-arrow-down"></i> Releases
-  </a>
-</div>
+            <a class="btn btn-outline-primary" href="https://github.com/gismodes37/Chilemon" target="_blank" rel="noreferrer">
+                <i class="bi bi-github"></i> Repo
+            </a>
+             <a class="btn btn-primary" style="background:var(--chile-red);border-color:var(--chile-red);"
+                 href="https://github.com/gismodes37/Chilemon/releases" target="_blank" rel="noreferrer">
+                <i class="bi bi-box-arrow-down"></i> Releases
+            </a>
+        </div>
     </div>
   </div>
 </nav>
@@ -123,39 +123,39 @@
       <div class="col-lg-7">
         <div class="d-flex flex-wrap gap-2 mb-3">
           <span class="brand-badge"><i class="bi bi-broadcast"></i> AllStarLink (ASL3)</span>
-          <span class="brand-badge"><i class="bi bi-shield-lock"></i> Login seguro</span>
+          <span class="brand-badge"><i class="bi bi-shield-lock"></i> Secure Login</span>
           <span class="brand-badge"><i class="bi bi-database"></i> SQLite</span>
-          <span class="brand-badge"><i class="bi bi-terminal"></i> Instalador automático</span>
+          <span class="brand-badge"><i class="bi bi-terminal"></i> Automatic Installer</span>
           <span class="brand-badge"><i class="bi bi-tag"></i> v0.1.0</span>
         </div>
 
         <h1 class="display-5 fw-semibold mb-3">ChileMon</h1>
         <p class="lead opacity-90 mb-4">
-          Dashboard moderno para nodos <strong>AllStarLink ASL3</strong>, inspirado en el concepto de Supermon,
-          pero construido con una base más ordenada, segura, modular e instalable.
-          El release actual ya permite <strong>instalación automática, autenticación, operación básica real y gestión local segura</strong>.
+          A modern dashboard for <strong>AllStarLink ASL3</strong> nodes, inspired by the Supermon concept,
+          but built on a more organized, secure, modular, and installable foundation.
+          The current release already provides <strong>automatic installation, authentication, real basic operation, and secure local management</strong>.
         </p>
 
         <div class="small opacity-75 mb-3">
-          <i class="bi bi-translate"></i>
-          English version available: <a class="link-light" href="index_en.html">index_en.html</a>
+            <i class="bi bi-translate"></i>
+            Versión en español disponible: <a class="link-light" href="index.html">index.html</a>
         </div>
 
         <div class="d-flex flex-wrap gap-2">
           <a class="btn btn-light btn-lg" href="#install">
-            <i class="bi bi-terminal"></i> Instalar
+            <i class="bi bi-terminal"></i> Install
           </a>
           <a class="btn btn-outline-light btn-lg" href="#security">
-            <i class="bi bi-shield-check"></i> Ver seguridad
+            <i class="bi bi-shield-check"></i> View Security
           </a>
           <a class="btn btn-outline-light btn-lg" href="#screens">
-            <i class="bi bi-eye"></i> Ver screenshots
+            <i class="bi bi-eye"></i> View Screenshots
           </a>
         </div>
 
         <div class="mt-4 small opacity-75">
           <i class="bi bi-info-circle"></i>
-          Primer release funcional: ChileMon ya se conecta, desconecta, autentica, guarda favoritos, registra actividad y se instala en nodos reales.
+          First functional release: ChileMon already connects, disconnects, authenticates, saves favorites, logs activity, and installs on real nodes.
         </div>
       </div>
 
@@ -173,7 +173,7 @@
 
             <div class="d-flex gap-2">
               <a class="btn btn-primary w-100" style="background:var(--chile-blue);border-color:var(--chile-blue);"
-                 href="https://github.com/gismodes37/Chilemon/blob/main/README_ES.md" target="_blank" rel="noreferrer">
+                 href="https://github.com/gismodes37/Chilemon/blob/main/README.md" target="_blank" rel="noreferrer">
                 <i class="bi bi-book"></i> README
               </a>
               <a class="btn btn-outline-secondary w-100"
@@ -185,10 +185,10 @@
             <hr class="my-4">
 
             <div class="small text-secondary">
-              <div><i class="bi bi-folder"></i> Instalación recomendada: <span class="code">/opt/chilemon</span></div>
-              <div class="mt-1"><i class="bi bi-link-45deg"></i> Public web: <span class="code">/chilemon</span> → <span class="code">/opt/chilemon/public</span></div>
-              <div class="mt-1"><i class="bi bi-database"></i> DB local: <span class="code">/opt/chilemon/data/chilemon.sqlite</span></div>
-              <div class="mt-1"><i class="bi bi-file-lock2"></i> Licencia: <span class="code">MIT</span></div>
+              <div><i class="bi bi-folder"></i> Recommended installation: <span class="code">/opt/chilemon</span></div>
+              <div class="mt-1"><i class="bi bi-link-45deg"></i> Web path: <span class="code">/chilemon</span> → <span class="code">/opt/chilemon/public</span></div>
+              <div class="mt-1"><i class="bi bi-database"></i> Local DB: <span class="code">/opt/chilemon/data/chilemon.sqlite</span></div>
+              <div class="mt-1"><i class="bi bi-file-lock2"></i> License: <span class="code">MIT</span></div>
             </div>
           </div>
         </div>
@@ -203,9 +203,9 @@
     <div class="container">
       <div class="row align-items-end mb-4">
         <div class="col-lg-8">
-          <h2 class="h1 section-title">Características</h2>
+          <h2 class="h1 section-title">Features</h2>
           <p class="text-secondary mb-0">
-            ChileMon ya no es solo una idea o una base técnica: el release actual entrega una primera versión funcional y usable en nodos reales.
+            ChileMon is no longer just an idea or a technical base: the current release delivers a first functional and usable version on real nodes.
           </p>
         </div>
       </div>
@@ -217,8 +217,8 @@
               <div class="d-flex gap-3">
                 <div class="feature-icon"><i class="bi bi-terminal"></i></div>
                 <div>
-                  <h3 class="h5 mb-1">Instalador automático</h3>
-                  <p class="text-secondary mb-0">Instalación guiada con validaciones, creación de estructura, wrapper, configuración local y resumen final de acceso.</p>
+                  <h3 class="h5 mb-1">Automatic Installer</h3>
+                  <p class="text-secondary mb-0">Guided installation with validations, structure creation, wrapper setup, local configuration, and a final access summary.</p>
                 </div>
               </div>
             </div>
@@ -231,8 +231,8 @@
               <div class="d-flex gap-3">
                 <div class="feature-icon"><i class="bi bi-router"></i></div>
                 <div>
-                  <h3 class="h5 mb-1">Configuración por nodo</h3>
-                  <p class="text-secondary mb-0">Cada instalación genera su propio <span class="kbd">config/local.php</span> según el entorno real del nodo.</p>
+                  <h3 class="h5 mb-1">Per-Node Configuration</h3>
+                  <p class="text-secondary mb-0">Each installation generates its own <span class="kbd">config/local.php</span> based on the real node environment.</p>
                 </div>
               </div>
             </div>
@@ -245,8 +245,8 @@
               <div class="d-flex gap-3">
                 <div class="feature-icon"><i class="bi bi-search"></i></div>
                 <div>
-                  <h3 class="h5 mb-1">Autodetección del entorno</h3>
-                  <p class="text-secondary mb-0">Detecta hostname del nodo y parámetros AMI desde la instalación real de ASL/Asterisk cuando están disponibles.</p>
+                  <h3 class="h5 mb-1">Environment Auto-Detection</h3>
+                  <p class="text-secondary mb-0">Detects node hostname and AMI parameters from the real ASL/Asterisk installation when available.</p>
                 </div>
               </div>
             </div>
@@ -259,8 +259,8 @@
               <div class="d-flex gap-3">
                 <div class="feature-icon"><i class="bi bi-shield-lock"></i></div>
                 <div>
-                  <h3 class="h5 mb-1">Login + sesión</h3>
-                  <p class="text-secondary mb-0">Acceso controlado, endpoints protegidos y una base segura para administración del dashboard.</p>
+                  <h3 class="h5 mb-1">Login + Session</h3>
+                  <p class="text-secondary mb-0">Controlled access, protected endpoints, and a secure foundation for dashboard administration.</p>
                 </div>
               </div>
             </div>
@@ -273,8 +273,8 @@
               <div class="d-flex gap-3">
                 <div class="feature-icon"><i class="bi bi-database"></i></div>
                 <div>
-                  <h3 class="h5 mb-1">SQLite estándar</h3>
-                  <p class="text-secondary mb-0">Sin MySQL ni MariaDB. La instalación queda simple, portable y fácil de mantener en el nodo.</p>
+                  <h3 class="h5 mb-1">Standard SQLite</h3>
+                  <p class="text-secondary mb-0">No MySQL or MariaDB. Installation stays simple, portable, and easy to maintain on the node.</p>
                 </div>
               </div>
             </div>
@@ -287,8 +287,8 @@
               <div class="d-flex gap-3">
                 <div class="feature-icon"><i class="bi bi-wrench-adjustable"></i></div>
                 <div>
-                  <h3 class="h5 mb-1">Wrapper seguro</h3>
-                  <p class="text-secondary mb-0">Uso controlado de comandos Asterisk mediante <span class="kbd">chilemon-rpt</span> y sudoers limitado a lo necesario.</p>
+                  <h3 class="h5 mb-1">Secure Wrapper</h3>
+                  <p class="text-secondary mb-0">Controlled use of Asterisk commands through <span class="kbd">chilemon-rpt</span> and tightly scoped sudo rules.</p>
                 </div>
               </div>
             </div>
@@ -301,8 +301,8 @@
               <div class="d-flex gap-3">
                 <div class="feature-icon"><i class="bi bi-plug"></i></div>
                 <div>
-                  <h3 class="h5 mb-1">Conectar / Desconectar</h3>
-                  <p class="text-secondary mb-0">Operación básica funcional desde el dashboard sobre nodos AllStar enlazados al nodo local.</p>
+                  <h3 class="h5 mb-1">Connect / Disconnect</h3>
+                  <p class="text-secondary mb-0">Functional basic operation from the dashboard over AllStar nodes linked to the local node.</p>
                 </div>
               </div>
             </div>
@@ -315,8 +315,8 @@
               <div class="d-flex gap-3">
                 <div class="feature-icon"><i class="bi bi-star"></i></div>
                 <div>
-                  <h3 class="h5 mb-1">Favoritos por usuario</h3>
-                  <p class="text-secondary mb-0">Acceso rápido a nodos frecuentes con alias y descripción personalizada por usuario autenticado.</p>
+                  <h3 class="h5 mb-1">Per-User Favorites</h3>
+                  <p class="text-secondary mb-0">Quick access to frequent nodes with alias and custom description per authenticated user.</p>
                 </div>
               </div>
             </div>
@@ -329,8 +329,8 @@
               <div class="d-flex gap-3">
                 <div class="feature-icon"><i class="bi bi-clock-history"></i></div>
                 <div>
-                  <h3 class="h5 mb-1">Actividad reciente</h3>
-                  <p class="text-secondary mb-0">Registro de eventos básicos para acompañar la operación del nodo y facilitar el monitoreo.</p>
+                  <h3 class="h5 mb-1">Recent Activity</h3>
+                  <p class="text-secondary mb-0">Basic event logging to support node operation and monitoring.</p>
                 </div>
               </div>
             </div>
@@ -341,28 +341,28 @@
 
       <div class="alert alert-info mt-4">
         <i class="bi bi-lightbulb"></i>
-        Estado actual: <strong>release v0.1.0 funcional</strong>. ChileMon ya instala, autentica, opera y se prueba con éxito en entornos reales.
+        Current status: <strong>functional v0.1.0 release</strong>. ChileMon already installs, authenticates, operates, and has been successfully tested in real environments.
       </div>
     </div>
   </section>
 
   <section id="security" class="py-5 bg-body-tertiary">
     <div class="container">
-      <h2 class="h1 section-title mb-3">Seguridad</h2>
+      <h2 class="h1 section-title mb-3">Security</h2>
       <p class="text-secondary mb-4">
-        ChileMon está construido para crecer con una base segura, controlada y predecible dentro de un nodo ASL3.
+        ChileMon is built to grow on a secure, controlled, and predictable foundation inside an ASL3 node.
       </p>
 
       <div class="row g-4">
         <div class="col-lg-6">
           <div class="card shadow-sm h-100">
             <div class="card-body p-4">
-              <h3 class="h5 mb-3"><i class="bi bi-shield-check"></i> Autenticación y sesión</h3>
+              <h3 class="h5 mb-3"><i class="bi bi-shield-check"></i> Authentication and Session</h3>
               <ul class="text-secondary mb-0">
-                <li><strong>CSRF</strong> en formularios.</li>
-                <li><strong>Sesión centralizada</strong> con login/logout consistentes.</li>
-                <li><strong>BASE_PATH / BASE_URL dinámicos</strong> para sub-path y despliegues reales en el nodo.</li>
-                <li><strong>Endpoints protegidos</strong> bajo sesión/autorización.</li>
+                <li><strong>CSRF</strong> protection in forms.</li>
+                <li><strong>Centralized session handling</strong> with consistent login/logout.</li>
+                <li><strong>Dynamic BASE_PATH / BASE_URL</strong> for sub-path deployments on real nodes.</li>
+                <li><strong>Protected endpoints</strong> under session/authorization control.</li>
               </ul>
             </div>
           </div>
@@ -371,12 +371,12 @@
         <div class="col-lg-6">
           <div class="card shadow-sm h-100">
             <div class="card-body p-4">
-              <h3 class="h5 mb-3"><i class="bi bi-lock"></i> Operación segura en el nodo</h3>
+              <h3 class="h5 mb-3"><i class="bi bi-lock"></i> Secure Operation on the Node</h3>
               <ul class="text-secondary mb-0">
-                <li><strong>Wrapper seguro</strong> para comandos <span class="kbd">rpt</span> de Asterisk.</li>
-                <li><strong>sudoers acotado</strong> para <span class="kbd">www-data</span>.</li>
-                <li><strong>Configuración local no versionada</strong> en <span class="kbd">config/local.php</span>.</li>
-                <li><strong>Validación de SQLite / PDO</strong> antes de inicializar la aplicación.</li>
+                <li><strong>Secure wrapper</strong> for Asterisk <span class="kbd">rpt</span> commands.</li>
+                <li><strong>Scoped sudoers</strong> for <span class="kbd">www-data</span>.</li>
+                <li><strong>Non-versioned local configuration</strong> in <span class="kbd">config/local.php</span>.</li>
+                <li><strong>SQLite / PDO validation</strong> before application initialization.</li>
               </ul>
             </div>
           </div>
@@ -385,7 +385,7 @@
         <div class="col-lg-12">
           <div class="alert alert-warning mb-0">
             <i class="bi bi-exclamation-triangle"></i>
-            La base de datos, logs, respaldos y configuración local se generan en el nodo. No deben subirse al repositorio ni tratarse como parte del código fuente.
+            The database, logs, backups, and local configuration are generated on the node. They should not be uploaded to the repository or treated as part of the source code.
           </div>
         </div>
       </div>
@@ -396,7 +396,7 @@
     <div class="container">
       <div class="text-center mb-5">
         <h2 class="h1 section-title">Screenshots</h2>
-        <p class="text-secondary mb-0">Vistas actuales del login, dashboard y operación básica del release v0.1.0.</p>
+        <p class="text-secondary mb-0">Current views of login, dashboard, and basic operation for the v0.1.0 release.</p>
       </div>
 
       <div class="row g-4">
@@ -407,7 +407,7 @@
             </div>
             <div class="card-footer bg-transparent border-0 text-secondary small">
               <i class="bi bi-shield-lock"></i>
-              Login modernizado y base para la identidad visual del proyecto.
+              Modernized login and foundation for the project’s visual identity.
             </div>
           </div>
         </div>
@@ -415,11 +415,11 @@
         <div class="col-lg-6">
           <div class="card shadow-sm h-100 border-0">
             <div class="card-body p-3">
-              <img src="img/dashboard-main.png" class="img-fluid rounded-4 border" alt="ChileMon Dashboard principal">
+              <img src="img/dashboard-main.png" class="img-fluid rounded-4 border" alt="ChileMon Main Dashboard">
             </div>
             <div class="card-footer bg-transparent border-0 text-secondary small">
               <i class="bi bi-layout-text-window-reverse"></i>
-              Dashboard principal con estado del nodo, acciones y operación básica.
+              Main dashboard with node status, actions, and basic operation.
             </div>
           </div>
         </div>
@@ -427,11 +427,11 @@
         <div class="col-lg-6">
           <div class="card shadow-sm h-100 border-0">
             <div class="card-body p-3">
-              <img src="img/node-online.png" class="img-fluid rounded-4 border" alt="Nodo conectado">
+              <img src="img/node-online.png" class="img-fluid rounded-4 border" alt="Connected Node">
             </div>
             <div class="card-footer bg-transparent border-0 text-secondary small">
               <i class="bi bi-broadcast"></i>
-              Visualización de nodo en línea y estado operativo actual.
+              Online node visualization and current operational state.
             </div>
           </div>
         </div>
@@ -439,11 +439,11 @@
         <div class="col-lg-6">
           <div class="card shadow-sm h-100 border-0">
             <div class="card-body p-3">
-              <img src="img/favorites.png" class="img-fluid rounded-4 border" alt="Favoritos por usuario">
+              <img src="img/favorites.png" class="img-fluid rounded-4 border" alt="Per-User Favorites">
             </div>
             <div class="card-footer bg-transparent border-0 text-secondary small">
               <i class="bi bi-star"></i>
-              Gestión de favoritos por usuario autenticado.
+              Favorites management for authenticated users.
             </div>
           </div>
         </div>
@@ -453,7 +453,7 @@
         <a class="btn btn-outline-primary"
            href="https://github.com/gismodes37/Chilemon/tree/main/docs/img"
            target="_blank" rel="noreferrer">
-          <i class="bi bi-folder2-open"></i> Ver carpeta completa en GitHub
+          <i class="bi bi-folder2-open"></i> View full folder on GitHub
         </a>
       </div>
     </div>
@@ -463,29 +463,29 @@
     <div class="container">
       <div class="row g-4 align-items-start">
         <div class="col-lg-6">
-          <h2 class="h1 section-title">Instalación</h2>
+          <h2 class="h1 section-title">Installation</h2>
           <p class="text-secondary">
-            ChileMon se instala en el nodo y publica su interfaz como <span class="kbd">/chilemon</span>. El instalador actual detecta hostname y parámetros AMI del entorno real cuando es posible.
+            ChileMon is installed on the node and publishes its interface under <span class="kbd">/chilemon</span>. The current installer detects hostname and AMI parameters from the real environment when possible.
           </p>
 
-          <h3 class="h5 mt-4">Requisitos y entornos probados</h3>
+          <h3 class="h5 mt-4">Requirements and tested environments</h3>
           <ul class="text-secondary">
-            <li><strong>Sistemas probados:</strong> Raspberry Pi 3B+ con ASL3 y Máquina Virtual Proxmox con Debian 13 + ASL3</li>
+            <li><strong>Tested systems:</strong> Raspberry Pi 3B+ with ASL3 and Proxmox virtual machine with Debian 13 + ASL3</li>
             <li>Apache + PHP 8.x</li>
-            <li>Extensiones PHP: <span class="kbd">PDO</span>, <span class="kbd">pdo_sqlite</span> y <span class="kbd">sqlite3</span></li>
-            <li>Git instalado en el nodo</li>
+            <li>PHP extensions: <span class="kbd">PDO</span>, <span class="kbd">pdo_sqlite</span>, and <span class="kbd">sqlite3</span></li>
+            <li>Git installed on the node</li>
           </ul>
 
           <div class="alert alert-secondary mt-4">
             <i class="bi bi-shield-check"></i>
-            La instalación recomendada crea configuración local por nodo, inicializa SQLite y deja el acceso web operativo bajo <span class="kbd">/chilemon</span>.
+            The recommended installation creates per-node local configuration, initializes SQLite, and leaves the web access working under <span class="kbd">/chilemon</span>.
           </div>
         </div>
 
         <div class="col-lg-6">
           <div class="card shadow-sm">
             <div class="card-body p-4">
-              <h3 class="h5 mb-3"><i class="bi bi-terminal"></i> Flujo recomendado</h3>
+              <h3 class="h5 mb-3"><i class="bi bi-terminal"></i> Recommended workflow</h3>
               <div class="code">
                 <div><span class="text-secondary">$</span> sudo apt update</div>
                 <div><span class="text-secondary">$</span> sudo apt install -y git</div>
@@ -496,14 +496,14 @@
               </div>
 
               <div class="mt-3 small text-secondary">
-                El instalador deja un resumen final con dirección de acceso, nodo local, usuario AMI detectado y datos relevantes de la instalación.
+                The installer leaves a final summary with the access URL, local node, detected AMI user, and relevant installation data.
               </div>
             </div>
           </div>
 
           <div class="alert alert-warning mt-3 mb-0">
             <i class="bi bi-exclamation-triangle"></i>
-            Mantén una única ruta oficial en Apache hacia <span class="kbd">/opt/chilemon/public</span> para evitar conflictos en el nodo.
+            Keep a single official Apache path pointing to <span class="kbd">/opt/chilemon/public</span> to avoid conflicts on the node.
           </div>
         </div>
       </div>
@@ -512,22 +512,22 @@
 
   <section id="architecture" class="py-5">
     <div class="container">
-      <h2 class="h1 section-title mb-3">Arquitectura</h2>
+      <h2 class="h1 section-title mb-3">Architecture</h2>
       <div class="row g-4">
         <div class="col-lg-6">
           <div class="card shadow-sm h-100">
             <div class="card-body p-4">
-              <h3 class="h5 mb-3"><i class="bi bi-diagram-3"></i> Componentes actuales</h3>
+              <h3 class="h5 mb-3"><i class="bi bi-diagram-3"></i> Current Components</h3>
               <ul class="text-secondary mb-0">
                 <li><strong>UI</strong>: <span class="kbd">public/views/*</span></li>
-                <li><strong>Auth</strong>: login/logout + sesión + CSRF</li>
+                <li><strong>Auth</strong>: login/logout + session + CSRF</li>
                 <li><strong>API</strong>: <span class="kbd">public/api/*</span></li>
-                <li><strong>DB</strong>: SQLite en <span class="kbd">data/chilemon.sqlite</span></li>
+                <li><strong>DB</strong>: SQLite in <span class="kbd">data/chilemon.sqlite</span></li>
                 <li><strong>Schema</strong>: <span class="kbd">install/sql/schema.sql</span></li>
                 <li><strong>Config</strong>: <span class="kbd">config/app.php</span> + <span class="kbd">config/local.php</span></li>
-                <li><strong>Instalador</strong>: <span class="kbd">install/install_chilemon.sh</span></li>
-                <li><strong>Inicialización</strong>: <span class="kbd">bin/install.php</span></li>
-                <li><strong>Wrapper Asterisk</strong>: <span class="kbd">/usr/local/bin/chilemon-rpt</span></li>
+                <li><strong>Installer</strong>: <span class="kbd">install/install_chilemon.sh</span></li>
+                <li><strong>Initialization</strong>: <span class="kbd">bin/install.php</span></li>
+                <li><strong>Asterisk Wrapper</strong>: <span class="kbd">/usr/local/bin/chilemon-rpt</span></li>
               </ul>
             </div>
           </div>
@@ -536,7 +536,7 @@
         <div class="col-lg-6">
           <div class="card shadow-sm h-100">
             <div class="card-body p-4">
-              <h3 class="h5 mb-3"><i class="bi bi-folder"></i> Estructura del proyecto</h3>
+              <h3 class="h5 mb-3"><i class="bi bi-folder"></i> Project Structure</h3>
               <div class="code mb-0">
                 <div>chilemon/</div>
                 <div>├─ app/</div>
@@ -563,7 +563,7 @@
 
       <div class="alert alert-info mt-4">
         <i class="bi bi-lightbulb"></i>
-        ChileMon ya cuenta con integración real con AllStarLink mediante comandos <span class="kbd">rpt</span>, operados a través de un wrapper seguro.
+        ChileMon already provides real integration with AllStarLink through <span class="kbd">rpt</span> commands operated via a secure wrapper.
       </div>
     </div>
   </section>
@@ -576,15 +576,15 @@
         <div class="col-lg-3">
           <div class="card h-100 shadow-sm">
             <div class="card-body p-4">
-              <h3 class="h5"><span class="badge text-bg-success">v0.1.0</span> Release funcional</h3>
+              <h3 class="h5"><span class="badge text-bg-success">v0.1.0</span> Functional Release</h3>
               <ul class="text-secondary mb-0">
-                <li>Dashboard operativo</li>
-                <li>Login + sesión</li>
-                <li>SQLite estándar</li>
-                <li>Conectar / Desconectar</li>
-                <li>Favoritos</li>
-                <li>Actividad reciente</li>
-                <li>Instalador automático</li>
+                <li>Operational dashboard</li>
+                <li>Login + session</li>
+                <li>Standard SQLite</li>
+                <li>Connect / Disconnect</li>
+                <li>Favorites</li>
+                <li>Recent activity</li>
+                <li>Automatic installer</li>
               </ul>
             </div>
           </div>
@@ -593,12 +593,12 @@
         <div class="col-lg-3">
           <div class="card h-100 shadow-sm">
             <div class="card-body p-4">
-              <h3 class="h5"><span class="badge text-bg-primary">v0.2.x</span> Vida del dashboard</h3>
+              <h3 class="h5"><span class="badge text-bg-primary">v0.2.x</span> Dashboard Life</h3>
               <ul class="text-secondary mb-0">
-                <li>Indicadores RX / TX</li>
-                <li>Mayor sensación de actividad</li>
-                <li>Mejoras visuales de monitoreo</li>
-                <li>Refresco más expresivo</li>
+                <li>RX / TX indicators</li>
+                <li>More activity feeling</li>
+                <li>Visual monitoring improvements</li>
+                <li>More expressive refresh</li>
               </ul>
             </div>
           </div>
@@ -607,12 +607,12 @@
         <div class="col-lg-3">
           <div class="card h-100 shadow-sm">
             <div class="card-body p-4">
-              <h3 class="h5"><span class="badge text-bg-primary">v0.3.x</span> Integración operativa</h3>
+              <h3 class="h5"><span class="badge text-bg-primary">v0.3.x</span> Operational Integration</h3>
               <ul class="text-secondary mb-0">
-                <li>Estado real más profundo desde Asterisk</li>
-                <li>Telemetría mejorada</li>
-                <li>Mejor interpretación de nodos/enlaces</li>
-                <li>Refinamiento de operación</li>
+                <li>Deeper real state from Asterisk</li>
+                <li>Improved telemetry</li>
+                <li>Better node/link interpretation</li>
+                <li>Operational refinement</li>
               </ul>
             </div>
           </div>
@@ -621,13 +621,13 @@
         <div class="col-lg-3">
           <div class="card h-100 shadow-sm">
             <div class="card-body p-4">
-              <h3 class="h5"><span class="badge text-bg-danger">v1.0</span> Release estable</h3>
+              <h3 class="h5"><span class="badge text-bg-danger">v1.0</span> Stable Release</h3>
               <ul class="text-secondary mb-0">
-                <li>Base madura</li>
-                <li>Operación sólida</li>
-                <li>Instalación repetible</li>
-                <li>Mayor documentación</li>
-                <li>Proyecto listo para la comunidad</li>
+                <li>Mature foundation</li>
+                <li>Solid operation</li>
+                <li>Repeatable installation</li>
+                <li>More documentation</li>
+                <li>Project ready for the community</li>
               </ul>
             </div>
           </div>
@@ -637,26 +637,26 @@
 
       <div class="alert alert-secondary mt-4 mb-0">
         <i class="bi bi-info-circle"></i>
-        ChileMon avanza por etapas controladas para proteger la estabilidad del nodo ASL3 mientras crecen sus capacidades.
+        ChileMon advances in controlled stages to protect ASL3 node stability while its capabilities grow.
       </div>
     </div>
   </section>
 
   <section id="contribute" class="py-5">
     <div class="container">
-      <h2 class="h1 section-title mb-3">Colaborar</h2>
+      <h2 class="h1 section-title mb-3">Contribute</h2>
       <div class="row g-4">
         <div class="col-lg-6">
           <div class="card shadow-sm h-100">
             <div class="card-body p-4">
-              <h3 class="h5 mb-3"><i class="bi bi-people"></i> Buscamos colaboradores</h3>
+              <h3 class="h5 mb-3"><i class="bi bi-people"></i> Contributors Welcome</h3>
               <p class="text-secondary mb-3">
-                ChileMon es un proyecto comunitario para radioaficionados y nodos AllStarLink. Hay espacio para aportar en UI, PHP, Asterisk/ASL, documentación, pruebas y mejora del instalador.
+                ChileMon is a community project for radio amateurs and AllStarLink nodes. There is room to contribute in UI, PHP, Asterisk/ASL, documentation, testing, and installer improvements.
               </p>
               <ul class="text-secondary mb-0">
-                <li><strong>Issues</strong>: reportar bugs o mejoras con contexto real</li>
-                <li><strong>PRs</strong>: cambios pequeños, claros y revisables</li>
-                <li><strong>Testing</strong>: validación en nodos ASL3 reales</li>
+                <li><strong>Issues</strong>: report bugs or improvements with real-world context</li>
+                <li><strong>PRs</strong>: small, clear, reviewable changes</li>
+                <li><strong>Testing</strong>: validation on real ASL3 nodes</li>
               </ul>
             </div>
           </div>
@@ -664,15 +664,15 @@
         <div class="col-lg-6">
           <div class="card shadow-sm h-100">
             <div class="card-body p-4">
-              <h3 class="h5 mb-3"><i class="bi bi-envelope"></i> Contacto</h3>
+              <h3 class="h5 mb-3"><i class="bi bi-envelope"></i> Contact</h3>
               <ul class="text-secondary mb-0">
-                <li>GitHub: usar el repo (Issues / Discussions)</li>
+                <li>GitHub: use the repo (Issues / Discussions)</li>
                 <li>Email: <a href="mailto:ca2iig@qsl.net">ca2iig@qsl.net</a> (CA2IIG)</li>
               </ul>
               <div class="mt-3">
                 <a class="btn btn-primary" style="background:var(--chile-blue);border-color:var(--chile-blue);"
                    href="https://github.com/gismodes37/Chilemon/issues" target="_blank" rel="noreferrer">
-                  <i class="bi bi-bug"></i> Abrir Issue
+                  <i class="bi bi-bug"></i> Open Issue
                 </a>
                 <a class="btn btn-outline-secondary ms-2"
                    href="https://github.com/gismodes37/Chilemon/pulls" target="_blank" rel="noreferrer">
@@ -686,7 +686,7 @@
 
       <div class="alert alert-warning mt-4 mb-0">
         <i class="bi bi-shield-check"></i>
-        Principio del proyecto: <strong>SQLite es la base por defecto</strong> y la instalación debe seguir siendo simple, segura y repetible en nodos reales.
+        Project principle: <strong>SQLite is the default database</strong>, and installation must remain simple, secure, and repeatable on real nodes.
       </div>
     </div>
   </section>
@@ -699,16 +699,16 @@
         <div class="accordion-item">
           <h2 class="accordion-header">
             <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#q1">
-              ¿ChileMon reemplaza a Supermon u otros sistemas para ASL3?
+              Does ChileMon replace Supermon or other systems for ASL3?
             </button>
           </h2>
           <div id="q1" class="accordion-collapse collapse show" data-bs-parent="#faqAcc">
             <div class="accordion-body text-secondary">
-              <p class="text-justify">No. ChileMon no fue creado para desplazar herramientas históricas del ecosistema AllStarLink. Reconoce el valor operativo de proyectos como Supermon y otros sistemas que han acompañado a la comunidad durante años.</p>
+              <p class="text-justify">No. ChileMon was not created to displace long-standing tools in the AllStarLink ecosystem. It recognizes the operational value of projects such as Supermon and other systems that have supported the community for years.</p>
 
-              <p class="text-justify">ChileMon nace como un desarrollo independiente, construido desde cero, con una arquitectura propia, una instalación más ordenada y una base pensada para crecer por etapas.</p>
+              <p class="text-justify">ChileMon was born as an independent project, built from scratch, with its own architecture, a more organized installation flow, and a foundation designed to grow in stages.</p>
 
-              <p class="text-justify">Su objetivo es aportar una alternativa moderna, mantenible y segura, capaz de convivir con instalaciones existentes y evolucionar junto a ASL3.</p>
+              <p class="text-justify">Its goal is to provide a modern, maintainable, and secure alternative capable of coexisting with existing installations and evolving alongside ASL3.</p>
             </div>
           </div>
         </div>
@@ -716,12 +716,12 @@
         <div class="accordion-item">
           <h2 class="accordion-header">
             <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#q2">
-              ¿Por qué SQLite?
+              Why SQLite?
             </button>
           </h2>
           <div id="q2" class="accordion-collapse collapse" data-bs-parent="#faqAcc">
             <div class="accordion-body text-secondary">
-              Porque simplifica la instalación, reduce dependencias externas y funciona muy bien en Raspberry Pi y nodos ASL3 donde la prioridad es estabilidad, portabilidad y bajo mantenimiento.
+              Because it simplifies installation, reduces external dependencies, and works very well on Raspberry Pi and ASL3 nodes where stability, portability, and low maintenance are priorities.
             </div>
           </div>
         </div>
@@ -729,12 +729,12 @@
         <div class="accordion-item">
           <h2 class="accordion-header">
             <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#q3">
-              ¿La instalación actual ya es usable en un nodo real?
+              Is the current installation already usable on a real node?
             </button>
           </h2>
           <div id="q3" class="accordion-collapse collapse" data-bs-parent="#faqAcc">
             <div class="accordion-body text-secondary">
-              Sí. El release actual ya cuenta con instalación automática, configuración local por nodo, wrapper seguro, SQLite, autenticación, favoritos y operación básica funcional.
+              Yes. The current release already includes automatic installation, per-node local configuration, a secure wrapper, SQLite, authentication, favorites, and functional basic operation.
             </div>
           </div>
         </div>
@@ -742,12 +742,12 @@
         <div class="accordion-item">
           <h2 class="accordion-header">
             <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#q4">
-              ¿En qué entornos se ha probado?
+              In which environments has it been tested?
             </button>
           </h2>
           <div id="q4" class="accordion-collapse collapse" data-bs-parent="#faqAcc">
             <div class="accordion-body text-secondary">
-              ChileMon ya fue probado con éxito en Raspberry Pi 3B+ con ASL3 y también en una máquina virtual Proxmox con Debian 13 + ASL3.
+              ChileMon has already been successfully tested on Raspberry Pi 3B+ with ASL3 and also on a Proxmox virtual machine with Debian 13 + ASL3.
             </div>
           </div>
         </div>
@@ -763,13 +763,13 @@
       <div>
         <div class="fw-semibold">ChileMon</div>
         <div class="text-secondary small">
-          Dashboard moderno para AllStarLink ASL3 — primer release funcional.
+          Modern dashboard for AllStarLink ASL3 — first functional release.
         </div>
       </div>
       <div class="text-secondary small">
         <div><i class="bi bi-github"></i> Repo: <a href="https://github.com/gismodes37/Chilemon" target="_blank" rel="noreferrer">gismodes37/Chilemon</a></div>
-        <div><i class="bi bi-tag"></i> Release actual: v0.1.0</div>
-        <div><i class="bi bi-person-badge"></i> Autor: Guillermo Ismodes López (CA2IIG)</div>
+        <div><i class="bi bi-tag"></i> Current release: v0.1.0</div>
+        <div><i class="bi bi-person-badge"></i> Author: Guillermo Ismodes López (CA2IIG)</div>
       </div>
     </div>
   </div>

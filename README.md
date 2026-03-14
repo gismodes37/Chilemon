@@ -1,314 +1,340 @@
+<p align="center">
+  <img src="docs/img/chilemon-banner.svg" alt="ChileMon Banner">
+</p>
+
+<p align="center">
+<img src="docs/img/dashboard-main.png" width="900">
+</p>
+
+##
+
+<p align="center">
+Modern dashboard for monitoring and controlling AllStarLink nodes
+</p>
+
+<p align="center">
+<img src="https://img.shields.io/badge/version-0.1.0-blue">
+<img src="https://img.shields.io/badge/php-8.2+-blue">
+<img src="https://img.shields.io/badge/database-SQLite-green">
+<img src="https://img.shields.io/badge/ASL3-compatible-green">
+<img alt="Static Badge" src="https://img.shields.io/badge/Bootstrap-5-purple">
+<img alt="Static Badge" src="https://img.shields.io/badge/Java-Script-EFD81C">
+<img alt="Static Badge" src="https://img.shields.io/badge/License-MIT-blue">
+</p>
+
 # 🇨🇱 ChileMon
 
-**ChileMon** es una plataforma de monitoreo y visualización para nodos **AllStarLink 3 (ASL3)**, inspirada en el estilo clásico de Supermon, pero desarrollada con una arquitectura moderna y mantenible en PHP.
+A modern dashboard for monitoring and controlling **AllStarLink (ASL3)** nodes. ChileMon was created as a modern alternative inspired by **Supermon**, designed to provide a clearer, more modular, and easier-to-install interface for AllStar node operators.
 
-Diseñado para ejecutarse como sub-ruta bajo el nodo ASL :
+The goal of the project is to provide a simple and secure tool to view and control the activity of an AllStarLink node from a web browser.
 
- ```ruby
- https://nodeXXXXX.local/chilemon/
- ```
- - ChileMon no reemplaza ASL ni modifica Asterisk.
- - Funciona como un módulo independiente que añade:
- - Persistencia real de datos mediante SQLite
- - Sistema de autenticación propio
- - Información avanzada del sistema
- - Arquitectura modular preparada para crecer
- - Instalación limpia y reproducible desde repositorio
----
+## 🌐 Languages
 
-## 🎯 Objetivo del Proyecto
-
-Supermon cumple una función visual básica, pero no incorpora:
- - Base de datos persistente
- - Gestión de usuarios
- - Modularidad extensible
- - Separación de capas
- - Flujo moderno de desarrollo
-
-ChileMon nace para cubrir esa brecha, manteniendo compatibilidad visual y conceptual con el ecosistema ASL.
+🇪🇸 Spanish documentation: `README_ES.md`  
+🇬🇧 English documentation: `README.md`
 
 ---
 
-## 🚀 Características
+# 📡 What is ChileMon?
 
-- Dashboard estilo Supermon moderno (100% Bootstrap 5)
-- Base de datos **SQLite** (ligera, portable y sin dependencias externas)
-- Compatible con Raspberry Pi
-- Soporte para sub-path `/chilemon`
-- Información del sistema (IP, temperatura CPU, Memoria, Hostname, Zona Horaria, PHP, etc.)
-- Arquitectura preparada para integración con Asterisk / ASL
-- Sin dependencia de MySQL/MariaDB
----
+ChileMon is a web application that allows you to:
 
-## 🧱 Filosofía
+- monitor connected nodes
+- connect remote nodes
+- disconnect nodes
+- visualize the linked node network
+- review node statistics
+- manage favorite nodes
+- view recent activity
 
-ChileMon:
-
-  ❌ No interfiere con ASL
-
-  ❌ No modifica configuración de Asterisk
-
-  ❌ No altera la landing original del nodo
-
-  ✅ Opera como módulo independiente
-
-  ✅ Respeta el estilo Supermon
-
-  ✅ Añade estructura, persistencia y escalabilidad
+All from a modern web interface.
 
 ---
 
-## 📦 Requisitos
+# ✨ Main Features
 
-- Debian 12 (ASL3 Pi Appliance recomendado)
-- PHP 8.2+
-- Apache2
-- Extensiones PHP: `pdo_sqlite` / `sqlite3`
+ChileMon currently includes:
+
+- Web dashboard for AllStarLink node monitoring
+- Remote node connection and disconnection
+- Real-time visualization of connected nodes
+- Node statistics obtained from Asterisk
+- Modal window to visualize the linked node network
+- Favorite node management
+- Recent activity logging
+- Secure command execution through a wrapper
+- Automatic installer for ASL3 systems
 
 ---
 
-## 🛠 Instalación en Raspberry / Nodo ASL3 (Producción)
+# 🧠 Project Philosophy
 
-### El usuario entra al nodo y abre la terminal o entra por SSH:
+ChileMon was designed with the following principles:
 
-### 1. Conectarse al nodo
-Abra la terminal local del nodo o conéctese por SSH desde otro equipo:
+- **Do not interfere with AllStarLink**
+- **Do not modify Asterisk**
+- **Do not replace Supermon**
+- **Be a modular tool**
+- **Be easy to install**
+- **Be secure**
+
+ChileMon works as an **additional module**, without altering the node’s base installation.
+
+---
+
+# 🏗 Architecture
+
+ChileMon is built using simple and robust technologies.
+
+### Backend
+
+- PHP 8+
+- SQLite
+
+### Frontend
+
+- Bootstrap 5
+- JavaScript
+- AJAX
+
+### Server
+
+- Apache
+
+---
+
+# 🔐 Security
+
+ChileMon **does not execute Asterisk commands directly from PHP**.
+
+Instead, it uses a secure wrapper:
 
 ```php
-ssh usuario@IP_DEL_NODO
+/usr/local/bin/chilemon-rpt
 ```
----
-### 2. Instalar Git
 
-Actualice los paquetes:
+This wrapper allows only specific commands to be executed:
 
-```php    
- sudo apt update
- ```
-Instale Git si aún no está disponible:
+ - rpt nodes
+ - rpt stats
+ - rpt connect
+ - rpt disconnect
+
+The commands are executed through a restricted sudo rule for the user:
 
 ```php
- sudo apt install -y git
+www-data
 ```
----
-### 3. Descargar ChileMon desde el repositorio oficial
 
-Ubíquese en /opt y clone el proyecto:
+This prevents arbitrary command execution on the system.
+
+---
+
+## ⚙ How ChileMon Works
+
+ChileMon obtains node information by running Asterisk rpt commands.
+
+Example:
 
 ```php
- cd /opt
- sudo git clone https://github.com/gismodes37/chilemon.git
+sudo -u www-data sudo -n chilemon-rpt nodes 494780
 ```
 
-### 4. Entrar a la carpeta del proyecto
+The output is processed by the service:
 
 ```php
- cd /opt/chilemon
+src/Services/AslRptService.php
 ```
+
+This service interprets the Asterisk output and extracts information such as:
+
+ - connected nodes
+ - node status
+ - system statistics
+
+The processed data is then displayed on the web dashboard.
+
 ---
 
-### 5. Ejecutar el instalador automático
+## 🖥 Dashboard
+
+The main dashboard allows you to view:
+
+ - local node
+ - connected nodes
+ - system status
+ - linked node network
+ - recent activity
+
+It also allows you to:
+
+ - connect nodes
+ - disconnect nodes
+ - manage favorites
+
+---
+
+## 🔎 ChileMon vs Supermon
+
+Supermon is the classic interface used by many AllStarLink nodes.
+
+ChileMon is inspired by that concept, but introduces a more modern architecture.
+
+
+| Feature	| Supermon	| ChileMon |
+|---|---|---|
+| Interface	| Classic HTML	| Modern dashboard |
+| Authentication | Basic login | User system |
+| Database | No | SQLite |
+| Installation | Manual | Automatic installer |
+| Architecture | Monolithic | Modular |
+| Extensibility | Limited | Designed for expansion |
+
+ChileMon **does not replace Supermon**, but instead offers a modern alternative for node monitoring and control.
+
+---
+
+## 📷 Screenshots
+
+### Dashboard
+
+![Dashboard](docs/img/screenshot01.png)
+
+### Red de nodos
+
+![Network](docs/img/network.png)
+
+### Favoritos
+
+![Favorites](docs/img/favorites.png)
+
+---
+
+## 🚀 Installation
+
+ChileMon can be installed directly on an ASL3 node.
+
+### Clone repository
 
 ```php
- sudo bash install/install_chilemon.sh
+cd /opt
+sudo git clone https://github.com/usuario/chilemon.git
 ```
----
 
-### 6. Responder los datos solicitados por el instalador
+### Run installer
 
-Durante la instalación se solicitarán los siguientes datos:
+```php
+ccd /opt/chilemon
+sudo bash install/install_chilemon.sh
+```
 
- - Numero de nodo ASL local
- - IP o nombre del servidor
+The installer will automatically perform:
 
-   Ejemplo:
-     - Nodo local: `12345`
-     - Servidor: `192.168.1.20`  ó  `node12345`
+ - dependency installation
+ - Apache configuration
+ - secure wrapper creation
+ - SQLite database initialization
+ - administrator user creation
 
- - Texto descriptivo del nodo
- - Host AMI
- - Puerto AMI
- - Usuario AMI
- - Clave AMI
- - Timeout AMI
+ ---
 
-La clave AMI se ingresa de forma oculta por seguridad. Esta clave es la misma que puso a la hora de configurar su nodo ASL.
+ ## 📂 Project Structure
 
----
-
-### 7. Validar acceso al sistema desde el navegador
-
-Al finalizar, el instalador mostrará la URL sugerida para abrir ChileMon en el navegador,
-
- - por ejemplo:
-     ```php
-     http://IP_DEL_NODO/chilemon
-     ```
-
- - Si su servidor ya tiene HTTPS activo, también puede probar:
-     ```php
-     https://IP_DEL_NODO/chilemon
-     ```
-
----
-
-
-## 🔐 Autenticación
- - Sistema de login propio con:
- - Tabla users
- - Passwords con password_hash()
- - Sesión PHP
- - Logout seguro
- - Protección de rutas privadas
- - El usuario inicial se crea durante instalación por consola.
----
-
-## 📂 Estructura del Proyecto
 
     chilemon/
-      │
-      ├── app/
-      │   └── Core/
-      │       └── Database.php
-      │
-      ├── config/
-      │   ├── app.php
-      │   └── database.php
-      │
-      ├── data/
-      │   └── chilemon.sqlite   (no debería versionarse)
-      │
-      ├── logs/
-      │
-      ├── public/
-      │   ├── index.php
-      │   ├── login.php
-      │   ├── logout.php
-      │   ├── api/
-      │   │   ├── log-call.php
-      │   │   ├── nodes.php
-      │   │   └── stats.php
-      │   └── assets/
-      │
-      ├── install/
-      ├── bin/
-      ├── README.md
-      └── .gitignore
-
-
----
-
-## 🧠 Arquitectura
-
-### ChileMon:
-
-- NO reemplaza ASL
-- NO modifica configuración de Asterisk
-- NO altera la landing original del nodo
-- Funciona como módulo independiente bajo Apache
-
+     │
+     ├── app/
+     │   └── Core/
+     │       └── Database.php
+     │
+     ├── config/
+     │   ├── app.php
+     │   └── database.php
+     │
+     ├── data/
+     │   └── chilemon.sqlite   (should not be versioned)
+     │
+     ├── logs/
+     │
+     ├── public/
+     │   ├── index.php
+     │   ├── login.php
+     │   ├── logout.php
+     │   ├── api/
+     │   │   ├── log-call.php
+     │   │   ├── nodes.php
+     │   │   └── stats.php
+     │   └── assets/
+     │
+     ├── install/
+     ├── bin/
+     ├── README_ES.md
+     ├── README.md
+     ├── CHANGELOG.md
+     ├── LICENSE.md
+     └── .gitignore
 
 ---
 
-## 🔄 Flujo de Desarrollo
+## 📈 Roadmap
 
- - Se desarrolla siempre en local:
+<img src="https://img.shields.io/badge/version-0.1.0-blue">
 
-   - PC → GitHub → Raspberry
+Initial functional release
 
-- Nunca modificar producción directamente.
-- Branches recomendadas:
-    
-     - main → estable
+<img alt="Static Badge" src="https://img.shields.io/badge/Version-0.2.0-blue">
 
-     - dev → desarrollo
+Real-time RX/TX activity
 
-- Tags semánticos:
+<img alt="Static Badge" src="https://img.shields.io/badge/Version-0.3.0-blue">
 
-     - v0.4.0
-     - v0.5.0
-     - v1.0.0
----
+Dashboard improvements
 
-## 🚀 Estado del Proyecto
+<img alt="Static Badge" src="https://img.shields.io/badge/Version-0.4.0-blue">
 
-### Milestone 1 – ✅ Completado
+Extended events and statistics
 
- - Base de datos SQLite estable
- - Eliminación total de MySQL/MariaDB
- - Dashboard estilo Supermon funcional
- - Soporte sub-path /chilemon
- - Información del sistema (CPU, IP, Hostname, etc.)
- - Login de usuarios implementado
- - Logout funcional
- - Permisos productivos configurados
- - Flujo Local → GitHub → Producción definido
+<img alt="Static Badge" src="https://img.shields.io/badge/Version-1.0-green">
+
+Stable release
 
 ---
 
-### Milestone 2 – ✅ Completado (Supermon+ UX)
+## 📦 Release
 
- - Botón y ventana modal de Favoritos desde el header
- - CRUD de favoritos por usuario (Nodo / Alias / Descripción editable)
- - Acción “Conectar” desde favoritos con confirmación
- - Botón “Desconectar” operativo desde el dashboard
- - Registro de actividad reciente (connect / disconnect / favorite*)
- - APIs protegidas por sesión (Unauthorized si no hay login)
- - Integración UI consistente (header + dashboard + estado)
+### v0.1.0
 
----
+First functional release of ChileMon.
 
-### Milestone 3 – 🧭 En planificación / Inicio (Integración real con Asterisk)
+Includes:
 
-Objetivo: pasar de “estado lógico” (DB/UI) a “estado real” con ASL/Asterisk.
+ - Operational dashboard
+ - Node connection and disconnection
+ - Node network visualization
+ - Favorites management
+ - Recent activity
+ - Automatic installer
+ - AllStarLink integration
 
- - Primera integración real con Asterisk (consulta de estado real del link)
- - Enlace “online real” (no solo marcado en DB)
- - Primera llamada / primer puente de audio (por etapas)
- - Base para monitoreo real (usuarios, links, rx/tx) desde Asterisk
+ ---
 
----
+ ## 🤝 Contributions
 
-## 🔮 Proyección Futura – Sistema de Versionado y Actualización
+Contributions are welcome.
 
-ChileMon contempla, en fases posteriores de desarrollo, la incorporación de un sistema formal de versionado visible y detección de nuevas versiones disponibles.
+If you would like to collaborate:
 
-Este sistema podría incluir:
+ 1. Fork the repository
+ 2. Create a new branch
+ 3. Submit a pull request
 
- - Visualización de versión instalada en la interfaz.
+ ---
 
- - Verificación controlada de versiones disponibles.
+ ## 📄 License
 
- - Notificación discreta de actualizaciones.
+ChileMon is distributed under the MIT
 
- - Mecanismo seguro y supervisado de actualización.
+<img alt="Static Badge" src="https://img.shields.io/badge/License-MIT-blue">
 
-Esta funcionalidad no será implementada hasta que exista una infraestructura clara de distribución y control, priorizando siempre:
-
- - Estabilidad del nodo.
-
- - No interferencia con ASL.
-
- - Control total por parte del administrador.
-
- - Integridad del repositorio y del sistema instalado.
-
-ChileMon no incorporará mecanismos automáticos que comprometan el entorno productivo sin consentimiento explícito del administrador.
-
-Esta característica formará parte de un milestone específico dedicado al ciclo de vida del producto.
-
-## 👨‍💻 Autor
-
-<ul>
- <li> Desarrollado en La Serena, Chile</li>
- <li> CA2IIG – Guillermo Ismodes López</li>
- <li> Servicios Tecnológicos Generales SpA</li>
- <li> La Serena - Chile</li>
-</ul>
----
-
-## 📜 Licencia
-
- - Licencia MIT para proyecto comunitario.
 ---
 

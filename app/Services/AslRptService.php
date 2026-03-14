@@ -147,12 +147,27 @@ final class AslRptService
             throw new RuntimeException("Argumento inválido: {$extraArg}");
         }
 
-        $parts = [
-            'sudo',
-            escapeshellarg($this->wrapper),
-            escapeshellarg($cmd),
-            escapeshellarg($this->nodeId),
-        ];
+        $isWindows = strtoupper(substr(PHP_OS_FAMILY, 0, 3)) === 'WIN';
+
+        // En entornos Windows (desarrollo), Asterisk y chilemon-rpt no existen.
+        // Devolvemos datos simulados para no romper el dashboard y evitar errores de "Ruta no encontrada".
+        if ($isWindows) {
+            if ($cmd === 'stats') {
+                return "System...........................................: ENABLED\n" .
+                       "Nodes currently connected to us..................: 1000, 2000\n";
+            }
+            if ($cmd === 'nodes') {
+                return "T1000\nT2000\n*3333\n<NONE>\n";
+            }
+            // Para 'connect' y 'disconnect'
+            return "Local simulate success";
+        }
+
+        $parts = ['sudo'];
+
+        $parts[] = escapeshellarg($this->wrapper);
+        $parts[] = escapeshellarg($cmd);
+        $parts[] = escapeshellarg($this->nodeId);
 
         if ($extraArg !== '') {
             $parts[] = escapeshellarg($extraArg);
