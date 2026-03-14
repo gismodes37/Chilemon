@@ -74,6 +74,11 @@
       pointer-events: none;
     }
   </style>
+
+  <script 
+  src="https://www.paypal.com/sdk/js?client-id=BAAaojTvA7nReIQJf-h8h5nbEbeRMEKOw6jWEuq9VwSG_HLus5CCFKUsUciYeK68MxFzAr0bousijDDGOE&components=hosted-buttons&disable-funding=venmo&currency=USD">
+  </script>
+
 </head>
 
 <body>
@@ -97,6 +102,7 @@
         <li class="nav-item"><a class="nav-link" href="#architecture">Arquitectura</a></li>
         <li class="nav-item"><a class="nav-link" href="#milestones">Roadmap</a></li>
         <li class="nav-item"><a class="nav-link" href="#faq">FAQ</a></li>
+        <a class="btn btn-outline-danger" href="#donations"><i class="bi bi-heart"></i> Apoyar</a>
       </ul>
 
       <div class="d-flex flex-wrap gap-2 ms-lg-3 mt-3 mt-lg-0 align-items-center">
@@ -756,6 +762,106 @@
   </section>
 
 </main>
+
+<section id="donations" class="py-5">
+  <div class="container">
+
+    <div class="row align-items-end mb-4">
+      <div class="col-lg-8">
+        <h2 class="h1 section-title">Apoyar ChileMon</h2>
+        <p class="text-secondary mb-0">
+          ChileMon es un proyecto independiente desarrollado para la comunidad de
+          radioaficionados y usuarios de AllStarLink.  
+          Si este proyecto te resulta útil, puedes apoyar su desarrollo con una donación voluntaria.
+        </p>
+      </div>
+    </div>
+
+    <div class="row g-4">
+
+      <div class="col-lg-7">
+
+        <div class="card shadow-sm h-100">
+          <div class="card-body p-4">
+
+            <h3 class="h5 mb-3">
+              <i class="bi bi-heart"></i> ¿En qué ayudan las donaciones?
+            </h3>
+
+            <p class="text-secondary">
+              El desarrollo de ChileMon se realiza de forma independiente.
+              Las donaciones ayudan a sostener el proyecto y permiten seguir mejorándolo.
+            </p>
+
+            <ul class="text-secondary mb-0">
+              <li>Desarrollo continuo del dashboard</li>
+              <li>Pruebas en nodos reales AllStarLink</li>
+              <li>Mejoras de seguridad y estabilidad</li>
+              <li>Documentación y sitio web del proyecto</li>
+              <li>Mantenimiento y evolución futura</li>
+            </ul>
+
+          </div>
+        </div>
+
+      </div>
+
+      <div class="col-lg-5">
+
+        <div class="card shadow-sm h-100">
+          <div class="card-body p-4">
+
+            <h3 class="h5 mb-3">
+              <i class="bi bi-cash-coin"></i> Formas de apoyar
+            </h3>
+
+            <div class="d-grid gap-2 mb-3">
+
+              <!--a class="btn btn-primary"
+                 style="background:var(--chile-blue);border-color:var(--chile-blue);"
+                 href="https://paypal.me/TU_LINK_PAYPAL"
+                 target="_blank" rel="noreferrer">
+                 <i class="bi bi-paypal"></i> Donar con PayPal
+              </a-->
+
+              <div id="paypal-container-UL86BH4BE7C2E"></div>
+<div id="paypal-container-UL86BH4BE7C2E"></div>
+<script>
+  paypal.HostedButtons({
+    hostedButtonId: "UL86BH4BE7C2E",
+  }).render("#paypal-container-UL86BH4BE7C2E")
+</script>
+
+              <a class="btn btn-outline-secondary"
+                 href="https://github.com/sponsors/gismodes37"
+                 target="_blank" rel="noreferrer">
+                 <i class="bi bi-github"></i> GitHub Sponsors
+              </a>
+
+            </div>
+
+            <hr>
+
+            <p class="small text-secondary mb-0">
+              También puedes apoyar el proyecto colaborando con código,
+              reportando errores o probando ChileMon en nodos reales.
+            </p>
+
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <div class="alert alert-secondary mt-4 mb-0">
+      <i class="bi bi-info-circle"></i>
+      ChileMon es un proyecto comunitario para radioaficionados.
+      Las donaciones son completamente voluntarias y ayudan a sostener el desarrollo del proyecto.
+    </div>
+
+  </div>
+</section>
 
 <footer class="footer py-4">
   <div class="container">

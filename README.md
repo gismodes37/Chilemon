@@ -318,6 +318,33 @@ Includes:
 
  ---
 
+ ## ❤️ Donations
+
+ChileMon is an independent project developed for the **amateur radio** and **AllStarLink** community.
+If this project is useful to you, you can support its development with a **voluntary donation**.
+
+### What do donations help with?
+
+Donations help sustain the project and make continued improvements possible:
+
+- ongoing dashboard development
+- testing on real AllStarLink nodes
+- security and stability improvements
+- project documentation and website
+- maintenance and future evolution
+
+### Ways to support
+
+- **PayPal:** `https://paypal.me/TU_LINK_PAYPAL`
+- **GitHub Sponsors:** `https://github.com/sponsors/gismodes37`
+
+You can also support the project by contributing code, reporting bugs, or testing ChileMon on real nodes.
+
+> Donations are completely voluntary and help sustain the project’s development.
+
+---
+
+
  ## 🤝 Contributions
 
 Contributions are welcome.

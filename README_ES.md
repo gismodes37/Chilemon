@@ -17,7 +17,7 @@ Modern dashboard for monitoring and controlling AllStarLink nodes
 <img src="https://img.shields.io/badge/php-8.2+-blue">
 <img src="https://img.shields.io/badge/database-SQLite-green">
 <img src="https://img.shields.io/badge/ASL3-compatible-green">
-<img alt="Static Badge" src="https://img.shields.io/badge/Bootstrap-5-purple">
+<img alt="Static Badge" src="https://img.shields.io/badge/Bootstrap-5-%20%237952B3">
 <img alt="Static Badge" src="https://img.shields.io/badge/Java-Script-EFD81C">
 <img alt="Static Badge" src="https://img.shields.io/badge/License-MIT-blue">
 
@@ -320,6 +320,33 @@ Incluye:
 - Integración con AllStarLink
 
 ---
+
+# ❤️ Donaciones
+
+ChileMon es un proyecto independiente desarrollado para la comunidad de radioaficionados y usuarios de **AllStarLink**.
+Si este proyecto te resulta útil, puedes apoyar su desarrollo con una **donación voluntaria**.
+
+## ¿En qué ayudan las donaciones?
+
+Las donaciones ayudan a sostener el proyecto y permiten seguir mejorándolo:
+
+- desarrollo continuo del dashboard
+- pruebas en nodos reales AllStarLink
+- mejoras de seguridad y estabilidad
+- documentación y sitio web del proyecto
+- mantenimiento y evolución futura
+
+## Formas de apoyar
+
+- **PayPal:** `https://paypal.me/TU_LINK_PAYPAL`
+- **GitHub Sponsors:** `https://github.com/sponsors/gismodes37`
+
+También puedes apoyar el proyecto colaborando con código, reportando errores o probando ChileMon en nodos reales.
+
+> Las donaciones son completamente voluntarias y ayudan a sostener el desarrollo del proyecto.
+
+---
+
 
 # 🤝 Contribuciones
 
