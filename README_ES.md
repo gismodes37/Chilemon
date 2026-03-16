@@ -1,4 +1,4 @@
-<p align="center">
+ <p align="center">
   <img src="docs/img/chilemon-banner.svg" alt="ChileMon Banner">
 </p>
 
@@ -321,29 +321,28 @@ Incluye:
 
 ---
 
-# ❤️ Donaciones
+# ❤️ Apoyar ChileMon
 
-ChileMon es un proyecto independiente desarrollado para la comunidad de radioaficionados y usuarios de **AllStarLink**.
-Si este proyecto te resulta útil, puedes apoyar su desarrollo con una **donación voluntaria**.
+ChileMon es un proyecto independiente desarrollado para la comunidad de radioaficionados y usuarios de **AllStarLink**. Si este proyecto te resulta útil, puedes apoyar su desarrollo con una **donación voluntaria**.
 
-## ¿En qué ayudan las donaciones?
+### ¿En qué ayudan las donaciones?
 
-Las donaciones ayudan a sostener el proyecto y permiten seguir mejorándolo:
+El desarrollo de ChileMon se realiza de forma independiente. Las donaciones ayudan a sostener el proyecto y permiten seguir mejorándolo.
 
-- desarrollo continuo del dashboard
-- pruebas en nodos reales AllStarLink
-- mejoras de seguridad y estabilidad
-- documentación y sitio web del proyecto
-- mantenimiento y evolución futura
+- Desarrollo continuo del dashboard
+- Pruebas en nodos reales AllStarLink
+- Mejoras de seguridad y estabilidad
+- Documentación y sitio web del proyecto
+- Mantenimiento y evolución futura
 
-## Formas de apoyar
+### Formas de apoyar
 
-- **PayPal:** `https://paypal.me/TU_LINK_PAYPAL`
-- **GitHub Sponsors:** `https://github.com/sponsors/gismodes37`
+- **PayPal:** [Apoyar Chilemon](https://www.paypal.com/ncp/payment/J56JZF5CPRBVG)
+- **GitHub Sponsors:** [gismodes37](https://github.com/sponsors/gismodes37)
 
 También puedes apoyar el proyecto colaborando con código, reportando errores o probando ChileMon en nodos reales.
 
-> Las donaciones son completamente voluntarias y ayudan a sostener el desarrollo del proyecto.
+> ChileMon es un proyecto comunitario para radioaficionados. Las donaciones son completamente voluntarias y ayudan a sostener el desarrollo del proyecto.
 
 ---
 
