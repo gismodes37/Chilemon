@@ -23,7 +23,10 @@ Modern dashboard for monitoring and controlling AllStarLink nodes
 
 </p>
 
-# 🇨🇱 ChileMon
+# 
+<p align="center">
+  <img src="public/assets/img/chile-flag-brush.png" alt="ChileMon Banner" style="width:100px; height:auto;">
+</p>
 
 Dashboard moderno para monitoreo y control de nodos **AllStarLink (ASL3)**. ChileMon nace como una alternativa moderna inspirada en **Supermon**, diseñada para ofrecer una interfaz más clara, modular y fácil de instalar para operadores de nodos AllStar.
 

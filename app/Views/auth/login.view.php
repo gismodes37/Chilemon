@@ -142,7 +142,7 @@ $serverLabelEsc = htmlspecialchars($serverLabel, ENT_QUOTES, 'UTF-8');
       align-items:center;
       justify-content:center;
       text-align:center;
-      padding: 12px;
+      padding: 100px;
     }
 
     .brand-bg{
@@ -177,8 +177,8 @@ $serverLabelEsc = htmlspecialchars($serverLabel, ENT_QUOTES, 'UTF-8');
 
     .tagline{
       font-size: clamp(14px, 1.6vw, 20px);
-      opacity: .95;
-      margin: 0;
+      opacity: 1.95;
+      margin-top: 6%;
       max-width: 46ch;
     }
 
@@ -248,7 +248,7 @@ $serverLabelEsc = htmlspecialchars($serverLabel, ENT_QUOTES, 'UTF-8');
       </div>
     </section>
 
-    <!-- DERECHA: BRANDING -->
+    <!-- DERECHA: BRANDING  -->
     <section class="right">
       <div class="orb"></div>
       <div class="orb2"></div>
@@ -257,7 +257,7 @@ $serverLabelEsc = htmlspecialchars($serverLabel, ENT_QUOTES, 'UTF-8');
         <img src="<?= BASE_PATH ?>/assets/img/chile-flag-brush.png" alt="Chile" class="brand-bg">
 
         <div class="overlay-text">
-          <h1 class="bigTitle">ChileMon</h1>
+          <!--h1 class="bigTitle">ChileMon</h1-->
 
           <p class="tagline">
             Dashboard para nodos

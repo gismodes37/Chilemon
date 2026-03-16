@@ -22,7 +22,11 @@ Modern dashboard for monitoring and controlling AllStarLink nodes
 <img alt="Static Badge" src="https://img.shields.io/badge/License-MIT-blue">
 </p>
 
-# 🇨🇱 ChileMon
+#
+# 
+<p align="center">
+  <img src="public/assets/img/chile-flag-brush.png" alt="ChileMon Banner" style="width:100px; height:auto;">
+</p>
 
 A modern dashboard for monitoring and controlling **AllStarLink (ASL3)** nodes. ChileMon was created as a modern alternative inspired by **Supermon**, designed to provide a clearer, more modular, and easier-to-install interface for AllStar node operators.
 
