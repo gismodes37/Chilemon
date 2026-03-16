@@ -1,0 +1,63 @@
+:root{
+  --chile-blue:#0039A6;
+  --chile-red:#D52B1E;
+  --bg:#0d1117;
+  --panel:#161b22;
+  --panel-2:#0f1722;
+  --border:#30363d;
+  --text:#c9d1d9;
+  --muted:#8b949e;
+  --primary:#58a6ff;
+  --success:#238636;
+  --success-hover:#2ea043;
+  --secondary:#21262d;
+  --secondary-hover:#30363d;
+  --shadow:0 20px 50px rgba(0,0,0,.35);
+}
+
+.card{border-radius:16px;}
+.section-title{letter-spacing:.2px;}
+.footer{border-top:1px solid rgba(0,0,0,.08);}
+
+.code{
+  font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size:.95rem;
+  background:rgba(0,0,0,.04);
+  border:1px solid rgba(0,0,0,.06);
+  border-radius:10px;
+  padding:.75rem 1rem;
+  overflow-x:auto;
+}
+
+.kbd{
+  font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  background:rgba(0,0,0,.06);
+  border:1px solid rgba(0,0,0,.10);
+  border-bottom-width:2px;
+  padding:.15rem .35rem;
+  border-radius:.5rem;
+  font-size:.9em;
+}
+
+.logo{
+  width:90px;
+  height:80px;
+  border-radius:12px;
+  object-fit:cover;
+  flex-shrink:0;
+}
+
+.btn-group .btn.disabled{
+  opacity:1;
+  pointer-events:none;
+}
+
+.btn-chile-red{
+  background:var(--chile-red);
+  border-color:var(--chile-red);
+}
+
+.btn-chile-blue{
+  background:var(--chile-blue);
+  border-color:var(--chile-blue);
+}

@@ -1,0 +1,29 @@
+.hero{
+  background:
+    radial-gradient(1200px 600px at 20% 0%, rgba(0,57,166,.35), transparent 60%),
+    radial-gradient(900px 500px at 90% 10%, rgba(213,43,30,.25), transparent 55%),
+    linear-gradient(135deg, #0b1220 0%, #0a1633 45%, #081128 100%);
+}
+
+.brand-badge{
+  background:rgba(255,255,255,.10);
+  border:1px solid rgba(255,255,255,.18);
+  color:#fff;
+  border-radius:999px;
+  padding:.35rem .75rem;
+  font-size:.9rem;
+}
+
+.feature-icon{
+  width:44px;
+  height:44px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:12px;
+  background:rgba(0,57,166,.10);
+  border:1px solid rgba(0,57,166,.18);
+  color:var(--chile-blue);
+  font-size:1.25rem;
+  flex:0 0 auto;
+}
