@@ -149,7 +149,9 @@ $serverLabelEsc = htmlspecialchars($serverLabel, ENT_QUOTES, 'UTF-8');
       width: min(520px, 90vw);
       height: auto;
       opacity: .95;
-      filter: drop-shadow(0 12px 26px rgba(0,0,0,.25));
+/*      filter: drop-shadow(0 12px 26px rgba(0,0,0,.25));*/
+      filter: drop-shadow(0 0 25px rgba(0,150,255,0.35));
+
     }
 
     .overlay-text{
@@ -163,7 +165,7 @@ $serverLabelEsc = htmlspecialchars($serverLabel, ENT_QUOTES, 'UTF-8');
       gap: 10px;
       text-align:center;
       width: 115%;           /* sobresale un poco */
-      left: -7.5%;           /* lo centra visualmente */
+      left: -9.0%;           /* lo centra visualmente */
     }
 
     .bigTitle{
@@ -254,16 +256,13 @@ $serverLabelEsc = htmlspecialchars($serverLabel, ENT_QUOTES, 'UTF-8');
       <div class="orb2"></div>
 
       <div class="brandStage">
-        <img src="<?= BASE_PATH ?>/assets/img/chile-flag-brush.png" alt="Chile" class="brand-bg">
+        <img src="<?= rtrim(BASE_PATH, '/') ?>/assets/img/chile-flag-brush.png" alt="Chile" class="brand-bg">
 
         <div class="overlay-text">
           <!--h1 class="bigTitle">ChileMon</h1-->
 
-          <p class="tagline">
-            Dashboard para nodos
-            <span class="asl-badge">AllStarLink</span>
-            Ham Radio
-          </p>
+          <p class="tagline">Dashboard para nodos <span class="asl-badge"> AllStarLink</span> Ham Radio</p>
+
         </div>
       </div>
     </section>

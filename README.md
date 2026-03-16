@@ -1,9 +1,9 @@
 <p align="center">
-  <img src="docs/img/chilemon-banner.svg" alt="ChileMon Banner">
+  <img src="docs/assets/img/chilemon-banner.svg" alt="ChileMon Banner">
 </p>
 
 <p align="center">
-<img src="docs/img/dashboard-main.png" width="900">
+<img src="docs/assets/img/dashboard-main.png" width="900">
 </p>
 
 ##
@@ -25,7 +25,7 @@ Modern dashboard for monitoring and controlling AllStarLink nodes
 #
 # 
 <p align="center">
-  <img src="public/assets/img/chile-flag-brush.png" alt="ChileMon Banner" style="width:100px; height:auto;">
+  <img src="docs/assets/img/chile-flag-brush.png" alt="ChileMon Banner" style="width:130px; height:auto;">
 </p>
 
 A modern dashboard for monitoring and controlling **AllStarLink (ASL3)** nodes. ChileMon was created as a modern alternative inspired by **Supermon**, designed to provide a clearer, more modular, and easier-to-install interface for AllStar node operators.
@@ -202,19 +202,45 @@ ChileMon **does not replace Supermon**, but instead offers a modern alternative 
 
 ### Dashboard
 
-![Dashboard](docs/img/screenshot01.png)
+![Dashboard](docs/assets/img/screenshot01.png)
 
 ### Red de nodos
 
-![Network](docs/img/network.png)
+![Network](docs/assets/img/network.png)
 
 ### Favoritos
 
-![Favorites](docs/img/favorites.png)
+![Favorites](docs/assets/img/favorites.png)
 
 ---
 
-## 🚀 Installation
+
+## README.md
+
+## 🚀 Installation Recommended
+
+ChileMon can be installed directly on an ASL3 node.
+
+### Installation
+
+For a stable setup, it is recommended to install ChileMon from the **latest published Release**.
+
+The `main` branch contains the current development state and may include changes that are not yet part of a stable release.
+
+- **Regular users / production:** use the latest Release
+- **Development or testing:** use the `main` branch
+
+### Stable installation from Release
+
+```bash
+cd /opt
+sudo git clone --branch v0.1.0 https://github.com/gismodes37/Chilemon.git chilemon
+cd /opt/chilemon
+sudo bash install/install_chilemon.sh
+```
+
+
+## 🚀 Installation from main (development or testing only)
 
 ChileMon can be installed directly on an ASL3 node.
 
@@ -222,7 +248,8 @@ ChileMon can be installed directly on an ASL3 node.
 
 ```php
 cd /opt
-sudo git clone https://github.com/usuario/chilemon.git
+sudo git clone --branch main https://github.com/gismodes37/Chilemon.git chilemon
+
 ```
 
 ### Run installer
