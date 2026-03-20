@@ -89,31 +89,26 @@ final class AslRptService
     public static function parseNodes(string $raw): array
     {
         $nodes = [];
-        foreach (preg_split('/[\r\n,]+/', $raw) as $token) {
+        // Dividir por comas, saltos de línea o espacios
+        foreach (preg_split('/[\r\n, \t]+/', $raw) as $token) {
             $token = trim($token);
-            if ($token === '' || $token === '<NONE>') {
-                continue;
-            }
-            if (strpos($token, 'CONNECTED NODES') !== false) {
-                continue;
-            }
-            if (isset($token[0]) && $token[0] === '*') {
+            if ($token === '' || $token === '<NONE>' || stripos($token, 'CONNECTED NODES') !== false) {
                 continue;
             }
 
-            $nodeId = ltrim($token, 'TRLtrl');
+            // Limpiar cualquier prefijo que no sea dígito (T, C, M, etc.)
+            $nodeId = preg_replace('/^[^0-9]+/', '', $token);
             if ($nodeId !== '' && ctype_digit($nodeId)) {
                 $nodes[] = $nodeId;
             }
         }
-
         return array_values(array_unique($nodes));
     }
 
     /**
-     * Parsea stats tipo:
-     * Nodes currently connected to us..................: 54614
-     * o eventualmente múltiples nodos separados por coma.
+     * Parsea rpt stats buscando la línea "Nodes currently connected to us":
+     * Ejemplo: "Nodes currently connected to us..................: T1001, T54614"
+     * Devuelve array de IDs numéricos limpios.
      */
     public static function parseDirectNodesFromStats(string $raw): array
     {
@@ -130,8 +125,14 @@ final class AslRptService
         $nodes = [];
         foreach (preg_split('/[\s,]+/', $value) as $token) {
             $token = trim($token);
-            if ($token !== '' && ctype_digit($token)) {
-                $nodes[] = $token;
+            if ($token === '') {
+                continue;
+            }
+
+            // Limpiar cualquier prefijo que no sea dígito al inicio (T, C, M, etc.)
+            $nodeId = preg_replace('/^[^0-9]+/', '', $token);
+            if ($nodeId !== '' && ctype_digit($nodeId)) {
+                $nodes[] = $nodeId;
             }
         }
 
