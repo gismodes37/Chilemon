@@ -823,6 +823,7 @@
       <div class="text-secondary small">
         <div><i class="bi bi-github"></i> Repo: <a href="https://github.com/gismodes37/Chilemon" target="_blank" rel="noreferrer">gismodes37/Chilemon</a></div>
         <div><i class="bi bi-tag"></i> Release actual: v0.1.0</div>
+        <div><i class="bi bi-graph-up"></i> Visitas: <span id="visit-counter">...</span></div>
         <div><i class="bi bi-person-badge"></i> Autor: Guillermo Ismodes López (CA2IIG)</div>
       </div>
     </div>
@@ -830,5 +831,20 @@
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+  var gcInterval = setInterval(function () {
+    if (window.goatcounter && window.goatcounter.visit_count) {
+      clearInterval(gcInterval);
+      window.goatcounter.visit_count({
+        append: '#visit-counter',
+        type: 'html'
+      });
+    }
+  }, 100);
+</script>
+
+<script data-goatcounter="https://TU_CODIGO.goatcounter.com/count"
+        async src="//gc.zgo.at/count.js"></script>
 </body>
 </html>
