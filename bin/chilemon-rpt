@@ -1,61 +1,50 @@
 #!/bin/bash
 # ---------------------------------------------------------
-# ChileMon - Wrapper seguro para comandos rpt
+# ChileMon - Wrapper seguro corregido (v0.2.2)
 # ---------------------------------------------------------
-# Uso:
-#   chilemon-rpt nodes YOUR_NODE
-#   chilemon-rpt stats YOUR_NODE
-#   chilemon-rpt connect YOUR_NODE 54614
-#   chilemon-rpt disconnect YOUR_NODE 54614
+# Este script actúa como un puente seguro entre PHP y Asterisk.
+# Limpia los parámetros de entrada y los ejecuta mediante 'rpt fun'.
 # ---------------------------------------------------------
 
-CMD="$1"
-LOCAL_NODE="$2"
-REMOTE_NODE="$3"
+# Limpiar parámetros de comillas para evitar fallos de ejecución desde la web
+CMD=$(echo $1 | tr -d "'\"")
+LOCAL=$(echo $2 | tr -d "'\"")
+REMOTE=$(echo $3 | tr -d "'\"")
 
-# ---------------------------------------------------------
-# Validación básica
-# ---------------------------------------------------------
-if [ -z "$CMD" ] || [ -z "$LOCAL_NODE" ]; then
-    echo "Usage: chilemon-rpt <nodes|stats|connect|disconnect|restart-asterisk|restart-apache|poweroff> <local-node> [remote-node]"
-    exit 1
-fi
+# Registro opcional para depuración en el nodo (descomentar si es necesario)
+# echo "[$(date)] EJECUTANDO: $CMD LOCAL:$LOCAL REMOTE:$REMOTE" >> /tmp/chilemon.log
 
-# ---------------------------------------------------------
-# Ejecutar comando permitido
-# ---------------------------------------------------------
 case "$CMD" in
     nodes)
-        /usr/sbin/asterisk -rx "rpt nodes $LOCAL_NODE"
+        # Lista los nodos conectados actualmente
+        /usr/sbin/asterisk -rx "rpt nodes $LOCAL"
         ;;
     stats)
-        /usr/sbin/asterisk -rx "rpt stats $LOCAL_NODE"
+        # Obtiene estadísticas detalladas del nodo local
+        /usr/sbin/asterisk -rx "rpt stats $LOCAL"
         ;;
     connect)
-        if [ -z "$REMOTE_NODE" ]; then
-            echo "Usage: chilemon-rpt connect <local-node> <remote-node>"
-            exit 1
-        fi
-        /usr/sbin/asterisk -rx "rpt fun $LOCAL_NODE *3$REMOTE_NODE"
+        # Realiza una conexión hacia un nodo remoto (*3 = transceive)
+        /usr/sbin/asterisk -rx "rpt fun $LOCAL *3$REMOTE"
         ;;
     disconnect)
-        if [ -z "$REMOTE_NODE" ]; then
-            echo "Usage: chilemon-rpt disconnect <local-node> <remote-node>"
-            exit 1
-        fi
-        /usr/sbin/asterisk -rx "rpt fun $LOCAL_NODE *1$REMOTE_NODE"
+        # Desconecta un nodo remoto específico (*1 = disconnect specific)
+        /usr/sbin/asterisk -rx "rpt fun $LOCAL *1$REMOTE"
         ;;
     restart-asterisk)
+        # Reinicia el servicio Asterisk completo
         /usr/bin/systemctl restart asterisk
         ;;
     restart-apache)
+        # Reinicia el servidor web Apache
         /usr/bin/systemctl restart apache2
         ;;
     poweroff)
+        # Apaga el hardware físicamente
         /usr/sbin/poweroff
         ;;
     *)
-        echo "Invalid command"
+        echo "Comando invalido: $CMD"
         exit 1
         ;;
 esac

@@ -218,7 +218,7 @@ final class AslRptService
     }
 
     /**
-     * Convierte string de tiempo (mm:ss, hh:mm:ss, solo segundos) a int segundos.
+     * Convierte string de tiempo (mm:ss, hh:mm:ss, hh:mm:ss:ms o solo segundos) a int segundos.
      * Tolerante: si no puede parsear, retorna 0.
      */
     private static function parseTimeToSeconds(string $time): int
@@ -228,11 +228,12 @@ final class AslRptService
             return 0;
         }
 
-        // Intentar formato hh:mm:ss o mm:ss
+        // AllStarLink puede enviar hasta 4 partes (hh:mm:ss:ms)
         $parts = explode(':', $time);
         $parts = array_map('intval', $parts);
 
         return match (count($parts)) {
+            4 => $parts[0] * 3600 + $parts[1] * 60 + $parts[2], // Ignorar ms
             3 => $parts[0] * 3600 + $parts[1] * 60 + $parts[2],
             2 => $parts[0] * 60 + $parts[1],
             1 => $parts[0],

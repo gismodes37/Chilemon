@@ -23,7 +23,7 @@ header('Connection: keep-alive');
 for ($i = 0; $i < ob_get_level(); $i++) {
     @ob_end_flush();
 }
-@ob_implicit_flush(1);
+@ob_implicit_flush(true);
 
 Auth::startSession();
 if (!Auth::isLoggedIn()) {
