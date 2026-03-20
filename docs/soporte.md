@@ -67,7 +67,7 @@ sudo tail -50 /opt/chilemon/logs/app.log
 
 ```bash
 # Ejecutar manualmente como www-data
-sudo -u www-data sudo -n /usr/local/bin/chilemon-rpt nodes 61916
+sudo -u www-data sudo -n /usr/local/bin/chilemon-rpt nodes YOUR_NODE
 
 # Verificar permisos del wrapper
 ls -la /usr/local/bin/chilemon-rpt
@@ -80,7 +80,7 @@ sudo cat /etc/sudoers.d/chilemon
 
 ```bash
 # Consulta directa a Asterisk (sin pasar por ChileMon)
-sudo asterisk -rx "rpt nodes 61916"
+sudo asterisk -rx "rpt nodes YOUR_NODE"
 
 # Verificar que Asterisk está activo
 sudo systemctl status asterisk

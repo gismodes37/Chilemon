@@ -97,7 +97,10 @@ function parseConnectedNodes(string $txt): array
 }
 
 try {
-    $nodeId = getenv('CHILEMON_NODE') ?: '61916';
+    $nodeId = getenv('CHILEMON_NODE') ?: '';
+if ($nodeId === '') {
+    throw new RuntimeException('CHILEMON_NODE no está definido para collector.php');
+}
 
     $db = Database::getConnection();
     ensureSchema($db);

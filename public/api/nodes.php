@@ -5,7 +5,7 @@ declare(strict_types=1);
  * ChileMon — Nodes API
  */
 
-require_once __DIR__ . '/../../../config/app.php';
+require_once __DIR__ . '/../../config/app.php';
 require_once __DIR__ . '/../../app/autoload.php';
 
 use App\Auth\Auth;

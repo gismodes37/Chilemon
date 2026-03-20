@@ -64,7 +64,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
                 $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 
                 // Redirigir al dashboard usando URL absoluta
-                // Resultado: https://node61916.local/chilemon/index.php
+                // Resultado: https://nodeYOUR_NODE.local/chilemon/index.php
                 header('Location: ' . $baseUrl . '/index.php');
                 exit;
             }

@@ -10,7 +10,15 @@ use RuntimeException;
  */
 final class AslRptService
 {
-    private const ALLOWED = ['stats', 'nodes', 'connect', 'disconnect'];
+    private const ALLOWED = [
+        'stats',
+        'nodes',
+        'connect',
+        'disconnect',
+        'restart-asterisk',
+        'restart-apache',
+        'poweroff'
+    ];
 
     private string $wrapper;
     private string $nodeId;
@@ -22,7 +30,10 @@ final class AslRptService
         $this->wrapper = $wrapperPath;
         $this->nodeId  = $nodeId !== ''
             ? $nodeId
-            : (defined('ASL_NODE') ? (string) ASL_NODE : (string)(getenv('CHILEMON_NODE') ?: '61916'));
+            : (defined('ASL_NODE') ? (string) ASL_NODE : (string)(getenv('CHILEMON_NODE') ?: ''));
+            if ($this->nodeId === '') {
+            throw new RuntimeException('Nodo local no configurado en ChileMon.');
+            }
     }
 
     public function stats(): string
@@ -41,10 +52,33 @@ final class AslRptService
         return true;
     }
 
-    public function disconnect(string $remoteNode): bool
+    public function disconnect(string $remoteNode): string
     {
-        $this->run('disconnect', $remoteNode);
-        return true;
+        return $this->run('disconnect', $remoteNode);
+    }
+
+    /**
+     * Reinicia el servicio Asterisk mediante el wrapper.
+     */
+    public function restartAsterisk(): string
+    {
+        return $this->run('restart-asterisk', $this->nodeId);
+    }
+
+    /**
+     * Reinicia el servidor web Apache.
+     */
+    public function restartApache(): string
+    {
+        return $this->run('restart-apache', $this->nodeId);
+    }
+
+    /**
+     * Apaga el nodo completamente (hardware).
+     */
+    public function powerOff(): string
+    {
+        return $this->run('poweroff', $this->nodeId);
     }
 
     /**
@@ -134,6 +168,79 @@ final class AslRptService
     }
 
     /**
+     * Parsea rpt stats enfocado en indicadores de actividad RX/TX.
+     *
+     * Campos extraídos:
+     *   - Signal on input  → rx (bool)
+     *   - TX time today    → tx_time_today (int, en segundos)
+     *   - Keyups today     → keyups_today (int)
+     *
+     * @return array{
+     *   rx: bool,
+     *   tx_time_today: int,
+     *   tx_time_raw: string,
+     *   keyups_today: int,
+     *   signal_raw: string,
+     *   timestamp: int
+     * }
+     */
+    public static function parseActivity(string $rawStats): array
+    {
+        $kv = self::parseKeyValueDots($rawStats);
+
+        // --- Signal on input → RX ---
+        $signalRaw = $kv['Signal on input'] ?? '';
+        $rx = false;
+        if ($signalRaw !== '') {
+            $upper = strtoupper(trim($signalRaw));
+            // "YES", cualquier número > 0, o texto distinto de "NO"/"0"/vacío
+            $rx = ($upper === 'YES')
+                || (is_numeric($signalRaw) && (int)$signalRaw > 0)
+                || ($upper !== 'NO' && $upper !== '0' && $upper !== '');
+        }
+
+        // --- TX time today → segundos ---
+        $txRaw = $kv['TX time today'] ?? '';
+        $txSeconds = self::parseTimeToSeconds($txRaw);
+
+        // --- Keyups today ---
+        $keyupsRaw = $kv['Keyups today'] ?? '0';
+        $keyups = (int)filter_var($keyupsRaw, FILTER_SANITIZE_NUMBER_INT);
+
+        return [
+            'rx'             => $rx,
+            'tx_time_today'  => $txSeconds,
+            'tx_time_raw'    => trim($txRaw),
+            'keyups_today'   => max(0, $keyups),
+            'signal_raw'     => trim($signalRaw),
+            'timestamp'      => time(),
+        ];
+    }
+
+    /**
+     * Convierte string de tiempo (mm:ss, hh:mm:ss, solo segundos) a int segundos.
+     * Tolerante: si no puede parsear, retorna 0.
+     */
+    private static function parseTimeToSeconds(string $time): int
+    {
+        $time = trim($time);
+        if ($time === '' || strtoupper($time) === 'N/A') {
+            return 0;
+        }
+
+        // Intentar formato hh:mm:ss o mm:ss
+        $parts = explode(':', $time);
+        $parts = array_map('intval', $parts);
+
+        return match (count($parts)) {
+            3 => $parts[0] * 3600 + $parts[1] * 60 + $parts[2],
+            2 => $parts[0] * 60 + $parts[1],
+            1 => $parts[0],
+            default => 0,
+        };
+    }
+
+    /**
      * Ejecuta el wrapper con exec() y valida exit code.
      * @throws RuntimeException si exit code != 0
      */
@@ -153,11 +260,23 @@ final class AslRptService
         // Devolvemos datos simulados para no romper el dashboard y evitar errores de "Ruta no encontrada".
         if ($isWindows) {
             if ($cmd === 'stats') {
+                // Mock enriquecido con campos de actividad para desarrollo visual
+                $mockRx     = rand(0, 1) ? 'YES' : 'NO';
+                $mockKeyups = (string)rand(0, 50);
+                $mockTx     = sprintf('%02d:%02d', rand(0, 5), rand(0, 59));
+
                 return "System...........................................: ENABLED\n" .
-                       "Nodes currently connected to us..................: 1000, 2000\n";
+                       "Nodes currently connected to us..................: 1000, 2000\n" .
+                       "Signal on input..................................: {$mockRx}\n" .
+                       "Keyups today.....................................: {$mockKeyups}\n" .
+                       "TX time today....................................: {$mockTx}\n";
             }
             if ($cmd === 'nodes') {
                 return "T1000\nT2000\n*3333\n<NONE>\n";
+            }
+            // Mocks para acciones de sistema en Windows
+            if (in_array($cmd, ['restart-asterisk', 'restart-apache', 'poweroff'], true)) {
+                return "Simulated success for action: {$cmd}";
             }
             // Para 'connect' y 'disconnect'
             return "Local simulate success";

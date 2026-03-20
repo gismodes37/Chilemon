@@ -3,10 +3,10 @@
 # ChileMon - Wrapper seguro para comandos rpt
 # ---------------------------------------------------------
 # Uso:
-#   chilemon-rpt nodes 61916
-#   chilemon-rpt stats 61916
-#   chilemon-rpt connect 61916 54614
-#   chilemon-rpt disconnect 61916 54614
+#   chilemon-rpt nodes YOUR_NODE
+#   chilemon-rpt stats YOUR_NODE
+#   chilemon-rpt connect YOUR_NODE 54614
+#   chilemon-rpt disconnect YOUR_NODE 54614
 # ---------------------------------------------------------
 
 CMD="$1"
@@ -17,7 +17,7 @@ REMOTE_NODE="$3"
 # Validación básica
 # ---------------------------------------------------------
 if [ -z "$CMD" ] || [ -z "$LOCAL_NODE" ]; then
-    echo "Usage: chilemon-rpt <nodes|stats|connect|disconnect> <local-node> [remote-node]"
+    echo "Usage: chilemon-rpt <nodes|stats|connect|disconnect|restart-asterisk|restart-apache|poweroff> <local-node> [remote-node]"
     exit 1
 fi
 
@@ -44,6 +44,15 @@ case "$CMD" in
             exit 1
         fi
         /usr/sbin/asterisk -rx "rpt fun $LOCAL_NODE *1$REMOTE_NODE"
+        ;;
+    restart-asterisk)
+        /usr/bin/systemctl restart asterisk
+        ;;
+    restart-apache)
+        /usr/bin/systemctl restart apache2
+        ;;
+    poweroff)
+        /usr/sbin/poweroff
         ;;
     *)
         echo "Invalid command"

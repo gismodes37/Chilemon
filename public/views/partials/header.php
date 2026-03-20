@@ -73,11 +73,7 @@ $headerStyle = $headerImgUrl
           <div class="text-end">
             <div class="mb-1">
 
-              <button class="btn btn-sm btn-outline-warning"
-                      data-bs-toggle="modal"
-                      data-bs-target="#favoritesModal">
-                <i class="bi bi-star"></i> Favoritos
-              </button>
+              
 
               <span class="badge bg-success">
                 <i class="bi bi-check-circle"></i>
@@ -110,6 +106,12 @@ $headerStyle = $headerImgUrl
                 <i class="bi bi-database"></i>
                 SQLite | <span id="current-time"><?= date('H:i') ?></span>
               </span>
+
+              <button class="btn btn-sm btn-outline-warning"
+                      data-bs-toggle="modal"
+                      data-bs-target="#favoritesModal">
+                <i class="bi bi-star"></i> Favoritos
+              </button>
 
             </div>
           </div>

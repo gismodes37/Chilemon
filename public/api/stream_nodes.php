@@ -6,7 +6,7 @@ declare(strict_types=1);
  * Permite mandar el estado actual sin requerir polling constante por el cliente.
  */
 
-require_once __DIR__ . '/../../../config/app.php';
+require_once __DIR__ . '/../../config/app.php';
 require_once __DIR__ . '/../../app/autoload.php';
 
 use App\Auth\Auth;

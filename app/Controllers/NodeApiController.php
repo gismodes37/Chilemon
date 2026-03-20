@@ -20,6 +20,9 @@ class NodeApiController
             $visibleNodes = AslRptService::parseNodes($rawNodes);
             $directNodes  = AslRptService::parseDirectNodesFromStats($rawStats);
 
+            // v0.2.x — Parsear indicadores de actividad RX/TX
+            $activity = AslRptService::parseActivity($rawStats);
+
             $visibleLookup = array_fill_keys($visibleNodes, true);
             $directLookup  = array_fill_keys($directNodes, true);
 
@@ -41,6 +44,7 @@ class NodeApiController
                     'mode'            => 'ASL',
                     'online'          => $isDirect,
                     'visibility_type' => $isDirect ? 'direct' : 'visible',
+                    'activity'        => $activity,
                 ];
             }
 
@@ -50,6 +54,7 @@ class NodeApiController
                 'ok'           => true,
                 'count'        => count($rows),
                 'nodes'        => $rows,
+                'activity'     => $activity,
                 'visibleNodes' => $visibleNodes,
                 'directNodes'  => $directNodes,
                 'rawNodes'     => $rawNodes,

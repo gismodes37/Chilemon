@@ -11,7 +11,9 @@ return [
      * Nodo local ASL del servidor donde se instala ChileMon.
      * Debe coincidir con el nodo configurado en este equipo.
      */
+    return [
     'local_node' => '12345',
+    ];
 
     /**
      * Texto opcional mostrado debajo del nombre de la aplicación.

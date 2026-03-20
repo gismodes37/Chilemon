@@ -269,124 +269,156 @@
             ChileMon - Modal Favoritos
         ============================== */
 
-/* Fondo azul tipo cabecera */
-#favoritesModal .modal-content {
-    background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
-    border: none;
-    color: #ffffff;
-    backdrop-filter: blur(4px);
-}
+/* =========================================
+   ChileMon - Premium Glass Modals (Global)
+   ========================================= */
 
-/* Opacidad ligera elegante */
-#favoritesModal .modal-content {
-    background-color: rgba(13, 110, 253, 0.95);
-}
-
-/* Header más oscuro */
-#favoritesModal .modal-header {
-    background-color: rgba(0, 0, 0, 0.15);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.15);
-}
-
-/* Inputs sobre azul */
-#favoritesModal .form-control {
-    background-color: rgba(255, 255, 255, 0.9);
-    border: none;
-}
-
-/* Tabla */
-#favoritesModal table {
-    color: #ffffff;
-}
-
-#favoritesModal thead {
-    background-color: rgba(0, 0, 0, 0.15);
-}
-
-/* Botón guardar más visible */
-#favoritesModal .btn-warning {
-    font-weight: 600;
-}
-
-/* Fondo del backdrop más elegante */
+/* Backdrop más oscuro y elegante con fuerte desenfoque */
 .modal-backdrop.show {
+    opacity: 0.78;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+/* Base de la ventana modal (Premium Glass) */
+.modal-content {
+    background: rgba(4, 18, 85, 0.88); /* Azul profundo ChileMon */
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    color: #fff;
+    border-radius: 24px;
+    box-shadow: 0 35px 85px rgba(0, 0, 0, 0.65);
+    overflow: hidden;
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.modal.fade .modal-dialog {
+    transform: scale(0.92);
+    transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.modal.show .modal-dialog {
+    transform: scale(1);
+}
+
+/* Cabecera uniforme y minimalista */
+.modal-header {
+    background: rgba(0, 0, 0, 0.22);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 1.4rem 1.6rem;
+}
+
+.modal-title {
+    font-weight: 800;
+    font-size: 1.25rem;
+    letter-spacing: 0.4px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+/* Botón de cierre Premium */
+.modal-header .btn-close {
+    filter: invert(1) brightness(2);
     opacity: 0.6;
+    transition: all 0.3s ease;
+    background-size: 0.85rem;
+    padding: 1.2rem;
 }
 
-/* Fondo del backdrop más suave */
-.modal-backdrop.show {
-  opacity: 0.55;
+.modal-header .btn-close:hover {
+    opacity: 1;
+    transform: rotate(90deg) scale(1.15);
 }
 
-/* Modal Favoritos estilo cabecera */
-#favoritesModal .modal-content {
-  background: rgba(0, 92, 185, 0.92); /* azul + opacidad */
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  backdrop-filter: blur(6px);
-  color: #fff;
+/* Cuerpo y tablas internas con mejor tipografía */
+.modal-body {
+    padding: 1.8rem;
+    font-size: 0.94rem;
 }
 
-#favoritesModal .modal-header {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+.modal-body .table,
+.modal-body .table thead,
+.modal-body .table tbody,
+.modal-body .table td,
+.modal-body .table th {
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.1);
+    background: transparent !important;
 }
 
-#favoritesModal .modal-body .table {
-  color: #fff;
+.modal-body thead th {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    opacity: 0.65;
+    border-bottom-width: 2px;
 }
 
-#favoritesModal .modal-body .table thead {
-  color: #e8f2ff;
+/* Footer con degradado suave */
+.modal-footer {
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.15), rgba(0, 0, 0, 0.05));
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 1.2rem 1.6rem;
+    gap: 12px;
 }
 
-#favoritesModal input.form-control {
-  background: rgba(255, 255, 255, 0.92);
+/* Botones dentro de modales */
+.modal .btn {
+    border-radius: 10px;
+    font-weight: 600;
+    padding: 0.5rem 1.2rem;
+    letter-spacing: 0.2px;
 }
 
-/* -------------------------
-   ChileMon - Favorites Modal (glass + azul)
--------------------------- */
-#favoritesModal .modal-content{
-  background: rgba(4, 18, 85, 0.88); /* #041255 con opacidad */
-  border: 1px solid rgba(255,255,255,0.18);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  color: #fff;
-  border-radius: 16px;
-  box-shadow: 0 18px 55px rgba(0,0,0,0.45);
+/* Variantes de color (Acentos Premium) */
+
+/* 1. Peligro / Advertencia (Reinicio, Apagado) */
+.modal-chilemon-danger .modal-content {
+    background: rgba(78, 6, 22, 0.92); /* Tinto profundo cristalino */
+    border-color: rgba(220, 53, 69, 0.35);
 }
 
-#favoritesModal .modal-header{
-  background: rgba(0,0,0,0.18);
-  border-bottom: 1px solid rgba(255,255,255,0.12);
+.modal-chilemon-danger .modal-header {
+    background: rgba(220, 53, 69, 0.12);
 }
 
-#favoritesModal .modal-title{
-  font-weight: 700;
+/* 2. Info / Nodos Remotos (Cian AllStarLink) */
+.modal-chilemon-info .modal-content {
+    background: rgba(1, 24, 55, 0.92); 
+    border-color: rgba(1, 254, 253, 0.28);
 }
 
-#favoritesModal .btn-close{
-  filter: invert(1);
-  opacity: 0.85;
+.modal-chilemon-info .modal-header {
+    background: rgba(1, 254, 253, 0.06);
 }
 
-#favoritesModal .table,
-#favoritesModal .table thead,
-#favoritesModal .table tbody,
-#favoritesModal .table td,
-#favoritesModal .table th{
-  color: #fff;
+/* Inputs y Formularios (Alta Visibilidad) */
+.modal .form-control, 
+.modal .form-select {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    color: #fff;
+    border-radius: 12px;
+    transition: all 0.25s ease;
 }
 
-#favoritesModal .table thead{
-  opacity: 0.9;
+.modal .form-control:focus {
+    background: rgba(255, 255, 255, 0.14);
+    border-color: rgba(1, 254, 253, 0.6);
+    color: #fff;
+    box-shadow: 0 0 20px rgba(1, 254, 253, 0.15);
 }
 
-#favoritesModal .form-label{
-  color: rgba(255,255,255,0.85);
+.modal .text-muted {
+    color: rgba(255, 255, 255, 0.55) !important;
 }
 
-#favoritesModal .text-muted{
-  color: rgba(255,255,255,0.65) !important;
+.modal hr {
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    opacity: 1;
 }
 
 /* Quita la franja gris superior (margen por defecto del navegador) */
@@ -570,3 +602,57 @@ html, body{
 .supermon-table tr.node-row-active td {
     transition: background-color 0.25s ease;
 }
+
+/* =========================================
+   ChileMon v0.2.x — Badges de Actividad RX/TX
+========================================= */
+
+/* Animación de pulso para RX/TX */
+@keyframes activityPulse {
+    0%   { opacity: 1; transform: scale(1); }
+    50%  { opacity: 0.72; transform: scale(1.06); }
+    100% { opacity: 1; transform: scale(1); }
+}
+
+/* RX activo: verde pulsante */
+.badge-activity-rx {
+    background-color: #28a745 !important;
+    color: #fff !important;
+    animation: activityPulse 1.2s ease-in-out infinite;
+}
+
+/* TX activo/reciente: rojo pulsante */
+.badge-activity-tx {
+    background-color: #dc3545 !important;
+    color: #fff !important;
+    animation: activityPulse 1.2s ease-in-out infinite;
+}
+
+/* Actividad reciente (keyups): azul tenue */
+.badge-activity-recent {
+    background-color: rgba(13, 110, 253, 0.18) !important;
+    color: #0d6efd !important;
+    border: 1px solid rgba(13, 110, 253, 0.3);
+}
+
+/* Idle: gris discreto */
+.badge-activity-idle {
+    background-color: rgba(108, 117, 125, 0.12) !important;
+    color: #6c757d !important;
+    border: 1px solid rgba(108, 117, 125, 0.2);
+}
+
+/* Dot pulsante junto al badge */
+.activity-dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    margin-right: 3px;
+    vertical-align: middle;
+}
+
+.badge-activity-rx .activity-dot { background: #fff; }
+.badge-activity-tx .activity-dot { background: #fff; }
+.badge-activity-recent .activity-dot { background: #0d6efd; }
+.badge-activity-idle .activity-dot { background: #6c757d; opacity: 0.4; }

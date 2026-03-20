@@ -61,17 +61,24 @@ if (!defined('ASL_NODE')) {
      * 3. Fallback temporal de compatibilidad
      *
      * Nota:
-     * El valor '61916' debería eliminarse en la fase final,
+     * El valor 'YOUR_NODE' debería eliminarse en la fase final,
      * cuando el instalador genere siempre config/local.php.
      */
     define(
         'ASL_NODE',
         (string) (
             getenv('CHILEMON_NODE')
-                ?: ($localConfig['local_node'] ?? '61916')
+                ?: ($localConfig['local_node'] ?? '')
         )
     );
 }
+
+if (ASL_NODE === '') {
+    throw new RuntimeException(
+        'ASL_NODE no está configurado. Define CHILEMON_NODE o config/local.php => local_node'
+    );
+}
+
 
 $isCli = (PHP_SAPI === 'cli' || PHP_SAPI === 'phpdbg');
 

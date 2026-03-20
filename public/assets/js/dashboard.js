@@ -205,8 +205,8 @@ function handleUnauthorized() {
   // Construir URL de login.
   // window.CHILEMON_BASE apunta a public/ (ej: "https://node.local/chilemon/")
   // login.php está en public/ → mismo nivel → base + "login.php"
-  // Ejemplo: "https://node61916.local/chilemon/" + "login.php"
-  //        = "https://node61916.local/chilemon/login.php"  ✓
+  // Ejemplo: "https://nodeYOUR_NODE.local/chilemon/" + "login.php"
+  //        = "https://nodeYOUR_NODE.local/chilemon/login.php"  ✓
   const loginUrl = base.replace(/\/+$/, "/") + "login.php";
   window.location.href = loginUrl;
 }
@@ -264,6 +264,54 @@ function setButtonLoading(button, isLoading, loadingText = "Procesando...") {
   }
 }
 
+/* =============================================================
+ * v0.2.x — Actividad RX/TX en vivo
+ * -------------------------------------------------------------
+ * Mapa para detectar delta de TX entre lecturas SSE.
+ * Si tx_time_today cambió entre dos lecturas → TX reciente.
+ * ============================================================= */
+let chilemonPrevTxTime = new Map();
+
+/**
+ * Genera el HTML del badge de actividad para un nodo.
+ *
+ * Prioridad de estados:
+ *   1. RX activo  (activity.rx === true)     → verde pulsante
+ *   2. TX reciente (tx_time cambió)          → rojo pulsante
+ *   3. Activo     (keyups_today > 0)         → azul tenue
+ *   4. Idle       (nada)                     → gris
+ *
+ * @param {Object} activity       - {rx, tx_time_today, keyups_today, ...}
+ * @param {string} nodeId         - ID del nodo para tracking de TX delta
+ * @returns {string} HTML del badge
+ */
+function renderActivityBadge(activity, nodeId) {
+  if (!activity) {
+    return `<span class="badge badge-activity-idle"><span class="activity-dot"></span> Idle</span>`;
+  }
+
+  const rx = !!activity.rx;
+  const txTimeNow = Number(activity.tx_time_today || 0);
+  const keyups = Number(activity.keyups_today || 0);
+
+  // Detectar TX reciente: comparar con valor anterior
+  const prevTx = chilemonPrevTxTime.get(nodeId) ?? null;
+  const txRecent = prevTx !== null && txTimeNow > prevTx;
+  chilemonPrevTxTime.set(nodeId, txTimeNow);
+
+  // Prioridad: RX > TX > Activo > Idle
+  if (rx) {
+    return `<span class="badge badge-activity-rx"><span class="activity-dot"></span> RX</span>`;
+  }
+  if (txRecent) {
+    return `<span class="badge badge-activity-tx"><span class="activity-dot"></span> TX</span>`;
+  }
+  if (keyups > 0) {
+    return `<span class="badge badge-activity-recent"><span class="activity-dot"></span> Activo</span>`;
+  }
+  return `<span class="badge badge-activity-idle"><span class="activity-dot"></span> Idle</span>`;
+}
+
 function renderNodes(nodes) {
   const tbody = document.getElementById("nodes-table-body");
   if (!tbody) return;
@@ -271,7 +319,7 @@ function renderNodes(nodes) {
   if (!Array.isArray(nodes) || nodes.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="8" class="text-center py-3 text-muted">
+        <td colspan="9" class="text-center py-3 text-muted">
           Sin nodos conectados
         </td>
       </tr>`;
@@ -282,6 +330,7 @@ function renderNodes(nodes) {
     .map((n) => {
       const nodeId = escapeHtml(n.node || "");
       const online = n.online ? "Sí" : "--";
+      const activityHtml = renderActivityBadge(n.activity || null, n.node || "");
 
       return `
   <tr
@@ -293,6 +342,8 @@ function renderNodes(nodes) {
     <td>${escapeHtml(n.info || "")}</td>
 
     <td>${escapeHtml(n.received || "--")}</td>
+
+    <td>${activityHtml}</td>
 
     <td>
       <span class="badge ${n.visibility_type === "direct" ? "bg-success" : "bg-info"}">
@@ -353,6 +404,8 @@ function buildNodeMap(nodes) {
     const id = String(n.node || n.node_id || "").trim();
     if (!id) continue;
 
+    const act = n.activity || {};
+
     map.set(id, {
       node: id,
       link: String(n.link || ""),
@@ -362,6 +415,10 @@ function buildNodeMap(nodes) {
       online: !!n.online,
       visibility_type: String(n.visibility_type || ""),
       remote_count: Number(n.remote_count || 0),
+      // v0.2.x — campos de actividad para detección de cambios
+      activity_rx: !!act.rx,
+      activity_tx: Number(act.tx_time_today || 0),
+      activity_keyups: Number(act.keyups_today || 0),
     });
   }
 
@@ -407,7 +464,11 @@ function detectChangedNodes(previousMap, nextNodes) {
       prevNode.mode !== nextNode.mode ||
       prevNode.online !== nextNode.online ||
       prevNode.visibility_type !== nextNode.visibility_type ||
-      prevNode.remote_count !== nextNode.remote_count;
+      prevNode.remote_count !== nextNode.remote_count ||
+      // v0.2.x — detectar cambios de actividad
+      prevNode.activity_rx !== nextNode.activity_rx ||
+      prevNode.activity_tx !== nextNode.activity_tx ||
+      prevNode.activity_keyups !== nextNode.activity_keyups;
 
     if (changedFields) {
       changed.push({ nodeId, isNew: false });
@@ -1023,9 +1084,11 @@ function stopChilemonAutoRefresh() {
 function startChilemonAutoRefresh() {
   if (chilemonEventSource) return; // ya activo, no duplicar
 
-  chilemonEventSource = new EventSource(base + "api/stream_nodes.php", { withCredentials: true });
+  chilemonEventSource = new EventSource(base + "api/stream_nodes.php", {
+    withCredentials: true,
+  });
 
-  chilemonEventSource.onmessage = function(event) {
+  chilemonEventSource.onmessage = function (event) {
     try {
       const json = JSON.parse(event.data);
       if (!json || !json.ok) return;
@@ -1049,8 +1112,8 @@ function startChilemonAutoRefresh() {
         // Redispara el filtrado de busqueda si es que esta escrito
         const searchInput = document.getElementById("node-search-filter");
         if (searchInput && searchInput.value.length > 0) {
-            // Gatillamos un input event para re-filtrar
-            searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+          // Gatillamos un input event para re-filtrar
+          searchInput.dispatchEvent(new Event("input", { bubbles: true }));
         }
 
         requestAnimationFrame(() => {
@@ -1066,25 +1129,24 @@ function startChilemonAutoRefresh() {
     }
   };
 
-  chilemonEventSource.onerror = function(event) {
-     if (this.readyState == EventSource.CLOSED) {
-         console.debug("SSE Connection closed");
-     } else {
-         console.debug("SSE error, attempting to reconnect", event);
-     }
+  chilemonEventSource.onerror = function (event) {
+    if (this.readyState == EventSource.CLOSED) {
+      console.debug("SSE Connection closed");
+    } else {
+      console.debug("SSE error, attempting to reconnect", event);
+    }
   };
 
-  chilemonEventSource.addEventListener("error", function(e) {
-      if (e.data) {
-          try {
-             const jsonError = JSON.parse(e.data);
-             if (jsonError.error === "Unauthorized") {
-                 handleUnauthorized();
-             }
-          } catch(err){}
-      }
+  chilemonEventSource.addEventListener("error", function (e) {
+    if (e.data) {
+      try {
+        const jsonError = JSON.parse(e.data);
+        if (jsonError.error === "Unauthorized") {
+          handleUnauthorized();
+        }
+      } catch (err) {}
+    }
   });
-
 }
 
 /* =============================================================
@@ -1133,13 +1195,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     searchInput.addEventListener("input", function (e) {
       const searchTerm = e.target.value.toLowerCase().trim();
       const rows = nodesTableBody.querySelectorAll("tr:not(.no-results-row)");
-      
+
       let visibleCount = 0;
 
-      rows.forEach(row => {
+      rows.forEach((row) => {
         // Obtenemos el texto de toda la fila para poder buscar por nodo, alias, IP, etc.
         const rowText = row.textContent.toLowerCase();
-        
+
         if (rowText.includes(searchTerm)) {
           row.style.display = "";
           visibleCount++;
@@ -1155,10 +1217,10 @@ document.addEventListener("DOMContentLoaded", async () => {
           noResultsRow = document.createElement("tr");
           noResultsRow.id = "no-results-search-row";
           noResultsRow.className = "no-results-row text-center py-4 text-muted";
-          noResultsRow.innerHTML = `<td colspan="8"><i class="bi bi-search"></i> No se encontraron nodos que coincidan con "${escapeHtml(searchTerm)}"</td>`;
+          noResultsRow.innerHTML = `<td colspan="9"><i class="bi bi-search"></i> No se encontraron nodos que coincidan con "${escapeHtml(searchTerm)}"</td>`;
           nodesTableBody.appendChild(noResultsRow);
         } else {
-          noResultsRow.innerHTML = `<td colspan="8"><i class="bi bi-search"></i> No se encontraron nodos que coincidan con "${escapeHtml(searchTerm)}"</td>`;
+          noResultsRow.innerHTML = `<td colspan="9"><i class="bi bi-search"></i> No se encontraron nodos que coincidan con "${escapeHtml(searchTerm)}"</td>`;
           noResultsRow.style.display = "";
         }
       } else if (noResultsRow) {
@@ -1168,9 +1230,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       // Actualizar el contador en el badge superior si existe
       if (totalNodesBadge) {
         if (searchTerm === "") {
-           totalNodesBadge.textContent = rows.length;
+          totalNodesBadge.textContent = rows.length;
         } else {
-           totalNodesBadge.textContent = visibleCount + " / " + rows.length;
+          totalNodesBadge.textContent = visibleCount + " / " + rows.length;
         }
       }
     });

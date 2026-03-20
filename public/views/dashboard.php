@@ -190,6 +190,7 @@ $systemInfo = $systemInfo ?? [
                             <th width="100">Nodo ID</th>
                             <th>Información del nodo</th>
                             <th width="120">Recibido</th>
+                            <th width="110">Actividad</th>
                             <th width="100">Enlace</th>
                             <th width="80">Dirección</th>
                             <th width="120">Conectado</th>
@@ -200,7 +201,7 @@ $systemInfo = $systemInfo ?? [
                     <tbody id="nodes-table-body">
                         <?php if (empty($nodos)): ?>
                             <tr>
-                                <td colspan="8" class="text-center py-4 text-muted">
+                                <td colspan="9" class="text-center py-4 text-muted">
                                     <i class="bi bi-exclamation-triangle"></i> No hay nodos disponibles
                                 </td>
                             </tr>
@@ -267,7 +268,15 @@ $systemInfo = $systemInfo ?? [
                                         <?php endif; ?>
                                     </td>
 
+                                    <td><?= htmlspecialchars($nodeInfo, ENT_QUOTES, 'UTF-8') ?></td>
+
                                     <td><?= htmlspecialchars($receivedText, ENT_QUOTES, 'UTF-8') ?></td>
+
+                                    <td>
+                                        <span class="badge badge-activity-idle">
+                                            <span class="activity-dot"></span> Idle
+                                        </span>
+                                    </td>
 
                                     <td>
                                         <span class="badge <?= $badgeClass ?>">
@@ -588,10 +597,12 @@ $systemInfo = $systemInfo ?? [
         <div class="modal-dialog modal-lg modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title"><i class="bi bi-star-fill text-warning"></i> Favoritos</h5>
+                    <h5 class="modal-title">
+                        <i class="bi bi-star-fill text-warning"></i>
+                        Mis nodos favoritos
+                    </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
                 </div>
-
                 <div class="modal-body">
                     <form id="favForm" class="row g-3">
                         <div class="col-md-3">
@@ -651,20 +662,23 @@ $systemInfo = $systemInfo ?? [
     </div>
 </main>
 
-<div class="modal fade" id="modalReinicio" tabindex="-1" aria-labelledby="modalReicioLabel" aria-hidden="true">
+<div class="modal fade modal-chilemon-danger" id="modalReinicio" tabindex="-1" aria-labelledby="modalReicioLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-danger">
-            <div class="modal-header bg-danger text-white">
+        <div class="modal-content">
+            <div class="modal-header">
                 <h5 class="modal-title" id="modalReicioLabel">
-                    <i class="bi bi-exclamation-triangle-fill"></i> Confirmar reinicio
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    <span id="reinicioTitulo">Confirmar acción</span>
                 </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
             </div>
             <div class="modal-body text-center py-4">
-                <i class="bi bi-arrow-repeat text-danger" style="font-size: 3rem;"></i>
-                <p class="mt-3 mb-1 fs-5">¿Estás seguro que deseas reiniciar</p>
-                <p class="fw-bold fs-4" id="modal-servicio-nombre">—</p>
-                <p class="text-muted small">Esta acción puede interrumpir conexiones activas.</p>
+                <div class="mb-3">
+                    <i id="reinicioIcono" class="bi bi-exclamation-octagon text-danger" style="font-size: 3.5rem; opacity: 0.9;"></i>
+                </div>
+                <p class="mb-1 opacity-75 fs-5">¿Estás seguro que deseas realizar esta acción sobre</p>
+                <p class="fw-bold fs-3 mb-2" id="modal-servicio-nombre">—</p>
+                <p class="small opacity-50">Esta acción es sensible y puede interrumpir la operatividad del nodo.</p>
             </div>
             <div class="modal-footer justify-content-center gap-2">
                 <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">
@@ -681,18 +695,26 @@ $systemInfo = $systemInfo ?? [
 <script>
 function confirmarReinicio(servicio, action) {
     document.getElementById('modal-servicio-nombre').textContent = servicio;
-
+    
+    const reinicioIcono = document.getElementById('reinicioIcono');
+    const reinicioTitulo = document.getElementById('reinicioTitulo');
     const btnConfirmar = document.getElementById('btn-confirmar-reinicio');
 
-    // Cambiar texto del botón según la acción
     const isPoweroff = action === 'poweroff';
     const isApacheRestart = action === 'restart-apache';
-    btnConfirmar.className = isPoweroff
-        ? 'btn btn-danger px-4'
-        : 'btn btn-warning px-4';
-    btnConfirmar.innerHTML = isPoweroff
-        ? '<i class="bi bi-power"></i> Sí, apagar'
-        : '<i class="bi bi-arrow-clockwise"></i> Sí, reiniciar';
+
+    // Personalizar según acción
+    if (isPoweroff) {
+        reinicioIcono.className = "bi bi-power text-danger";
+        reinicioTitulo.textContent = "Confirmar Apagado";
+        btnConfirmar.className = 'btn btn-danger px-4';
+        btnConfirmar.innerHTML = '<i class="bi bi-power"></i> Sí, apagar';
+    } else {
+        reinicioIcono.className = "bi bi-arrow-repeat text-warning";
+        reinicioTitulo.textContent = "Confirmar Reinicio";
+        btnConfirmar.className = 'btn btn-warning px-4';
+        btnConfirmar.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Sí, reiniciar';
+    }
 
     btnConfirmar.onclick = async function () {
         btnConfirmar.disabled = true;
@@ -737,13 +759,13 @@ function confirmarReinicio(servicio, action) {
 }
 </script>
 
-<div class="modal fade" id="remoteNodesModal" tabindex="-1" aria-hidden="true">
+<div class="modal fade modal-chilemon-info" id="remoteNodesModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">
-                    <i class="bi bi-diagram-3"></i>
-                    Red remota visible — Nodo <span id="remoteNodesModalNode">--</span>
+                    <i class="bi bi-diagram-3-fill text-info"></i>
+                    Red remota visible — Nodo <span id="remoteNodesModalNode" class="font-monospace text-info">--</span>
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
             </div>
