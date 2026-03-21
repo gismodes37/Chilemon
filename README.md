@@ -13,7 +13,7 @@ Modern dashboard for monitoring and controlling AllStarLink nodes
 </p>
 
 <p align="center">
-<img src="https://img.shields.io/badge/version-0.1.0-blue">
+<img src="https://img.shields.io/badge/version-0.2.3-blue">
 <img src="https://img.shields.io/badge/php-8.2+-blue">
 <img src="https://img.shields.io/badge/database-SQLite-green">
 <img src="https://img.shields.io/badge/ASL3-compatible-green">
@@ -217,55 +217,28 @@ ChileMon **does not replace Supermon**, but instead offers a modern alternative 
 
 ## README.md
 
-## 🚀 Installation Recommended
+# 🚀 Quick Installation (v0.2.x)
 
-ChileMon can be installed directly on an ASL3 node.
-
-### Installation
-
-For a stable setup, it is recommended to install ChileMon from the **latest published Release**.
-
-The `main` branch contains the current development state and may include changes that are not yet part of a stable release.
-
-- **Regular users / production:** use the latest Release
-- **Development or testing:** use the `main` branch
-
-### Stable installation from Release
+To install ChileMon on an ASL3 node (Debian), simply run this block in your terminal:
 
 ```bash
-cd /opt
-sudo git clone --branch v0.1.0 https://github.com/gismodes37/Chilemon.git chilemon
+# 1. Clone the repository
+sudo git clone https://github.com/gismodes37/Chilemon.git /opt/chilemon
+
+# 2. Enter the directory
 cd /opt/chilemon
+
+# 3. Run the automatic installer
+# (Make sure to have your node ID and AMI password ready)
 sudo bash install/install_chilemon.sh
 ```
 
-
-## 🚀 Installation from main (development or testing only)
-
-ChileMon can be installed directly on an ASL3 node.
-
-### Clone repository
-
-```php
-cd /opt
-sudo git clone --branch main https://github.com/gismodes37/Chilemon.git chilemon
-
-```
-
-### Run installer
-
-```php
-ccd /opt/chilemon
-sudo bash install/install_chilemon.sh
-```
-
-The installer will automatically perform:
-
- - dependency installation
- - Apache configuration
- - secure wrapper creation
- - SQLite database initialization
- - administrator user creation
+The installer will automatically:
+- Install dependencies (PHP, Apache, SQLite).
+- Configure your local node.
+- Install the secure Asterisk wrapper (v0.2.3).
+- Configure database permissions.
+- Set up Apache to be ready at `http://your_ip/chilemon`.
 
  ---
 

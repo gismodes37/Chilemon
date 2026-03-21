@@ -99,6 +99,37 @@ sqlite3 /opt/chilemon/data/chilemon.sqlite ".tables"
 sqlite3 /opt/chilemon/data/chilemon.sqlite "SELECT id, username, created_at FROM users;"
 ```
 
+### 2.5 Configuración Rápida de EchoLink (Opcional)
+
+Si tu nodo no tiene EchoLink configurado, puedes usar este bloque para crearlo rápidamente. **Importante:** Debes cambiar los campos `call`, `pwd` y `astnode` antes de ejecutarlo.
+
+```bash
+# 1. Crear el archivo de configuración (Cambia los datos marcados abajo)
+cat << 'EOF' | sudo tee /etc/asterisk/echolink.conf > /dev/null
+[general]
+call = TU_CALLSIGN-L      ; << CAMBIA ESTO (Ej: CA2IIG-L)
+pwd = TU_PASSWORD        ; << CAMBIA ESTO (Tu pass de EchoLink)
+name = ChileMon Node
+qth = Quilpue, Chile
+email = soporte@chilemon.cl
+maxstns = 10
+rtcpport = 5199
+server1 = nasouth.echolink.org
+server2 = naeast.echolink.org
+server3 = servers.echolink.org
+astnode = 494780          ; << CAMBIA ESTO (Tu nodo local ASL)
+context = radio-secure    ; O "echolink-in"
+[el0]
+conf = no
+EOF
+
+# 2. Habilitar el módulo en Asterisk
+sudo sed -i 's/noload => chan_echolink.so/load => chan_echolink.so/g' /etc/asterisk/modules.conf
+
+# 3. Reiniciar Asterisk para aplicar cambios
+sudo systemctl restart asterisk
+```
+
 ---
 
 ## 3. Errores conocidos y soluciones

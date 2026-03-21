@@ -324,76 +324,38 @@ write_wrapper_if_missing() {
     cat > "$WRAPPER_PATH" <<'BASH'
 #!/usr/bin/env bash
 # ==============================================================================
-# ChileMon - Wrapper seguro para comandos rpt de Asterisk
-# ------------------------------------------------------------------------------
-# Uso:
-#   chilemon-rpt nodes <nodo_local>
-#   chilemon-rpt stats <nodo_local>
-#   chilemon-rpt connect <nodo_local> <nodo_remoto>
-#   chilemon-rpt disconnect <nodo_local> <nodo_remoto>
+# ChileMon - Wrapper seguro para comandos rpt de Asterisk (v0.2.3)
 # ==============================================================================
+# Limpieza de parámetros para evitar inyecciones y fallos de comillas desde PHP
+CMD=$(echo ${1:-} | tr -d "'\"")
+LOCAL=$(echo ${2:-} | tr -d "'\"")
+REMOTE=$(echo ${3:-} | tr -d "'\"")
 
-set -Eeuo pipefail
+# LOG DE DEPURACIÓN (Ayuda a ver qué llega desde la web)
+# echo "[$(date)] WEB_CMD: $CMD LOCAL:$LOCAL REMOTE:$REMOTE" >> /tmp/chilemon.log
 
-usage() {
-    echo "Uso: chilemon-rpt {nodes|stats|connect|disconnect|sys-restart-asterisk|sys-restart-apache|sys-poweroff} [args...]" >&2
-    exit 1
-}
-
-is_number() {
-    [[ "${1:-}" =~ ^[0-9]+$ ]]
-}
-
-main() {
-    local action="${1:-}"
-    local local_node="${2:-}"
-    local remote_node="${3:-}"
-
-    [[ -n "$action" ]] || usage
-
-    case "$action" in
-        nodes)
-            [[ -n "$local_node" ]] || usage
-            is_number "$local_node" || usage
-            exec /usr/sbin/asterisk -rx "rpt nodes ${local_node}"
-            ;;
-        stats)
-            [[ -n "$local_node" ]] || usage
-            is_number "$local_node" || usage
-            exec /usr/sbin/asterisk -rx "rpt stats ${local_node}"
-            ;;
-        connect)
-            [[ -n "$local_node" && -n "$remote_node" ]] || usage
-            is_number "$local_node" || usage
-            is_number "$remote_node" || usage
-            exec /usr/sbin/asterisk -rx "rpt fun ${local_node} *3${remote_node}"
-            ;;
-        disconnect)
-            [[ -n "$local_node" && -n "$remote_node" ]] || usage
-            is_number "$local_node" || usage
-            is_number "$remote_node" || usage
-            exec /usr/sbin/asterisk -rx "rpt fun ${local_node} *1${remote_node}"
-            ;;
-        sys-restart-asterisk)
-            exec systemctl restart asterisk
-            ;;
-        sys-restart-apache)
-            exec systemctl restart apache2
-            ;;
-        sys-poweroff)
-            exec poweroff
-            ;;
-        *)
-            usage
-            ;;
-    esac
-}
-
-main "$@"
+case "$CMD" in
+    nodes) /usr/sbin/asterisk -rx "rpt nodes $LOCAL" ;;
+    stats) /usr/sbin/asterisk -rx "rpt stats $LOCAL" ;;
+    connect)
+        # Si el numero empieza con 8, usamos el comando *8 (EchoLink) configurado en rpt.conf
+        if [[ $REMOTE == 8* ]]; then
+            /usr/sbin/asterisk -rx "rpt fun $LOCAL *$REMOTE"
+        else
+            /usr/sbin/asterisk -rx "rpt fun $LOCAL *3$REMOTE"
+        fi
+        ;;
+    disconnect) /usr/sbin/asterisk -rx "rpt fun $LOCAL *1$REMOTE" ;;
+    sys-restart-asterisk) systemctl restart asterisk ;;
+    sys-restart-apache) systemctl restart apache2 ;;
+    sys-poweroff) poweroff ;;
+    *) echo "Comando invalido: $CMD" >> /tmp/chilemon.log; exit 1 ;;
+esac
 BASH
 
     chmod 755 "$WRAPPER_PATH"
-    ok "Wrapper instalado en $WRAPPER_PATH"
+    chown root:root "$WRAPPER_PATH"
+    ok "Wrapper robusto instalado en $WRAPPER_PATH"
 }
 
 write_sudoers() {

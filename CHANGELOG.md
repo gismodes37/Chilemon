@@ -10,6 +10,26 @@ https://semver.org/lang/es/
 
 ---
 
+# [0.2.3] - 2026-03-20
+
+## ✨ Novedades v0.2.x (Dashboard Activo)
+
+Esta actualización transforma el Dashboard de una vista estática a un centro de monitoreo vivo y robusto.
+
+### 📡 Añadido
+- **Monitoreo en Tiempo Real**: Indicadores visuales de **RX (Verde)** y **TX (Rojo)** que parpadean según la actividad del nodo.
+- **Soporte EchoLink Nativo**: El Dashboard ahora reconoce y procesa conexiones de la red EchoLink (Prefijos 8 o 3 automáticos).
+- **Limpieza de Prefijos**: La tabla de nodos ahora es más legible, eliminando prefijos técnicos de AllStarLink (`T`, `C`, `M`).
+- **Instalador v0.2.3**: Nuevo proceso de instalación automatizada (`bash install/install_chilemon.sh`) con configuración de permisos de DB y wrapper robusto.
+
+### 🔧 Corregido
+- **Compatibilidad PHP 8.2+**: Arreglado el error de `ob_implicit_flush` que congelaba el refresco del Dashboard.
+- **Wrapper Seguro**: Limpieza de parámetros (`tr -d "'\""`) para evitar fallos de ejecución desde PHP.
+- **Parser de Tiempo**: Ahora se procesan correctamente las estadísticas con milisegundos de ASL3.
+- **Estabilidad DB**: Corrección de bloqueos de SQLite mediante limpieza manual de archivos journal.
+
+---
+
 # [0.1.0] - 2026-03-13
 
 ## 🚀 Primer release funcional

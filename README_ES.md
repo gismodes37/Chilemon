@@ -13,7 +13,7 @@ Modern dashboard for monitoring and controlling AllStarLink nodes
 </p>
 
 <p align="center">
-<img src="https://img.shields.io/badge/version-0.1.0-blue">
+<img src="https://img.shields.io/badge/version-0.2.3-blue">
 <img src="https://img.shields.io/badge/php-8.2+-blue">
 <img src="https://img.shields.io/badge/database-SQLite-green">
 <img src="https://img.shields.io/badge/ASL3-compatible-green">
@@ -215,56 +215,28 @@ ChileMon **no reemplaza Supermon**, sino que ofrece una alternativa moderna para
 
 ---
 
-# 🚀 Instalación Estable
+# 🚀 Instalación Rápida (v0.2.x)
 
-ChileMon puede instalarse directamente en un nodo ASL3.
-
-## Instalación recomendada
-
-Para un entorno estable, se recomienda instalar ChileMon desde el **último Release publicado**.
-
-La rama `main` contiene el desarrollo actual y puede incluir cambios que todavía no forman parte de una versión estable.
-
-- **Usuarios normales / producción:** usar el último Release
-- **Desarrollo o pruebas:** usar la rama `main`
-
-### Instalación estable desde Release
+Para instalar ChileMon en un nodo con ASL3 (Debian), simplemente ejecuta este bloque en tu terminal:
 
 ```bash
-cd /opt
-sudo git clone --branch v0.1.0 https://github.com/gismodes37/Chilemon.git chilemon
+# 1. Clonar el repositorio
+sudo git clone https://github.com/gismodes37/Chilemon.git /opt/chilemon
+
+# 2. Entrar a la carpeta
 cd /opt/chilemon
+
+# 3. Ejecutar el instalador automático
+# (Asegúrate de tener a mano tu N° de nodo y clave AMI)
 sudo bash install/install_chilemon.sh
 ```
 
----
-
-
-# 🚀 Instalación desde main (solo desarrollo o pruebas)
-
-ChileMon puede instalarse directamente en un nodo ASL3.
-
-### Clonar repositorio
-
-```php
-cd /opt
-sudo git clone --branch main https://github.com/gismodes37/Chilemon.git chilemon
-```
-
-### Ejecutar instalador
-
-```php
-cd /opt/chilemon
-sudo bash install/install_chilemon.sh
-```
-
-El instalador realizará automáticamente:
-
-- instalación de dependencias
-- configuración de Apache
-- creación del wrapper seguro
-- inicialización de base SQLite
-- creación de usuario administrador
+El instalador se encargará automáticamente de:
+- Instalar dependencias (PHP, Apache, SQLite).
+- Configurar tu nodo local.
+- Instalar el wrapper seguro para Asterisk (v0.2.3).
+- Configurar los permisos de base de datos.
+- Dejar Apache listo para volar en `http://tu_ip/chilemon`.
 
 ---
 

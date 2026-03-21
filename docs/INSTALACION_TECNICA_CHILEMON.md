@@ -31,14 +31,20 @@ El instalador genera `config/local.php` con:
 - `database_path`
 - `wrapper_path`
 
-## Wrapper seguro
-El wrapper acepta únicamente estas acciones:
-- `nodes <nodo_local>`
-- `stats <nodo_local>`
-- `connect <nodo_local> <nodo_remoto>`
-- `disconnect <nodo_local> <nodo_remoto>`
+## Wrapper seguro (v0.2.3)
+El wrapper (`/usr/local/bin/chilemon-rpt`) ha sido rediseñado para mayor robustez:
+- **Limpieza de parámetros**: Se eliminan comillas simples y dobles (`tr -d "'\""`) para evitar inyecciones desde la web.
+- **Soporte EchoLink**: Detecta números que comienzan por `8` y utiliza el comando de función de Asterisk correspondiente.
+- **Acciones soportadas**:
+    - `nodes <local_node>`
+    - `stats <local_node>`
+    - `connect <local_node> <remote_node>`
+    - `disconnect <local_node> <remote_node>`
+    - `sys-restart-asterisk`
+    - `sys-restart-apache`
+    - `sys-poweroff`
 
-Internamente ejecuta `/usr/sbin/asterisk -rx`.
+Internamente ejecuta `/usr/sbin/asterisk -rx` con los parámetros limpios.
 
 ## Sudoers
 El instalador escribe:

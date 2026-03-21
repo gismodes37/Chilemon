@@ -61,10 +61,10 @@ El instalador mostrará pasos numerados. Entre ellos:
 - validación del repositorio
 - instalación de dependencias
 - generación de `config/local.php`
-- instalación del wrapper `chilemon-rpt`
+- instalación del wrapper `chilemon-rpt` (v0.2.3 con soporte EchoLink)
 - configuración de sudoers
 - configuración de Apache
-- inicialización de ChileMon con PHP
+- inicialización de ChileMon con PHP y SQLite
 
 ## 8. Abrir ChileMon en el navegador
 Al finalizar verá una URL como esta:
