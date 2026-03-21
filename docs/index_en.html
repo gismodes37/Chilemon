@@ -78,14 +78,14 @@
           <span class="brand-badge"><i class="bi bi-shield-lock"></i> Secure Login</span>
           <span class="brand-badge"><i class="bi bi-database"></i> SQLite</span>
           <span class="brand-badge"><i class="bi bi-terminal"></i> Automatic Installer</span>
-          <span class="brand-badge"><i class="bi bi-tag"></i> v0.2.3</span>
+          <span class="brand-badge"><i class="bi bi-tag"></i> v0.3.0</span>
         </div>
 
         <h1 class="display-5 fw-semibold mb-3">ChileMon</h1>
         <p class="lead opacity-90 mb-4">
           A modern dashboard for <strong>AllStarLink ASL3</strong> nodes, inspired by the Supermon concept,
           but built on a more organized, secure, modular, and installable foundation.
-          The current release already provides <strong>automatic installation, authentication, real basic operation, and secure local management</strong>.
+          The v0.3.x release now provides <strong>full Favorites integration, RX/TX real-time monitoring, and secure local management</strong>.
         </p>
 
         <div class="small opacity-75 mb-3">
@@ -117,10 +117,8 @@
             <h2 class="h5 section-title mb-3">Quick start</h2>
 
             <div class="code mb-3">
-              <div><span class="text-secondary">$</span> cd /opt</div>
-              <div><span class="text-secondary">$</span> sudo git clone https://github.com/gismodes37/Chilemon.git chilemon</div>
-              <div><span class="text-secondary">$</span> cd /opt/chilemon</div>
-              <div><span class="text-secondary">$</span> sudo bash install/install_chilemon.sh</div>
+              <div><span class="text-secondary">$</span> sudo git clone -b v0.1.0 https://github.com/gismodes37/Chilemon.git /opt/chilemon</div>
+              <div><span class="text-secondary">$</span> cd /opt/chilemon && sudo bash install/install_chilemon.sh</div>
             </div>
 
             <div class="d-flex gap-2">
@@ -293,7 +291,7 @@
 
       <div class="alert alert-info mt-4">
         <i class="bi bi-lightbulb"></i>
-        Current status: <strong>functional v0.1.0 release</strong>. ChileMon already installs, authenticates, operates, and has been successfully tested in real environments.
+        Current status: <strong>functional v0.3.0 release</strong>. ChileMon already integrates favorites with custom aliases, RX/TX monitoring, and installs on real nodes automatically.
       </div>
     </div>
   </section>
@@ -439,12 +437,9 @@
             <div class="card-body p-4">
               <h3 class="h5 mb-3"><i class="bi bi-terminal"></i> Recommended workflow</h3>
               <div class="code">
-                <div><span class="text-secondary">$</span> sudo apt update</div>
-                <div><span class="text-secondary">$</span> sudo apt install -y git</div>
-                <div><span class="text-secondary">$</span> cd /opt</div>
-                <div><span class="text-secondary">$</span> sudo git clone https://github.com/gismodes37/Chilemon.git chilemon</div>
-                <div><span class="text-secondary">$</span> cd /opt/chilemon</div>
-                <div><span class="text-secondary">$</span> sudo bash install/install_chilemon.sh</div>
+                <div><span class="text-secondary"># Clone stable version and install</span></div>
+                <div><span class="text-secondary">$</span> sudo git clone -b v0.1.0 https://github.com/gismodes37/Chilemon.git /opt/chilemon</div>
+                <div><span class="text-secondary">$</span> cd /opt/chilemon && sudo bash install/install_chilemon.sh</div>
               </div>
 
               <div class="mt-3 small text-secondary">
@@ -543,14 +538,16 @@
         </div>
 
         <div class="col-lg-3">
-          <div class="card h-100 shadow-sm">
+          <div class="card h-100 shadow-sm border-primary">
             <div class="card-body p-4">
-              <h3 class="h5"><span class="badge text-bg-primary">v0.2.x</span> Dashboard Life</h3>
+              <h3 class="h5"><span class="badge text-bg-primary">v0.3.0</span> Current Release</h3>
               <ul class="text-secondary mb-0">
+                <li><strong>Favorites Integration</strong></li>
+                <li>Custom aliases</li>
+                <li>Quick table toggle</li>
+                <li>One-Step Installer</li>
                 <li>RX / TX indicators</li>
-                <li>More activity feeling</li>
-                <li>Visual monitoring improvements</li>
-                <li>More expressive refresh</li>
+                <li>EchoLink Support</li>
               </ul>
             </div>
           </div>
@@ -559,12 +556,12 @@
         <div class="col-lg-3">
           <div class="card h-100 shadow-sm">
             <div class="card-body p-4">
-              <h3 class="h5"><span class="badge text-bg-primary">v0.3.x</span> Operational Integration</h3>
+              <h3 class="h5"><span class="badge text-bg-secondary">v0.4.x</span> Expansion</h3>
               <ul class="text-secondary mb-0">
-                <li>Deeper real state from Asterisk</li>
-                <li>Improved telemetry</li>
-                <li>Better node/link interpretation</li>
-                <li>Operational refinement</li>
+                <li>Extended statistics</li>
+                <li>Activity charts</li>
+                <li>User management UI</li>
+                <li>Visual customization</li>
               </ul>
             </div>
           </div>

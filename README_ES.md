@@ -13,7 +13,7 @@ Modern dashboard for monitoring and controlling AllStarLink nodes
 </p>
 
 <p align="center">
-<img src="https://img.shields.io/badge/version-0.2.3-blue">
+<img src="https://img.shields.io/badge/version-0.3.0-blue">
 <img src="https://img.shields.io/badge/php-8.2+-blue">
 <img src="https://img.shields.io/badge/database-SQLite-green">
 <img src="https://img.shields.io/badge/ASL3-compatible-green">
@@ -215,9 +215,25 @@ ChileMon **no reemplaza Supermon**, sino que ofrece una alternativa moderna para
 
 ---
 
-# 🚀 Instalación Rápida (v0.2.x)
+# 🚀 Opciones de Instalación
 
-Para instalar ChileMon en un nodo con ASL3 (Debian), simplemente ejecuta este bloque en tu terminal:
+ChileMon puede instalarse directamente en un nodo **ASL3**. Se recomienda utilizar un sistema basado en Debian (como el oficial de ASL3).
+
+### 📦 Versión Estable (Auto-Instalación)
+
+Esta es la forma más rápida y automática. Solo copia y pega estos comandos en tu terminal (asegúrate de tener a mano tu N° de nodo y clave AMI):
+
+```bash
+# 1. Clonar versión estable e instalar todo de una vez
+sudo git clone -b v0.1.0 https://github.com/gismodes37/Chilemon.git /opt/chilemon
+cd /opt/chilemon && sudo bash install/install_chilemon.sh
+```
+
+---
+
+### 🧪 Opción 2: Rama Main (Experimentación y Desarrollo)
+
+Si deseas probar las últimas características en desarrollo (v0.2.x), puedes clonar directamente el repositorio:
 
 ```bash
 # 1. Clonar el repositorio
@@ -231,12 +247,7 @@ cd /opt/chilemon
 sudo bash install/install_chilemon.sh
 ```
 
-El instalador se encargará automáticamente de:
-- Instalar dependencias (PHP, Apache, SQLite).
-- Configurar tu nodo local.
-- Instalar el wrapper seguro para Asterisk (v0.2.3).
-- Configurar los permisos de base de datos.
-- Dejar Apache listo para volar en `http://tu_ip/chilemon`.
+El instalador configurará automáticamente los servicios de Apache, PHP, SQLite y el wrapper de seguridad para que ChileMon esté listo en `http://tu_ip/chilemon`.
 
 ---
 
@@ -287,11 +298,11 @@ Release inicial funcional
 
 <img alt="Static Badge" src="https://img.shields.io/badge/Version-0.2.0-blue">
 
-Actividad RX/TX en tiempo real
+Actividad RX/TX en tiempo real (Disponible)
 
 <img alt="Static Badge" src="https://img.shields.io/badge/Version-0.3.0-blue">
 
-Mejoras de dashboard
+Integración total de Favoritos y Simplificación del Instalador (Nueva)
 
 <img alt="Static Badge" src="https://img.shields.io/badge/Version-0.4.0-blue">
 
@@ -303,9 +314,19 @@ Release estable
 
 ---
 
-# 📦 Release
+# 📦 Releases
 
-## v0.1.0
+## v0.3.0
+- **Integración total de Favoritos**: Visualización de estrellas y alias en el dashboard.
+- **Botón de Toggle rápido**: Gestión directa de favoritos desde la tabla.
+- **Instalador simplificado**: Nuevo proceso de instalación en un solo bloque.
+
+## v0.2.x
+- **Monitoreo en tiempo real**: Indicadores RX (verde) y TX (rojo) dinámicos.
+- **Soporte EchoLink**: Identificación automática de conexiones EchoLink.
+- **Wrapper v0.2.3**: Mejoras de seguridad y limpieza de parámetros.
+
+## v0.1.0 (Legacy)
 
 Primer release funcional de ChileMon.
 

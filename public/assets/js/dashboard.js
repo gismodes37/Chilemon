@@ -329,15 +329,22 @@ function renderNodes(nodes) {
   tbody.innerHTML = nodes
     .map((n) => {
       const nodeId = escapeHtml(n.node || "");
+      const isFav = !!n.is_favorite;
+      const alias = n.alias || "";
       const online = n.online ? "Sí" : "--";
       const activityHtml = renderActivityBadge(n.activity || null, n.node || "");
+
+      // Mostrar alias o info del nodo. Si es favorito, mostrar estrella junto al ID.
+      const nodeDisplayId = isFav 
+        ? `<i class="bi bi-star-fill text-warning me-1 small"></i>${nodeId}` 
+        : nodeId;
 
       return `
   <tr
     id="node-row-${nodeId}"
     class="${n.visibility_type === "direct" ? "node-row-direct" : "node-row-visible"}">
 
-    <td class="fw-bold font-monospace">${nodeId}</td>
+    <td class="fw-bold font-monospace">${nodeDisplayId}</td>
 
     <td>${escapeHtml(n.info || "")}</td>
 
@@ -375,12 +382,20 @@ function renderNodes(nodes) {
       <div class="btn-group btn-group-sm">
 
         <button class="btn btn-connect"
-          onclick="connectToSpecificNode('${nodeId}')">
+          onclick="connectToSpecificNode('${nodeId}')"
+          title="Conectar a este nodo">
           <i class="bi bi-telephone"></i>
         </button>
 
+        <button class="btn btn-outline-warning"
+          onclick="toggleFavoriteNode('${nodeId}', ${isFav})"
+          title="${isFav ? 'Quitar de favoritos' : 'Añadir a favoritos'}">
+          <i class="bi ${isFav ? "bi-star-fill text-warning" : "bi-star"}"></i>
+        </button>
+
         <button class="btn btn-outline-danger"
-          onclick="disconnectFromNodeConfirm('${nodeId}')">
+          onclick="disconnectFromNodeConfirm('${nodeId}')"
+          title="Desconectar este nodo">
           <i class="bi bi-telephone-x"></i>
         </button>
 
@@ -1012,6 +1027,40 @@ function renderFavorites(items) {
       }
     });
   });
+}
+
+/**
+ * Añade o elimina un nodo de favoritos directamente desde la tabla.
+ * No requiere recarga completa de la página ya que el auto-refresh
+ * reflejará el cambio visual en la próxima lectura SSE.
+ *
+ * @param {string} nodeId - ID del nodo a togglear.
+ * @param {boolean} isCurrentlyFav - Estado actual en la UI.
+ */
+async function toggleFavoriteNode(nodeId, isCurrentlyFav) {
+  try {
+    const action = isCurrentlyFav ? "delete" : "upsert";
+    const payload = {
+      action: action,
+      node_id: nodeId,
+    };
+
+    // Si es nuevo favorito, enviamos alias vacío (se usará el default del servidor)
+    if (!isCurrentlyFav) {
+      payload.alias = "";
+      payload.description = "Añadido desde dashboard";
+    }
+
+    await postForm("api/favorites.php", payload);
+
+    // Refrescar inmediatamente el dashboard para ver el cambio visual (iconos/nombres)
+    await refreshNodesLive();
+
+  } catch (err) {
+    if (err.message !== "Unauthorized") {
+      alert(`Error con favoritos: ${err.message}`);
+    }
+  }
 }
 
 /* =============================================================

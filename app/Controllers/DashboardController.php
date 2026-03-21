@@ -31,15 +31,25 @@ class DashboardController
 
             /**
              * Tabla principal: SOLO nodos directos
-             * Si existe un solo nodo directo, podemos asumir que la red visible
-             * pertenece a ese enlace.
-             * Si existen varios nodos directos, NO asociamos visibles por fila
-             * porque nodes() entrega una bolsa global y no una topología separada.
              */
             $directTableNodes = array_values(array_unique($directNodes));
             sort($directTableNodes, SORT_NATURAL);
 
             $singleDirectMode = count($directTableNodes) === 1;
+
+            // v0.2.x — Cargar favoritos para el usuario actual
+            $favorites = [];
+            $userId = (int)($_SESSION['user_id'] ?? 0);
+            if ($userId > 0) {
+                try {
+                    $db = \App\Core\Database::getConnection();
+                    $st = $db->prepare("SELECT node_id, alias FROM favorites WHERE user_id = :uid");
+                    $st->execute([':uid' => $userId]);
+                    $favorites = $st->fetchAll(\PDO::FETCH_KEY_PAIR);
+                } catch (\Throwable $e) {
+                    error_log("Error cargando favoritos en DashboardController: " . $e->getMessage());
+                }
+            }
 
             foreach ($directTableNodes as $nodeId) {
                 $globalVisibleNodes = array_values(array_diff($visibleNodes, $directTableNodes));
@@ -57,11 +67,17 @@ class DashboardController
                     $remoteScope = 'global';
                 }
 
+                $isFav = isset($favorites[$nodeId]);
+                $alias = (string)($favorites[$nodeId] ?? '');
+                $nodeName = ($alias !== '') ? $alias : 'Nodo ' . $nodeId;
+
                 $nodos[] = [
                     'node'             => (string)$nodeId,
                     'node_id'          => (string)$nodeId,
-                    'info'             => 'Nodo ' . $nodeId,
-                    'name'             => 'Nodo ' . $nodeId,
+                    'is_favorite'      => $isFav,
+                    'alias'            => $alias,
+                    'info'             => (string)$nodeName,
+                    'name'             => (string)$nodeName,
                     'received'         => '--',
                     'link'             => 'DIRECTO',
                     'direction'        => 'IN',

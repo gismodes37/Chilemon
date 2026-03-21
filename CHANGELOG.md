@@ -10,6 +10,24 @@ https://semver.org/lang/es/
 
 ---
 
+# [0.3.0] - 2026-03-21
+
+## ✨ Integración de Favoritos y Simplificación (v0.3.x)
+
+Esta actualización marca la integración total del sistema de favoritos y la optimización radical de la experiencia de instalación para usuarios finales.
+
+### 📡 Añadido
+- **Favoritos en Dashboard**: Ahora los nodos favoritos muestran una **estrella amarilla** y su **Alias personalizado** directamente en la tabla principal.
+- **Toggle Rápido de Favoritos**: Nuevo botón en la columna de acciones para agregar o quitar favoritos con un solo clic, sin abrir paneles adicionales.
+- **Instalación "Un Solo Paso"**: Documentación actualizada con un comando único de `git clone` y ejecución automática para usuarios no técnicos.
+- **Refresco Inteligente**: El sistema de actualización en tiempo real (SSE) ahora refresca automáticamente el estado de favoritos y los alias si cambian.
+
+### 🔧 Corregido
+- **Sincronización de Nombres**: Se corrigió el problema donde los alias de favoritos no se mostraban en la carga inicial de la página.
+- **Consistencia de UI**: Los botones de acción ahora tienen títulos (tooltips) claros para facilitar el uso a nuevos operadores.
+
+---
+
 # [0.2.3] - 2026-03-20
 
 ## ✨ Novedades v0.2.x (Dashboard Activo)

@@ -30,13 +30,35 @@ class NodeApiController
             sort($allNodes, SORT_NATURAL);
 
             $rows = [];
+            
+            // v0.2.x — Cargar favoritos para el usuario actual
+            $favorites = [];
+            $userId = (int)($_SESSION['user_id'] ?? 0);
+            if ($userId > 0) {
+                try {
+                    $db = \App\Core\Database::getConnection();
+                    $st = $db->prepare("SELECT node_id, alias FROM favorites WHERE user_id = :uid");
+                    $st->execute([':uid' => $userId]);
+                    $favorites = $st->fetchAll(\PDO::FETCH_KEY_PAIR); // [ '494780' => 'Mi Nodo', ... ]
+                } catch (\Throwable $e) {
+                    error_log("Error cargando favoritos en NodeApiController: " . $e->getMessage());
+                    $favorites = [];
+                }
+            }
+
             foreach ($allNodes as $nodeId) {
-                $isDirect  = isset($directLookup[$nodeId]);
-                $isVisible = isset($visibleLookup[$nodeId]);
+                $isDirect   = isset($directLookup[$nodeId]);
+                $isVisible  = isset($visibleLookup[$nodeId]);
+                $isFav      = isset($favorites[$nodeId]);
+                $alias      = (string)($favorites[$nodeId] ?? '');
+                
+                $nodeInfo = ($alias !== '') ? $alias : 'Nodo ' . $nodeId;
 
                 $rows[] = [
                     'node'            => (string)$nodeId,
-                    'info'            => 'Nodo ' . $nodeId,
+                    'is_favorite'     => $isFav,
+                    'alias'           => $alias,
+                    'info'            => (string)$nodeInfo,
                     'received'        => '--',
                     'link'            => $isDirect ? 'DIRECTO' : ($isVisible ? 'VISIBLE' : '--'),
                     'direction'       => $isDirect ? 'IN' : '',

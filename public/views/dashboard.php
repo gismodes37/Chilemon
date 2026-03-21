@@ -210,6 +210,7 @@ $systemInfo = $systemInfo ?? [
                                 <?php
                                 $nodeId         = (string)($nodo['node'] ?? $nodo['node_id'] ?? '');
                                 $nodeInfo       = (string)($nodo['info'] ?? $nodo['name'] ?? ('Nodo ' . $nodeId));
+                                $isFav          = (bool)($nodo['is_favorite'] ?? false);
                                 $receivedText   = (string)($nodo['received'] ?? '--');
                                 $directionText  = (string)($nodo['direction'] ?? '');
                                 $connectedText  = (string)($nodo['connected'] ?? '--');
@@ -219,6 +220,7 @@ $systemInfo = $systemInfo ?? [
                                 $remoteVisible  = $nodo['remote_visible'] ?? [];
                                 $remoteCount    = (int)($nodo['remote_count'] ?? 0);
                                 $canShowRemote  = (bool)($nodo['can_show_remote'] ?? false);
+                                $remoteScope    = (string)($nodo['remote_scope'] ?? 'global');
 
                                 if ($visibilityType === 'direct') {
                                     $badgeClass = 'bg-success';

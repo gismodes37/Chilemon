@@ -77,7 +77,7 @@
           <span class="brand-badge"><i class="bi bi-shield-lock"></i> Login seguro</span>
           <span class="brand-badge"><i class="bi bi-database"></i> SQLite</span>
           <span class="brand-badge"><i class="bi bi-terminal"></i> Instalador automático</span>
-          <span class="brand-badge"><i class="bi bi-tag"></i> v0.2.3</span>
+          <span class="brand-badge"><i class="bi bi-tag"></i> v0.3.0</span>
         </div>
 
         <h1 class="display-5 fw-semibold mb-3">ChileMon</h1>
@@ -85,7 +85,7 @@
         <p class="lead opacity-90 mb-4">
           Dashboard moderno para nodos <strong>AllStarLink ASL3</strong> y <strong>EchoLink</strong>, inspirado en el concepto de Supermon,
           pero construido con una base más ordenada, segura, modular e instalable.
-          El release v0.2.x ya permite <strong>monitoreo RX/TX en tiempo real, soporte EchoLink y gestión local segura</strong>.
+          El release v0.3.x ya permite <strong>integración total de favoritos, monitoreo RX/TX en tiempo real y gestión local segura</strong>.
         </p>
 
         <div class="small opacity-75 mb-3">
@@ -117,10 +117,8 @@
             <h2 class="h5 section-title mb-3">Quick start</h2>
 
             <div class="code mb-3">
-              <div><span class="text-secondary">$</span> cd /opt</div>
-              <div><span class="text-secondary">$</span> sudo git clone https://github.com/gismodes37/Chilemon.git chilemon</div>
-              <div><span class="text-secondary">$</span> cd /opt/chilemon</div>
-              <div><span class="text-secondary">$</span> sudo bash install/install_chilemon.sh</div>
+              <div><span class="text-secondary">$</span> sudo git clone -b v0.1.0 https://github.com/gismodes37/Chilemon.git /opt/chilemon</div>
+              <div><span class="text-secondary">$</span> cd /opt/chilemon && sudo bash install/install_chilemon.sh</div>
             </div>
 
             <div class="d-flex gap-2">
@@ -293,7 +291,7 @@
 
       <div class="alert alert-info mt-4">
         <i class="bi bi-lightbulb"></i>
-        Estado actual: <strong>release v0.1.0 funcional</strong>. ChileMon ya instala, autentica, opera y se prueba con éxito en entornos reales.
+        Estado actual: <strong>release v0.3.0 funcional</strong>. ChileMon ya integra favoritos con alias personalizados, monitoreo RX/TX y se instala en nodos reales de forma automática.
       </div>
     </div>
   </section>
@@ -348,7 +346,7 @@
     <div class="container">
       <div class="text-center mb-5">
         <h2 class="h1 section-title">Screenshots</h2>
-        <p class="text-secondary mb-0">Vistas actuales del login, dashboard y operación básica del release v0.1.0.</p>
+        <p class="text-secondary mb-0">Vistas actuales del login, dashboard y operación básica del release v0.3.0.</p>
       </div>
 
       <div class="row g-4">
@@ -439,12 +437,9 @@
             <div class="card-body p-4">
               <h3 class="h5 mb-3"><i class="bi bi-terminal"></i> Flujo recomendado</h3>
               <div class="code">
-                <div><span class="text-secondary">$</span> sudo apt update</div>
-                <div><span class="text-secondary">$</span> sudo apt install -y git</div>
-                <div><span class="text-secondary">$</span> cd /opt</div>
-                <div><span class="text-secondary">$</span> sudo git clone https://github.com/gismodes37/Chilemon.git chilemon</div>
-                <div><span class="text-secondary">$</span> cd /opt/chilemon</div>
-                <div><span class="text-secondary">$</span> sudo bash install/install_chilemon.sh</div>
+                <div><span class="text-secondary"># Clonar versión estable e instalar</span></div>
+                <div><span class="text-secondary">$</span> sudo git clone -b v0.1.0 https://github.com/gismodes37/Chilemon.git /opt/chilemon</div>
+                <div><span class="text-secondary">$</span> cd /opt/chilemon && sudo bash install/install_chilemon.sh</div>
               </div>
 
               <div class="mt-3 small text-secondary">
@@ -543,14 +538,16 @@
         </div>
 
         <div class="col-lg-3">
-          <div class="card h-100 shadow-sm">
+          <div class="card h-100 shadow-sm border-primary">
             <div class="card-body p-4">
-              <h3 class="h5"><span class="badge text-bg-primary">v0.2.x</span> Vida del dashboard</h3>
+              <h3 class="h5"><span class="badge text-bg-primary">v0.3.0</span> Release Actual</h3>
               <ul class="text-secondary mb-0">
+                <li><strong>Integración Favoritos</strong></li>
+                <li>Alias personalizados</li>
+                <li>Toggle rápido en tabla</li>
+                <li>Instalador One-Step</li>
                 <li>Indicadores RX / TX</li>
-                <li>Mayor sensación de actividad</li>
-                <li>Mejoras visuales de monitoreo</li>
-                <li>Refresco más expresivo</li>
+                <li>Soporte EchoLink</li>
               </ul>
             </div>
           </div>
@@ -559,12 +556,12 @@
         <div class="col-lg-3">
           <div class="card h-100 shadow-sm">
             <div class="card-body p-4">
-              <h3 class="h5"><span class="badge text-bg-primary">v0.3.x</span> Integración operativa</h3>
+              <h3 class="h5"><span class="badge text-bg-secondary">v0.4.x</span> Expansión</h3>
               <ul class="text-secondary mb-0">
-                <li>Estado real más profundo desde Asterisk</li>
-                <li>Telemetría mejorada</li>
-                <li>Mejor interpretación de nodos/enlaces</li>
-                <li>Refinamiento de operación</li>
+                <li>Estadísticas extendidas</li>
+                <li>Gráficos de actividad</li>
+                <li>Gestión de usuarios UI</li>
+                <li>Personalización visual</li>
               </ul>
             </div>
           </div>

@@ -101,7 +101,7 @@ sqlite3 /opt/chilemon/data/chilemon.sqlite "SELECT id, username, created_at FROM
 
 ### 2.5 Configuración Rápida de EchoLink (Opcional)
 
-Si tu nodo no tiene EchoLink configurado, puedes usar este bloque para crearlo rápidamente. **Importante:** Debes cambiar los campos `call`, `pwd` y `astnode` antes de ejecutarlo.
+Si tu nodo no tiene EchoLink configurado, puedes usar este bloque en la terminal de tu nodo para crearlo rápidamente. **Importante:** Debes cambiar los campos `call`, `pwd` y `astnode` antes de ejecutarlo.
 
 ```bash
 # 1. Crear el archivo de configuración (Cambia los datos marcados abajo)

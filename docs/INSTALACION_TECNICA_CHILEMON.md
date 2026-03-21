@@ -12,9 +12,12 @@ Instalar ChileMon sobre Debian/ASL3 con Apache, PHP y SQLite, dejando el nodo lo
 - Base SQLite en `data/chilemon.sqlite`
 
 ## Flujo recomendado
-1. Clonar o actualizar el repositorio en `/opt/chilemon`.
-2. Ejecutar `sudo bash install/install_chilemon.sh`.
-3. Ingresar nodo local y host del servidor.
+1. Ejecutar el comando de instalación automática:
+   ```bash
+   sudo git clone -b v0.1.0 https://github.com/gismodes37/Chilemon.git /opt/chilemon
+   cd /opt/chilemon && sudo bash install/install_chilemon.sh
+   ```
+2. Ingresar nodo local y host del servidor cuando se solicite.
 4. Verificar URL final y wrapper con `www-data`.
 
 ## Dependencias instaladas por el script
@@ -31,7 +34,7 @@ El instalador genera `config/local.php` con:
 - `database_path`
 - `wrapper_path`
 
-## Wrapper seguro (v0.2.3)
+## Wrapper seguro (v0.3.0)
 El wrapper (`/usr/local/bin/chilemon-rpt`) ha sido rediseñado para mayor robustez:
 - **Limpieza de parámetros**: Se eliminan comillas simples y dobles (`tr -d "'\""`) para evitar inyecciones desde la web.
 - **Soporte EchoLink**: Detecta números que comienzan por `8` y utiliza el comando de función de Asterisk correspondiente.
