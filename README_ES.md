@@ -219,31 +219,42 @@ ChileMon **no reemplaza Supermon**, sino que ofrece una alternativa moderna para
 
 ChileMon puede instalarse directamente en un nodo **ASL3**. Se recomienda utilizar un sistema basado en Debian (como el oficial de ASL3).
 
-### 📦 Versión Estable (Auto-Instalación)
+### 📦 Opción 1: Versión Estable (Auto-Instalación)
 
 Esta es la forma más rápida y automática. Solo copia y pega estos comandos en tu terminal (asegúrate de tener a mano tu N° de nodo y clave AMI):
 
-```bash
-# 1. Clonar versión estable e instalar todo de una vez
+### 1.1 Clonar versión estable e instalar todo de una vez
+
+```php
 sudo git clone -b v0.1.0 https://github.com/gismodes37/Chilemon.git /opt/chilemon
-cd /opt/chilemon && sudo bash install/install_chilemon.sh
 ```
 
+### 1.2 Instalar ChileMon
+```php
+cd /opt/chilemon && sudo bash install/install_chilemon.sh
+```
 ---
 
-### 🧪 Opción 2: Rama Main (Experimentación y Desarrollo)
+## 🧪 Opción 2: Rama Main (Experimentación y Desarrollo)
 
 Si deseas probar las últimas características en desarrollo (v0.2.x), puedes clonar directamente el repositorio:
 
-```bash
-# 1. Clonar el repositorio
+### 2.1 Clonar el repositorio
+
+```php
 sudo git clone https://github.com/gismodes37/Chilemon.git /opt/chilemon
+```
 
-# 2. Entrar a la carpeta
+### 2.2 Entrar a la carpeta
+
+```php
 cd /opt/chilemon
+```
 
-# 3. Ejecutar el instalador automático
-# (Asegúrate de tener a mano tu N° de nodo y clave AMI)
+### 2.3 Ejecutar el instalador automático
+#### (Asegúrate de tener a mano tu N° de nodo y clave AMI)
+
+```php
 sudo bash install/install_chilemon.sh
 ```
 
