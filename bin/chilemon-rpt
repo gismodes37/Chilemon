@@ -1,18 +1,23 @@
-#!/bin/bash
-# ---------------------------------------------------------
-# ChileMon - Wrapper seguro corregido (v0.2.2)
-# ---------------------------------------------------------
+#!/usr/bin/env bash
+# ==============================================================================
+# ChileMon - Wrapper seguro para comandos rpt de Asterisk (v0.3.1)
+# ==============================================================================
 # Este script actúa como un puente seguro entre PHP y Asterisk.
 # Limpia los parámetros de entrada y los ejecuta mediante 'rpt fun'.
-# ---------------------------------------------------------
+#
+# Soporte EchoLink:
+#   Los nodos EchoLink en AllStarLink usan prefijo 3 + 6 dígitos (7 total).
+#   Ej: EchoLink 1234 → 3001234 en ASL.
+#   Se conectan/desconectan con los mismos comandos *3 y *1 que nodos ASL.
+# ==============================================================================
 
-# Limpiar parámetros de comillas para evitar fallos de ejecución desde la web
-CMD=$(echo $1 | tr -d "'\"")
-LOCAL=$(echo $2 | tr -d "'\"")
-REMOTE=$(echo $3 | tr -d "'\"")
+# Limpieza de parámetros para evitar inyecciones y fallos de comillas desde PHP
+CMD=$(echo ${1:-} | tr -d "'\"")
+LOCAL=$(echo ${2:-} | tr -d "'\"")
+REMOTE=$(echo ${3:-} | tr -d "'\"")
 
-# Registro opcional para depuración en el nodo (descomentar si es necesario)
-# echo "[$(date)] EJECUTANDO: $CMD LOCAL:$LOCAL REMOTE:$REMOTE" >> /tmp/chilemon.log
+# LOG DE DEPURACIÓN (descomentar para ver qué llega desde la web)
+# echo "[$(date)] WEB_CMD: $CMD LOCAL:$LOCAL REMOTE:$REMOTE" >> /tmp/chilemon.log
 
 case "$CMD" in
     nodes)
@@ -24,7 +29,8 @@ case "$CMD" in
         /usr/sbin/asterisk -rx "rpt stats $LOCAL"
         ;;
     connect)
-        # Realiza una conexión hacia un nodo remoto (*3 = transceive)
+        # Conectar a un nodo remoto (*3 = transceive)
+        # Funciona tanto para nodos ASL normales como EchoLink (prefijo 3xxxxxx)
         /usr/sbin/asterisk -rx "rpt fun $LOCAL *3$REMOTE"
         ;;
     disconnect)
@@ -33,18 +39,18 @@ case "$CMD" in
         ;;
     sys-restart-asterisk)
         # Reinicia el servicio Asterisk completo
-        /usr/bin/systemctl restart asterisk
+        systemctl restart asterisk
         ;;
     sys-restart-apache)
         # Reinicia el servidor web Apache
-        /usr/bin/systemctl restart apache2
+        systemctl restart apache2
         ;;
     sys-poweroff)
         # Apaga el hardware físicamente
-        /usr/sbin/poweroff
+        poweroff
         ;;
     *)
-        echo "Comando invalido: $CMD"
+        echo "Comando invalido: $CMD" >> /tmp/chilemon.log
         exit 1
         ;;
 esac

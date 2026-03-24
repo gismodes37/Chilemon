@@ -375,7 +375,7 @@ function renderNodes(nodes) {
     <td>${escapeHtml(n.connected || "--")}</td>
 
     <td>
-      <span class="badge bg-secondary">${escapeHtml(n.mode || "ASL")}</span>
+      <span class="badge ${(n.mode || 'ASL') === 'EchoLink' ? 'bg-purple' : 'bg-secondary'}">${escapeHtml(n.mode || "ASL")}</span>
     </td>
 
     <td>

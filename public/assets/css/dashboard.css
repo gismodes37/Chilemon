@@ -656,3 +656,11 @@ html, body{
 .badge-activity-tx .activity-dot { background: #fff; }
 .badge-activity-recent .activity-dot { background: #0d6efd; }
 .badge-activity-idle .activity-dot { background: #6c757d; opacity: 0.4; }
+
+/* =========================================
+   ChileMon — Badge EchoLink (modo)
+========================================= */
+.bg-purple {
+    background-color: #6f42c1 !important;
+    color: #fff !important;
+}

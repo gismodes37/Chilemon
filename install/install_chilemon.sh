@@ -324,7 +324,7 @@ write_wrapper_if_missing() {
     cat > "$WRAPPER_PATH" <<'BASH'
 #!/usr/bin/env bash
 # ==============================================================================
-# ChileMon - Wrapper seguro para comandos rpt de Asterisk (v0.2.3)
+# ChileMon - Wrapper seguro para comandos rpt de Asterisk (v0.3.1)
 # ==============================================================================
 # Limpieza de parámetros para evitar inyecciones y fallos de comillas desde PHP
 CMD=$(echo ${1:-} | tr -d "'\"")
@@ -338,12 +338,9 @@ case "$CMD" in
     nodes) /usr/sbin/asterisk -rx "rpt nodes $LOCAL" ;;
     stats) /usr/sbin/asterisk -rx "rpt stats $LOCAL" ;;
     connect)
-        # Si el numero empieza con 8, usamos el comando *8 (EchoLink) configurado en rpt.conf
-        if [[ $REMOTE == 8* ]]; then
-            /usr/sbin/asterisk -rx "rpt fun $LOCAL *$REMOTE"
-        else
-            /usr/sbin/asterisk -rx "rpt fun $LOCAL *3$REMOTE"
-        fi
+        # Conectar a nodo remoto (*3 = transceive)
+        # Funciona tanto para ASL como EchoLink (prefijo 3xxxxxx)
+        /usr/sbin/asterisk -rx "rpt fun $LOCAL *3$REMOTE"
         ;;
     disconnect) /usr/sbin/asterisk -rx "rpt fun $LOCAL *1$REMOTE" ;;
     sys-restart-asterisk) systemctl restart asterisk ;;

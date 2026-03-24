@@ -299,7 +299,7 @@ $systemInfo = $systemInfo ?? [
                                     <td><?= htmlspecialchars($connectedText, ENT_QUOTES, 'UTF-8') ?></td>
 
                                     <td>
-                                        <span class="badge bg-secondary">
+                                        <span class="badge <?= $modeText === 'EchoLink' ? 'bg-purple' : 'bg-secondary' ?>">
                                             <?= htmlspecialchars($modeText, ENT_QUOTES, 'UTF-8') ?>
                                         </span>
                                     </td>

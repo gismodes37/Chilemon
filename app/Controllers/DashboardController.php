@@ -69,7 +69,11 @@ class DashboardController
 
                 $isFav = isset($favorites[$nodeId]);
                 $alias = (string)($favorites[$nodeId] ?? '');
-                $nodeName = ($alias !== '') ? $alias : 'Nodo ' . $nodeId;
+
+                // Detectar modo: nodos EchoLink en ASL empiezan con 3 y tienen 7 dígitos
+                $isEchoLink = str_starts_with((string)$nodeId, '3') && strlen((string)$nodeId) === 7;
+                $mode       = $isEchoLink ? 'EchoLink' : 'ASL';
+                $nodeName   = ($alias !== '') ? $alias : ($isEchoLink ? 'EchoLink ' . $nodeId : 'Nodo ' . $nodeId);
 
                 $nodos[] = [
                     'node'             => (string)$nodeId,
@@ -82,7 +86,7 @@ class DashboardController
                     'link'             => 'DIRECTO',
                     'direction'        => 'IN',
                     'connected'        => 'Si',
-                    'mode'             => 'ASL',
+                    'mode'             => $mode,
                     'online'           => true,
                     'visibility_type'  => 'direct',
                     'remote_visible'   => $remoteVisible,

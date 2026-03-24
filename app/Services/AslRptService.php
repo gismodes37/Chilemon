@@ -268,13 +268,13 @@ final class AslRptService
                 $mockTx     = sprintf('%02d:%02d', rand(0, 5), rand(0, 59));
 
                 return "System...........................................: ENABLED\n" .
-                       "Nodes currently connected to us..................: 1000, 2000\n" .
+                       "Nodes currently connected to us..................: 1000, 2000, 3001234\n" .
                        "Signal on input..................................: {$mockRx}\n" .
                        "Keyups today.....................................: {$mockKeyups}\n" .
                        "TX time today....................................: {$mockTx}\n";
             }
             if ($cmd === 'nodes') {
-                return "T1000\nT2000\n*3333\n<NONE>\n";
+                return "T1000\nT2000\n*3333\nE3001234\nE3054614\n<NONE>\n";
             }
             // Mocks para acciones de sistema en Windows
             if (in_array($cmd, ['sys-restart-asterisk', 'sys-restart-apache', 'sys-poweroff'], true)) {

@@ -52,7 +52,11 @@ class NodeApiController
                 $isFav      = isset($favorites[$nodeId]);
                 $alias      = (string)($favorites[$nodeId] ?? '');
                 
-                $nodeInfo = ($alias !== '') ? $alias : 'Nodo ' . $nodeId;
+                // Detectar modo: nodos EchoLink en ASL empiezan con 3 y tienen 7 dígitos
+                $isEchoLink = str_starts_with((string)$nodeId, '3') && strlen((string)$nodeId) === 7;
+                $mode       = $isEchoLink ? 'EchoLink' : 'ASL';
+                
+                $nodeInfo = ($alias !== '') ? $alias : ($isEchoLink ? 'EchoLink ' . $nodeId : 'Nodo ' . $nodeId);
 
                 $rows[] = [
                     'node'            => (string)$nodeId,
@@ -63,7 +67,7 @@ class NodeApiController
                     'link'            => $isDirect ? 'DIRECTO' : ($isVisible ? 'VISIBLE' : '--'),
                     'direction'       => $isDirect ? 'IN' : '',
                     'connected'       => $isDirect ? 'ACTIVO' : '--',
-                    'mode'            => 'ASL',
+                    'mode'            => $mode,
                     'online'          => $isDirect,
                     'visibility_type' => $isDirect ? 'direct' : 'visible',
                     'activity'        => $activity,
