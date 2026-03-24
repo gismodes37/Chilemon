@@ -37,10 +37,10 @@ if ($node === '' || strlen($node) < 3 || strlen($node) > 20) {
 }
 
 if ($alias !== '') {
-    $alias = mb_substr($alias, 0, 60);
+    $alias = substr($alias, 0, 60);
 }
 if ($desc !== '') {
-    $desc = mb_substr($desc, 0, 500); // límite sano para UI
+    $desc = substr($desc, 0, 500); // límite sano para UI
 }
 
 try {
