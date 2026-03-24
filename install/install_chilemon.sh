@@ -489,11 +489,11 @@ main() {
     read -r -p "¿Desea continuar con la instalación? [s/N]: " confirm
     [[ "$confirm" =~ ^[sS]$ ]] || { echo "Instalación cancelada."; exit 0; }
 
-    step "1 de 8" "Validando estructura del repositorio"
+    step "1 de 9" "Validando estructura del repositorio"
     check_repo_structure
     ok "Estructura del repositorio validada"
 
-    step "2 de 8" "Instalando dependencias base"
+    step "2 de 9" "Instalando dependencias base"
     apt-get update
     ensure_package git
     ensure_package apache2
@@ -503,7 +503,7 @@ main() {
     ensure_package sudo
     ok "Dependencias instaladas o ya presentes"
 
-    step "3 de 8" "Detectando datos del nodo y solicitando confirmación"
+    step "3 de 9" "Detectando datos del nodo y solicitando confirmación"
 
     local local_node=""
     while [[ -z "$local_node" ]]; do
@@ -556,13 +556,13 @@ main() {
     ok "Servidor detectado/configurado: $server_host"
     ok "Usuario AMI detectado: $ami_user"
 
-    step "4 de 8" "Preparando carpetas y permisos"
+    step "4 de 9" "Preparando carpetas y permisos"
     mkdir -p "$DATA_DIR" "$LOG_DIR" "$BACKUP_DIR" "$REPO_DIR/config"
     chown -R www-data:www-data "$DATA_DIR" "$LOG_DIR" "$BACKUP_DIR"
     chmod -R 775 "$DATA_DIR" "$LOG_DIR" "$BACKUP_DIR"
     ok "Carpetas preparadas y permisos aplicados"
 
-    step "5 de 8" "Generando configuración local"
+    step "5 de 9" "Generando configuración local"
     write_local_config \
         "$local_node" \
         "$server_host" \
@@ -573,11 +573,11 @@ main() {
         "$ami_pass" \
         "$ami_timeout"
 
-    step "6 de 8" "Instalando wrapper y sudoers"
+    step "6 de 9" "Instalando wrapper y sudoers"
     write_wrapper_if_missing
     write_sudoers
 
-    step "7 de 8" "Configurando Apache"
+    step "7 de 9" "Configurando Apache"
     write_apache_config
 
     step "8 de 9" "Validando PHP e inicializando ChileMon"
@@ -588,6 +588,6 @@ main() {
     run_php_user_creation
 
     validate_installation "$local_node" "$server_host" "$ami_user" "definido durante instalación" "$web_proto"
-    }
+}
 
 main "$@"
