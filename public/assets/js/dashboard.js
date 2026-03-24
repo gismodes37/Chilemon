@@ -666,11 +666,7 @@ async function refreshNodesLive() {
 function afterNodeActionLive() {
   setTimeout(() => {
     reloadDashboard();
-  }, 1800);
-
-  setTimeout(() => {
-    reloadDashboard();
-  }, 4500);
+  }, 2000);
 }
 
 /* =============================================================
@@ -857,7 +853,6 @@ function setupFavoritesModal() {
     });
   }
 
-  // Formulario de agregar/editar favorito (upsert: crea o actualiza por node_id)
   const form = document.getElementById("favForm");
   if (form) {
     form.addEventListener("submit", async (e) => {
@@ -878,9 +873,7 @@ function setupFavoritesModal() {
       }
 
       try {
-        // Upsert: si ya existe el node_id actualiza, si no crea
-        await postForm("api/favorites.php", {
-          action: "upsert",
+        await postForm("api/favorites/save.php", {
           node_id,
           alias,
           description,
@@ -888,6 +881,15 @@ function setupFavoritesModal() {
 
         favoritesClearForm(); // limpiar formulario tras guardar
         await favoritesReload(); // refrescar tabla de favoritos
+        
+        // ¡Ocultar el modal automáticamente para que sea obvio que funcionó!
+        const modalEl = document.getElementById("favoritesModal");
+        if (modalEl && window.bootstrap) {
+          const inst = window.bootstrap.Modal.getInstance(modalEl);
+          if (inst) inst.hide();
+        }
+        
+        alert("¡Favorito guardado correctamente en tu base de datos!");
       } catch (err) {
         if (err.message !== "Unauthorized") {
           alert(`Error guardando favorito: ${err.message}`);
@@ -924,8 +926,8 @@ async function favoritesReload() {
   tbody.innerHTML = `<tr><td colspan="4" class="text-muted">Cargando...</td></tr>`;
 
   try {
-    // GET api/favorites.php → { success: true, items: [...] }
-    const json = await getJson("api/favorites.php");
+    // GET api/favorites/list.php → { success: true, items: [...] }
+    const json = await getJson("api/favorites/list.php");
     const items = json && json.items ? json.items : [];
     renderFavorites(items);
   } catch (err) {
@@ -1015,8 +1017,7 @@ function renderFavorites(items) {
       if (!confirm(`¿Eliminar favorito ${node}?`)) return;
 
       try {
-        await postForm("api/favorites.php", {
-          action: "delete",
+        await postForm("api/favorites/delete.php", {
           node_id: node,
         });
         await favoritesReload(); // refrescar lista sin recargar la página
@@ -1039,9 +1040,8 @@ function renderFavorites(items) {
  */
 async function toggleFavoriteNode(nodeId, isCurrentlyFav) {
   try {
-    const action = isCurrentlyFav ? "delete" : "upsert";
+    const endpoint = isCurrentlyFav ? "api/favorites/delete.php" : "api/favorites/save.php";
     const payload = {
-      action: action,
       node_id: nodeId,
     };
 
@@ -1051,7 +1051,7 @@ async function toggleFavoriteNode(nodeId, isCurrentlyFav) {
       payload.description = "Añadido desde dashboard";
     }
 
-    await postForm("api/favorites.php", payload);
+    await postForm(endpoint, payload);
 
     // Refrescar inmediatamente el dashboard para ver el cambio visual (iconos/nombres)
     await refreshNodesLive();
@@ -1080,24 +1080,27 @@ function refreshSystemInfo() {
 }
 
 /* =============================================================
- * 11. AUTO REFRESH AUTOMÁTICO
+ * 11. AUTO REFRESH AUTOMÁTICO (POLLING)
  * -------------------------------------------------------------
- * Consulta api/ami/nodes.php cada 10 segundos.
- * Solo recarga la página si el estado de los nodos cambió
- * (comparando un JSON.stringify del array de nodos como "snapshot").
+ * Consulta api/nodes.php cada 8 segundos vía fetch.
+ * Solo actualiza la tabla si el estado de los nodos cambió.
+ *
+ * NOTA: Anteriormente se usaba SSE (Server-Sent Events) con un
+ * while(true)+sleep(2) que bloqueaba un worker Apache permanente.
+ * En RPi 3B+ con pocos workers esto saturaba el servidor.
+ * Se reemplazó por polling ligero que libera el worker tras cada request.
  *
  * Variables de estado:
- *   chilemonAutoRefresh      → referencia al setInterval activo
+ *   chilemonPollingInterval  → referencia al setInterval activo
  *   chilemonLastNodeSnapshot → snapshot del último estado conocido
  *
  * Manejo de errores:
  *   - 401 → getJson llama handleUnauthorized() → clearInterval → redirect
  *   - Otros errores de red → console.debug, el intervalo continúa
- *     (puede ser un corte temporal de red, no se debe cancelar)
  * ============================================================= */
 
-/** EventSource connection for Server-Sent Events. null = detenido. */
-let chilemonEventSource = null;
+/** Polling interval for auto refresh. null = detenido. */
+let chilemonPollingInterval = null;
 
 /** Snapshot del último estado de nodos conocido (JSON serializado). */
 let chilemonLastNodeSnapshot = "";
@@ -1116,30 +1119,28 @@ function buildNodeSnapshot(json) {
 }
 
 /**
- * Detiene EventSource de auto refresh.
+ * Detiene el polling de auto refresh.
  * Llamado desde handleUnauthorized() o si se necesita pausar el refresh.
  */
 function stopChilemonAutoRefresh() {
-  if (chilemonEventSource !== null) {
-    chilemonEventSource.close();
-    chilemonEventSource = null;
+  if (chilemonPollingInterval !== null) {
+    clearInterval(chilemonPollingInterval);
+    chilemonPollingInterval = null;
   }
 }
 
 /**
- * Inicia conexión SSE para recibir actualizaciones en tiempo real.
- * Reemplaza el polling antiguo mediante fetch interval.
+ * Inicia polling ligero para recibir actualizaciones periódicas.
+ * Consulta api/nodes.php cada 8 segundos en vez de mantener una
+ * conexión SSE permanente que bloqueaba un worker Apache.
+ * Optimizado para Raspberry Pi 3B+ con recursos limitados.
  */
 function startChilemonAutoRefresh() {
-  if (chilemonEventSource) return; // ya activo, no duplicar
+  if (chilemonPollingInterval) return; // ya activo, no duplicar
 
-  chilemonEventSource = new EventSource(base + "api/stream_nodes.php", {
-    withCredentials: true,
-  });
-
-  chilemonEventSource.onmessage = function (event) {
+  chilemonPollingInterval = setInterval(async () => {
     try {
-      const json = JSON.parse(event.data);
+      const json = await getJson("api/nodes.php");
       if (!json || !json.ok) return;
 
       const nextSnapshot = buildNodeSnapshot(json);
@@ -1158,10 +1159,9 @@ function startChilemonAutoRefresh() {
         chilemonLastNodeSnapshot = nextSnapshot;
         renderNodes(json.nodes);
 
-        // Redispara el filtrado de busqueda si es que esta escrito
+        // Redispara el filtrado de búsqueda si está activo
         const searchInput = document.getElementById("node-search-filter");
         if (searchInput && searchInput.value.length > 0) {
-          // Gatillamos un input event para re-filtrar
           searchInput.dispatchEvent(new Event("input", { bubbles: true }));
         }
 
@@ -1174,28 +1174,13 @@ function startChilemonAutoRefresh() {
         chilemonPreviousNodeMap = nextMap;
       }
     } catch (e) {
-      console.debug("Error procesando SSE data:", e.message);
+      if (e.message === "Unauthorized") {
+        handleUnauthorized();
+        return;
+      }
+      console.debug("Polling error:", e.message);
     }
-  };
-
-  chilemonEventSource.onerror = function (event) {
-    if (this.readyState == EventSource.CLOSED) {
-      console.debug("SSE Connection closed");
-    } else {
-      console.debug("SSE error, attempting to reconnect", event);
-    }
-  };
-
-  chilemonEventSource.addEventListener("error", function (e) {
-    if (e.data) {
-      try {
-        const jsonError = JSON.parse(e.data);
-        if (jsonError.error === "Unauthorized") {
-          handleUnauthorized();
-        }
-      } catch (err) {}
-    }
-  });
+  }, 8000); // 8 segundos — ligero para RPi 3B+
 }
 
 /* =============================================================

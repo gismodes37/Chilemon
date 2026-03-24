@@ -31,15 +31,15 @@ case "$CMD" in
         # Desconecta un nodo remoto específico (*1 = disconnect specific)
         /usr/sbin/asterisk -rx "rpt fun $LOCAL *1$REMOTE"
         ;;
-    restart-asterisk)
+    sys-restart-asterisk)
         # Reinicia el servicio Asterisk completo
         /usr/bin/systemctl restart asterisk
         ;;
-    restart-apache)
+    sys-restart-apache)
         # Reinicia el servidor web Apache
         /usr/bin/systemctl restart apache2
         ;;
-    poweroff)
+    sys-poweroff)
         # Apaga el hardware físicamente
         /usr/sbin/poweroff
         ;;

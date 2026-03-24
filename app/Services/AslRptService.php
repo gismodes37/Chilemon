@@ -15,9 +15,9 @@ final class AslRptService
         'nodes',
         'connect',
         'disconnect',
-        'restart-asterisk',
-        'restart-apache',
-        'poweroff'
+        'sys-restart-asterisk',
+        'sys-restart-apache',
+        'sys-poweroff'
     ];
 
     private string $wrapper;
@@ -62,7 +62,7 @@ final class AslRptService
      */
     public function restartAsterisk(): string
     {
-        return $this->run('restart-asterisk', $this->nodeId);
+        return $this->run('sys-restart-asterisk', $this->nodeId);
     }
 
     /**
@@ -70,7 +70,7 @@ final class AslRptService
      */
     public function restartApache(): string
     {
-        return $this->run('restart-apache', $this->nodeId);
+        return $this->run('sys-restart-apache', $this->nodeId);
     }
 
     /**
@@ -78,7 +78,7 @@ final class AslRptService
      */
     public function powerOff(): string
     {
-        return $this->run('poweroff', $this->nodeId);
+        return $this->run('sys-poweroff', $this->nodeId);
     }
 
     /**
@@ -277,7 +277,7 @@ final class AslRptService
                 return "T1000\nT2000\n*3333\n<NONE>\n";
             }
             // Mocks para acciones de sistema en Windows
-            if (in_array($cmd, ['restart-asterisk', 'restart-apache', 'poweroff'], true)) {
+            if (in_array($cmd, ['sys-restart-asterisk', 'sys-restart-apache', 'sys-poweroff'], true)) {
                 return "Simulated success for action: {$cmd}";
             }
             // Para 'connect' y 'disconnect'

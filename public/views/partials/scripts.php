@@ -12,6 +12,6 @@
 $jsPath = dirname(__DIR__, 2) . '/assets/js/dashboard.js';
 $jsVer  = file_exists($jsPath) ? (string)filemtime($jsPath) : (string)APP_VERSION;
 ?>
-<script src="<?= rtrim(BASE_URL, '/') ?>/assets/js/dashboard.js?v=<?= $jsVer ?>"></script>
+<script src="<?= rtrim(BASE_URL, '/') ?>/assets/js/dashboard.js?v=<?= time() ?>"></script>
 </body>
 </html>

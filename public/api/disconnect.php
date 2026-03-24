@@ -53,7 +53,7 @@ try {
 
     // Registrar evento en SQLite para actividad reciente
     try {
-        $db = \App\Core\Database::getInstance();
+        $db = \App\Core\Database::getConnection();
         $db->exec("
             CREATE TABLE IF NOT EXISTS node_events (
                 id         INTEGER PRIMARY KEY AUTOINCREMENT,

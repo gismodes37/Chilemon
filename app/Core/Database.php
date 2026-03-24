@@ -43,6 +43,36 @@ final class Database
 
             // Recomendado: integridad referencial
             self::$instance->exec('PRAGMA foreign_keys = ON;');
+            // WAL mode: mejor rendimiento con lecturas/escrituras concurrentes (polling + múltiples usuarios)
+            self::$instance->exec('PRAGMA journal_mode = WAL;');
+
+            // Asegurar que la tabla favorites existe (puede faltar si el instalador no se re-ejecutó)
+            self::$instance->exec("
+                CREATE TABLE IF NOT EXISTS favorites (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    node_id TEXT NOT NULL,
+                    alias TEXT DEFAULT '',
+                    description TEXT DEFAULT '',
+                    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    UNIQUE(user_id, node_id)
+                )
+            ");
+
+            // MIGRACIÓN AUTOMÁTICA: Si la tabla favorites es de una v0.1 antigua, puede faltarle alias y description.
+            try {
+                self::$instance->exec("ALTER TABLE favorites ADD COLUMN alias TEXT DEFAULT ''");
+            } catch (\Throwable $err) {}
+            try {
+                self::$instance->exec("ALTER TABLE favorites ADD COLUMN description TEXT DEFAULT ''");
+            } catch (\Throwable $err) {}
+            try {
+                self::$instance->exec("ALTER TABLE favorites ADD COLUMN updated_at TEXT NOT NULL DEFAULT (datetime('now'))");
+            } catch (\Throwable $err) {}
+            try {
+                self::$instance->exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_favorites_user_node ON favorites(user_id, node_id);");
+            } catch (\Throwable $err) {}
 
         } catch (PDOException $e) {
             throw new \RuntimeException('Error SQLite: ' . $e->getMessage(), 0, $e);

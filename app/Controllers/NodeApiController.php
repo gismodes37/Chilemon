@@ -84,7 +84,10 @@ class NodeApiController
             ];
 
         } catch (Throwable $e) {
-            http_response_code(500);
+            // Cuando es ejecutado desde stream_nodes.php (SSE), no podemos mandar un 500 si ya se enviaron headers
+            if (!headers_sent()) {
+                http_response_code(500);
+            }
             return ['ok' => false, 'error' => $e->getMessage()];
         }
     }

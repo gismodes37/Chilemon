@@ -28,9 +28,9 @@ $node = trim((string)($_POST['node_id'] ?? ''));
 $alias = trim((string)($_POST['alias'] ?? ''));
 $desc = trim((string)($_POST['description'] ?? ''));
 
-// sanitización razonable
-$node = preg_replace('/[^0-9]/', '', $node); // nodos ASL: numérico
-if ($node === '' || strlen($node) < 3 || strlen($node) > 10) {
+// sanitización razonable (números y letras para soportar distintos formatos)
+$node = preg_replace('/[^0-9A-Za-z_-]/', '', $node);
+if ($node === '' || strlen($node) < 3 || strlen($node) > 20) {
     http_response_code(400);
     echo json_encode(['success' => false, 'error' => 'Nodo inválido']);
     exit;

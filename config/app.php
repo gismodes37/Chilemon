@@ -42,7 +42,7 @@ if (!defined('HEADER_TAGLINE')) {
     define(
         'HEADER_TAGLINE',
         getenv('CHILEMON_HEADER_TAGLINE')
-            ?: ($localConfig['header_tagline'] ?? 'Puedes perzonalizar esta linea de cabecera')
+            ?: ($localConfig['header_tagline'] ?? 'Nodo: 494780 de La Serena')
     );
 }
 

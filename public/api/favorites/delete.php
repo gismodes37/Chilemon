@@ -25,7 +25,7 @@ if (!Auth::validateCsrf($token)) {
 }
 
 $node = trim((string)($_POST['node_id'] ?? ''));
-$node = preg_replace('/[^0-9]/', '', $node);
+$node = preg_replace('/[^0-9A-Za-z_-]/', '', $node);
 if ($node === '') {
     http_response_code(400);
     echo json_encode(['success' => false, 'error' => 'Nodo inválido']);
