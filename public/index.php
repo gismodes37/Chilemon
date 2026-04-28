@@ -15,7 +15,7 @@ use App\Auth\Auth;
 use App\Controllers\DashboardController;
 
 if (!defined('APP_VERSION')) {
-    define('APP_VERSION', '0.3.0');
+    define('APP_VERSION', '0.3.1');
 }
 
 // 3. Verificación de Seguridad y Sesión

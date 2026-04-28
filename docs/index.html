@@ -77,7 +77,7 @@
           <span class="brand-badge"><i class="bi bi-shield-lock"></i> Login seguro</span>
           <span class="brand-badge"><i class="bi bi-database"></i> SQLite</span>
           <span class="brand-badge"><i class="bi bi-terminal"></i> Instalador automático</span>
-          <span class="brand-badge"><i class="bi bi-tag"></i> v0.3.0</span>
+          <span class="brand-badge"><i class="bi bi-tag"></i> v0.3.1</span>
         </div>
 
         <h1 class="display-5 fw-semibold mb-3">ChileMon</h1>
@@ -291,7 +291,7 @@
 
       <div class="alert alert-info mt-4">
         <i class="bi bi-lightbulb"></i>
-        Estado actual: <strong>release v0.3.0 funcional</strong>. ChileMon ya integra favoritos con alias personalizados, monitoreo RX/TX y se instala en nodos reales de forma automática.
+        Estado actual: <strong>release v0.3.1 funcional</strong>. ChileMon ya integra favoritos con alias personalizados, monitoreo RX/TX y se instala en nodos reales de forma automática.
       </div>
     </div>
   </section>
@@ -346,7 +346,7 @@
     <div class="container">
       <div class="text-center mb-5">
         <h2 class="h1 section-title">Screenshots</h2>
-        <p class="text-secondary mb-0">Vistas actuales del login, dashboard y operación básica del release v0.3.0.</p>
+        <p class="text-secondary mb-0">Vistas actuales del login, dashboard y operación básica del release v0.3.1.</p>
       </div>
 
       <div class="row g-4">
@@ -472,6 +472,22 @@
             </div>
           </div>
 
+          <div class="card shadow-sm mt-3">
+            <div class="card-body p-4">
+              <h3 class="h5 mb-3"><i class="bi bi-box-seam"></i> Opción: Desarrollo Local (Docker)</h3>
+              <p class="text-secondary small mb-3">Para pruebas sin un nodo real, usa Docker Compose.</p>
+              <div class="code">
+                <div><span class="text-secondary"># Clonar e iniciar contenedor</span></div>
+                <div><span class="text-secondary">$</span> docker-compose up -d --build</div>
+                <div><span class="text-secondary"># Inicializar DB y Usuario</span></div>
+                <div><span class="text-secondary">$</span> docker-compose exec chilemon php bin/install.php</div>
+              </div>
+              <div class="mt-3 small text-secondary">
+                Accede a <code>http://localhost:8080</code>.
+              </div>
+            </div>
+          </div>
+
           <div class="alert alert-warning mt-3 mb-0">
             <i class="bi bi-exclamation-triangle"></i>
             Mantén una única ruta oficial en Apache hacia <span class="kbd">/opt/chilemon/public</span> para evitar conflictos en el nodo.
@@ -564,7 +580,7 @@
         <div class="col-lg-3">
           <div class="card h-100 shadow-sm border-primary">
             <div class="card-body p-4">
-              <h3 class="h5"><span class="badge text-bg-primary">v0.3.0</span> Release Actual</h3>
+              <h3 class="h5"><span class="badge text-bg-primary">v0.3.1</span> Release Actual</h3>
               <ul class="text-secondary mb-0">
                 <li><strong>Integración Favoritos</strong></li>
                 <li>Alias personalizados</li>

@@ -10,6 +10,17 @@ https://semver.org/lang/es/
 
 ---
 
+# [0.3.1] - 2026-04-27
+
+## ✨ Entorno Local y Docker
+
+### 📡 Añadido
+- **Entorno Local (Docker)**: Soporte completo para desarrollo local mediante Docker Compose, sin necesidad de un nodo AllStarLink físico.
+- **Mock de Comandos**: Script simulador de `chilemon-rpt` para emular actividad RX/TX, nodos conectados y estadísticas en entornos Windows/Mac/Linux.
+- **Documentación Bilingüe**: Actualización de los `README` (Inglés y Español) integrando los pasos para arrancar y probar el contenedor.
+
+---
+
 # [0.3.0] - 2026-03-21
 
 ## ✨ Integración de Favoritos y Simplificación (v0.3.x)

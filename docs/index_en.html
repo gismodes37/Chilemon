@@ -78,7 +78,7 @@
           <span class="brand-badge"><i class="bi bi-shield-lock"></i> Secure Login</span>
           <span class="brand-badge"><i class="bi bi-database"></i> SQLite</span>
           <span class="brand-badge"><i class="bi bi-terminal"></i> Automatic Installer</span>
-          <span class="brand-badge"><i class="bi bi-tag"></i> v0.3.0</span>
+          <span class="brand-badge"><i class="bi bi-tag"></i> v0.3.1</span>
         </div>
 
         <h1 class="display-5 fw-semibold mb-3">ChileMon</h1>
@@ -291,7 +291,7 @@
 
       <div class="alert alert-info mt-4">
         <i class="bi bi-lightbulb"></i>
-        Current status: <strong>functional v0.3.0 release</strong>. ChileMon already integrates favorites with custom aliases, RX/TX monitoring, and installs on real nodes automatically.
+        Current status: <strong>functional v0.3.1 release</strong>. ChileMon already integrates favorites with custom aliases, RX/TX monitoring, and installs on real nodes automatically.
       </div>
     </div>
   </section>
@@ -469,6 +469,22 @@
             </div>
           </div>
 
+          <div class="card shadow-sm mt-3">
+            <div class="card-body p-4">
+              <h3 class="h5 mb-3"><i class="bi bi-box-seam"></i> Option: Local Development (Docker)</h3>
+              <p class="text-secondary small mb-3">For testing without a real node, use Docker Compose.</p>
+              <div class="code">
+                <div><span class="text-secondary"># Clone and start container</span></div>
+                <div><span class="text-secondary">$</span> docker-compose up -d --build</div>
+                <div><span class="text-secondary"># Initialize DB and User</span></div>
+                <div><span class="text-secondary">$</span> docker-compose exec chilemon php bin/install.php</div>
+              </div>
+              <div class="mt-3 small text-secondary">
+                Access at <code>http://localhost:8080</code>.
+              </div>
+            </div>
+          </div>
+
           <div class="alert alert-warning mt-3 mb-0">
             <i class="bi bi-exclamation-triangle"></i>
             Keep a single official Apache path pointing to <span class="kbd">/opt/chilemon/public</span> to avoid conflicts on the node.
@@ -561,7 +577,7 @@
         <div class="col-lg-3">
           <div class="card h-100 shadow-sm border-primary">
             <div class="card-body p-4">
-              <h3 class="h5"><span class="badge text-bg-primary">v0.3.0</span> Current Release</h3>
+              <h3 class="h5"><span class="badge text-bg-primary">v0.3.1</span> Current Release</h3>
               <ul class="text-secondary mb-0">
                 <li><strong>Favorites Integration</strong></li>
                 <li>Custom aliases</li>

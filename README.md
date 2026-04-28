@@ -13,7 +13,7 @@ Modern dashboard for monitoring and controlling AllStarLink nodes
 </p>
 
 <p align="center">
-<img src="https://img.shields.io/badge/version-0.3.0-blue">
+<img src="https://img.shields.io/badge/version-0.3.1-blue">
 <img src="https://img.shields.io/badge/php-8.2+-blue">
 <img src="https://img.shields.io/badge/database-SQLite-green">
 <img src="https://img.shields.io/badge/ASL3-compatible-green">
@@ -352,6 +352,10 @@ Stable release
 ## 📦 Release
 
 # 📦 Releases
+
+## v0.3.1
+- **Local Environment (Docker)**: Full support for local development using Docker Compose.
+- **Command Mock**: Simulator script to emulate RX/TX activity in local environments.
 
 ## v0.3.0
 - **Full Favorites Integration**: Star icon and alias display in the dashboard.
