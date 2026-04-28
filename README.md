@@ -263,6 +263,30 @@ The installer will automatically configure Apache, PHP, SQLite, and the security
 
  ---
 
+### 🐳 Option 3: Local Development Environment (Docker)
+
+To continue advancing development and be able to test ChileMon on any computer (Windows, Mac, or Linux) without needing a real AllStarLink node, we have created a Docker-based environment that simulates node activity.
+
+#### 3.1 Requirements
+- Docker and Docker Compose installed.
+
+#### 3.2 Start the environment
+In the root of the project, run:
+```bash
+docker-compose up -d --build
+```
+
+#### 3.3 Initialize Database and User
+```bash
+docker-compose exec chilemon php bin/install.php
+docker-compose exec chilemon php bin/create-user.php
+```
+
+#### 3.4 Access the Dashboard
+Go to `http://localhost:8080`. The environment uses a mock script that simulates Asterisk `rpt` responses, allowing you to test the graphical interface, favorites management, and authentication without affecting a real node.
+
+ ---
+
  ## 📂 Project Structure
 
 
