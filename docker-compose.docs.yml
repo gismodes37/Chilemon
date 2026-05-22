@@ -1,0 +1,9 @@
+services:
+  chilemon_web_info:
+    build:
+      context: .
+      dockerfile: Dockerfile.docs
+    container_name: chilemon_web_informativa
+    ports:
+      - "8080:80" # Puedes cambiar el 8080 por el puerto público que desees
+    restart: unless-stopped

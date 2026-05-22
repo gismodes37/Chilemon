@@ -1,0 +1,11 @@
+# Usar una imagen ligera de Nginx para servir archivos estáticos (web informativa)
+FROM nginx:alpine
+
+# Eliminar los archivos por defecto de Nginx
+RUN rm -rf /usr/share/nginx/html/*
+
+# Copiar el contenido de la carpeta docs al directorio público de Nginx
+COPY docs/ /usr/share/nginx/html/
+
+# Exponer el puerto 80
+EXPOSE 80
