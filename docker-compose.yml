@@ -1,0 +1,18 @@
+services:
+  chilemon:
+    build: .
+    container_name: chilemon_local
+    ports:
+      - "8090:80"
+    volumes:
+      - .:/opt/chilemon
+      - chilemon_data:/opt/chilemon/data
+      - chilemon_logs:/opt/chilemon/logs
+    environment:
+      - CHILEMON_NODE=494780
+      - APP_ENV=local
+    restart: unless-stopped
+
+volumes:
+  chilemon_data:
+  chilemon_logs:

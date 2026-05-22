@@ -98,6 +98,4 @@ debug.php
 # Docker (Entorno local)
 # --------------------------
 
-Dockerfile
-docker-compose.yml
 .docker/
