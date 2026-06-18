@@ -19,6 +19,7 @@ require_once ROOT_PATH . '/app/Core/Database.php';
 require_once ROOT_PATH . '/app/Core/NodeLogger.php';
 
 use App\Auth\Auth;
+use App\Core\RateLimiter;
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -27,6 +28,16 @@ Auth::startSession();
 if (!Auth::isLoggedIn()) {
     http_response_code(401);
     echo json_encode(['ok' => false, 'error' => 'Unauthorized'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+// Rate limiting: 60 requests per minute
+require_once ROOT_PATH . '/app/Core/RateLimiter.php';
+try {
+    RateLimiter::check('api-ami-nodes', 60, 60);
+} catch (\RuntimeException $e) {
+    http_response_code(429);
+    echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
     exit;
 }
 

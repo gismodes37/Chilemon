@@ -125,10 +125,15 @@ try {
         fail("No se pudo generar hash de contraseña.");
     }
 
-    $insert = $pdo->prepare("INSERT INTO users (username, password_hash) VALUES (?, ?)");
-    $insert->execute([$username, $hash]);
+    echo "\n¿Este usuario debe ser administrador?\n";
+    echo "(admin puede gestionar usuarios y acceder al panel de administración)\n";
+    $isAdmin = strtolower(trim(prompt("¿Admin? (s/N): "))) === 's';
+    $role = $isAdmin ? 'admin' : 'user';
 
-    echo "✅ Usuario creado correctamente: {$username}\n";
+    $insert = $pdo->prepare("INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)");
+    $insert->execute([$username, $hash, $role]);
+
+    echo "✅ Usuario creado correctamente: {$username} (rol: {$role})\n";
 
 } catch (Throwable $e) {
     fail("Error: " . $e->getMessage());

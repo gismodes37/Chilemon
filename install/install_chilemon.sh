@@ -545,9 +545,13 @@ main() {
     echo "Ingrese la clave AMI configurada en /etc/asterisk/manager.conf."
     echo "El usuario AMI corresponde al nombre del bloque detectado, "
     echo "por ejemplo: [admin] => usuario admin."
-    read -r -s -p "Ingrese clave AMI [Enter para usar valor por defecto actual]: " ami_pass
-    echo ""
-    ami_pass="${ami_pass:-angE29angE64}"
+    while [[ -z "$ami_pass" ]]; do
+        read -r -s -p "Ingrese clave AMI (obligatorio): " ami_pass
+        echo ""
+        if [[ -z "$ami_pass" ]]; then
+            echo "[ERROR] La clave AMI es obligatoria. Revisa /etc/asterisk/manager.conf"
+        fi
+    done
 
     ok "Nodo local capturado: $local_node"
     ok "Servidor detectado/configurado: $server_host"

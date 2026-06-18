@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * Autocargador ligero nativo PSR-4.
  * Elimina la necesidad de Composer y de usar require_once múltiples manuales.

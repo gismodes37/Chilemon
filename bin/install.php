@@ -329,10 +329,10 @@ try {
         fail("No se pudo generar hash de contraseña.");
     }
 
-    $insert = $pdo->prepare("INSERT INTO users (username, password_hash) VALUES (?, ?)");
+    $insert = $pdo->prepare("INSERT INTO users (username, password_hash, role) VALUES (?, ?, 'admin')");
     $insert->execute([$username, $hash]);
 
-    echo "\n✅ Usuario creado correctamente: {$username}\n";
+    echo "\n✅ Usuario administrador creado correctamente: {$username}\n";
     echo "🚀 Instalación finalizada\n\n";
     echo "Accede en: " . buildAccessUrl($basePath) . "\n\n";
 

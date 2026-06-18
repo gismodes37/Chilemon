@@ -6,6 +6,15 @@ namespace App\Auth;
 use App\Core\Database;
 use PDO;
 
+/**
+ * System roles
+ */
+final class UserRole
+{
+    public const ADMIN = 'admin';
+    public const USER  = 'user';
+}
+
 final class Auth
 {
     private const INACTIVITY_TIMEOUT = 1800; // 30 min
@@ -212,6 +221,7 @@ final class Auth
 
         $_SESSION['user_id']       = (int)$row['id'];
         $_SESSION['username']      = (string)$row['username'];
+        $_SESSION['user_role']     = (string)($row['role'] ?? UserRole::USER);
         $_SESSION['last_activity'] = time();
 
         return true;
@@ -268,5 +278,60 @@ final class Auth
             return false;
         }
         return hash_equals($sessionToken, $token);
+    }
+
+    // ---------------------------------------------------------------
+    //  Session Accessors
+    // ---------------------------------------------------------------
+
+    /**
+     * Retorna el user_id de la sesión, o 0 si no hay sesión activa.
+     */
+    public static function getUserId(): int
+    {
+        self::startSession();
+        return (int)($_SESSION['user_id'] ?? 0);
+    }
+
+    /**
+     * Retorna el username de la sesión, o '' si no hay sesión activa.
+     */
+    public static function getUsername(): string
+    {
+        self::startSession();
+        return (string)($_SESSION['username'] ?? '');
+    }
+
+    // ---------------------------------------------------------------
+    //  Role System
+    // ---------------------------------------------------------------
+
+    /**
+     * Retorna el rol del usuario logueado, o 'user' por defecto.
+     */
+    public static function getUserRole(): string
+    {
+        self::startSession();
+        return (string)($_SESSION['user_role'] ?? UserRole::USER);
+    }
+
+    /**
+     * Verifica si el usuario logueado es administrador.
+     */
+    public static function isAdmin(): bool
+    {
+        return self::getUserRole() === UserRole::ADMIN;
+    }
+
+    /**
+     * Requiere rol admin. Lanza 403 si no lo es.
+     */
+    public static function requireAdmin(): void
+    {
+        if (!self::isAdmin()) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'Forbidden: se requiere rol admin']);
+            exit;
+        }
     }
 }

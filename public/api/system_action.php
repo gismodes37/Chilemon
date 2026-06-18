@@ -20,10 +20,12 @@ declare(strict_types=1);
  */
 
 require_once __DIR__ . '/../../config/app.php';
-require_once __DIR__ . '/../../app/autoload.php';
+require_once ROOT_PATH . '/app/autoload.php';
 
 use App\Auth\Auth;
+use App\Auth\UserRole;
 use App\Controllers\SystemController;
+use App\Core\RateLimiter;
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -42,11 +44,23 @@ if (!Auth::isLoggedIn()) {
     exit;
 }
 
+// Requerir rol admin (solo administradores pueden reiniciar/apagar)
+Auth::requireAdmin();
+
 // Validar CSRF
 $token = (string)($_POST['csrf_token'] ?? '');
 if ($token !== '' && !Auth::validateCsrf($token)) {
     http_response_code(400);
     echo json_encode(['success' => false, 'error' => 'Bad Request (CSRF)']);
+    exit;
+}
+
+// Rate limiting: 5 system actions per minute (peligrosas!)
+try {
+    RateLimiter::check('api-system-action', 5, 60);
+} catch (\RuntimeException $e) {
+    http_response_code(429);
+    echo json_encode(['success' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
     exit;
 }
 

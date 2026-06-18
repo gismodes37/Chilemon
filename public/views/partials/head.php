@@ -1,3 +1,4 @@
+<?php declare(strict_types=1); ?>
 <!DOCTYPE html>
 <html lang="es-CL" data-bs-theme="<?= $darkMode ? 'dark' : 'light' ?>">
 <head>
@@ -9,9 +10,9 @@
   
   <title><?= APP_NAME ?> v<?= APP_VERSION ?> - Supermon Style</title>
 
-  <!-- Bootstrap 5 + Icons -->
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+  <!-- Bootstrap 5 + Icons (SRI protected) -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-9ndCyUaIbzAi2FUVXJi0CjmCapSmO7SnpJef0486qhLnuZ2cdeRhO02iuK6FUUVM" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.min.css" integrity="sha384-mddk2pOtleiE3UNWQfF4qF2ldD2xQcEU6s4wFcyQw2LV6G2GsePwJUVa3XtVnjXK" crossorigin="anonymous">
 
   <?php
     $cssPath = dirname(__DIR__, 2) . '/assets/css/dashboard.css';

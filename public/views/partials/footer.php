@@ -1,3 +1,4 @@
+<?php declare(strict_types=1); ?>
 <!-- Footer -->
 <footer class="mt-5 py-3">
   <div class="container">

@@ -15,10 +15,11 @@ declare(strict_types=1);
  */
 
 require_once __DIR__ . '/../../config/app.php';
-require_once __DIR__ . '/../../app/autoload.php';
+require_once ROOT_PATH . '/app/autoload.php';
 
 use App\Auth\Auth;
 use App\Services\AslRptService;
+use App\Core\RateLimiter;
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -38,11 +39,28 @@ if ($token !== '' && !Auth::validateCsrf($token)) {
     exit;
 }
 
+// Rate limiting: 20 connect requests per minute
+try {
+    RateLimiter::check('api-connect', 20, 60);
+} catch (\RuntimeException $e) {
+    http_response_code(429);
+    echo json_encode(['success' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 // Validar parámetro node — solo dígitos
 $node = trim((string)($_POST['node'] ?? ''));
 if ($node === '' || !ctype_digit($node)) {
     http_response_code(400);
     echo json_encode(['success' => false, 'error' => 'Parámetro node inválido']);
+    exit;
+}
+
+// Whitelist check: si NODE_WHITELIST está definida y no está vacía, solo esos nodos
+$whitelist = defined('NODE_WHITELIST') && is_array(NODE_WHITELIST) ? NODE_WHITELIST : [];
+if (!empty($whitelist) && !in_array($node, $whitelist, true)) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'error' => 'Nodo no autorizado'], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
@@ -69,7 +87,7 @@ try {
         );
         $stmt->execute([
             ':node' => $node,
-            ':user' => $_SESSION['username'] ?? 'system',
+            ':user' => Auth::getUsername() ?: 'system',
         ]);
     } catch (Throwable $dbEx) {
         error_log('[connect.php] SQLite error: ' . $dbEx->getMessage());

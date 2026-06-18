@@ -16,20 +16,13 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 // Validar CSRF
 $csrf = (string)($_POST['csrf_token'] ?? '');
-if (
-    empty($_SESSION['csrf_token']) ||
-    !hash_equals((string)$_SESSION['csrf_token'], $csrf)
-) {
+if (!Auth::validateCsrf($csrf)) {
     header('HTTP/1.1 400 Bad Request');
     exit;
 }
 
 // Ejecutar logout
 Auth::logout();
-
-// Invalidar token
-$_SESSION = [];
-session_destroy();
 
 // Redirección consistente
 $bp = rtrim((string)(defined('BASE_PATH') ? BASE_PATH : ''), '/');

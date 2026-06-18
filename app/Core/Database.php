@@ -74,6 +74,24 @@ final class Database
                 self::$instance->exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_favorites_user_node ON favorites(user_id, node_id);");
             } catch (\Throwable $err) {}
 
+            // MIGRACIÓN v0.4.0: Agregar columna role a users
+            try {
+                self::$instance->exec("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user'");
+            } catch (\Throwable $err) {}
+
+            // MIGRACIÓN v0.4.0: Tabla para rate limiting de APIs
+            self::$instance->exec("
+                CREATE TABLE IF NOT EXISTS api_attempts (
+                    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                    action     TEXT NOT NULL,
+                    ip_address TEXT NOT NULL,
+                    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+                )
+            ");
+            try {
+                self::$instance->exec("CREATE INDEX IF NOT EXISTS idx_api_attempts_lookup ON api_attempts(action, ip_address, created_at);");
+            } catch (\Throwable $err) {}
+
         } catch (PDOException $e) {
             throw new \RuntimeException('Error SQLite: ' . $e->getMessage(), 0, $e);
         }

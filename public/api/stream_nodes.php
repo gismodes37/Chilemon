@@ -7,10 +7,11 @@ declare(strict_types=1);
  */
 
 require_once __DIR__ . '/../../config/app.php';
-require_once __DIR__ . '/../../app/autoload.php';
+require_once ROOT_PATH . '/app/autoload.php';
 
 use App\Auth\Auth;
 use App\Controllers\NodeApiController;
+use App\Core\RateLimiter;
 
 // Set headers for SSE
 header('Content-Type: text/event-stream');
@@ -29,6 +30,15 @@ Auth::startSession();
 if (!Auth::isLoggedIn()) {
     echo "event: error\n";
     echo "data: {\"error\": \"Unauthorized\"}\n\n";
+    exit;
+}
+
+// Rate limiting: 10 SSE connections per minute (cada conexión vive ~10 min)
+try {
+    RateLimiter::check('api-stream-nodes', 10, 60);
+} catch (\RuntimeException $e) {
+    echo "event: error\n";
+    echo "data: {\"error\": \"Rate limit exceeded\"}\n\n";
     exit;
 }
 

@@ -7,6 +7,7 @@ require_once ROOT_PATH . '/app/Core/Database.php';
 
 use App\Auth\Auth;
 use App\Core\Database;
+use App\Core\RateLimiter;
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -24,6 +25,15 @@ if (!Auth::validateCsrf($token)) {
     exit;
 }
 
+// Rate limiting: 20 favorites writes per minute
+try {
+    RateLimiter::check('api-favorites-delete', 20, 60);
+} catch (\RuntimeException $e) {
+    http_response_code(429);
+    echo json_encode(['success' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 $node = trim((string)($_POST['node_id'] ?? ''));
 $node = preg_replace('/[^0-9A-Za-z_-]/', '', $node);
 if ($node === '') {
@@ -35,7 +45,7 @@ if ($node === '') {
 try {
     $db = Database::getConnection();
     $stmt = $db->prepare("DELETE FROM favorites WHERE user_id = :uid AND node_id = :node");
-    $stmt->execute([':uid' => (int)$_SESSION['user_id'], ':node' => $node]);
+    $stmt->execute([':uid' => Auth::getUserId(), ':node' => $node]);
 
     echo json_encode(['success' => true], JSON_UNESCAPED_UNICODE);
 } catch (Throwable $e) {

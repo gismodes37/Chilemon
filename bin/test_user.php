@@ -1,5 +1,8 @@
 <?php
-$dbPath = 'c:\xampp\htdocs\chilemon\data\chilemon.sqlite';
+
+declare(strict_types=1);
+
+$dbPath = dirname(__DIR__) . '/data/chilemon.sqlite';
 $pdo = new PDO('sqlite:' . $dbPath);
 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 

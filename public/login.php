@@ -25,11 +25,6 @@ use App\Auth\Auth;
 // Iniciar sesión con flags de seguridad (httponly, samesite, etc.)
 Auth::startSession();
 
-// Generar token CSRF si no existe en la sesión actual
-if (empty($_SESSION['csrf_token']) || !is_string($_SESSION['csrf_token'])) {
-    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-}
-
 $error   = null;
 $oldUser = '';
 
@@ -50,7 +45,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
 
     // Validar token CSRF antes de procesar cualquier dato
     $csrf = (string) ($_POST['csrf_token'] ?? '');
-    if (!hash_equals((string) $_SESSION['csrf_token'], $csrf)) {
+    if (!hash_equals(Auth::csrfToken(), $csrf)) {
         $error = 'Solicitud inválida. Intenta nuevamente.';
     } else {
         $u = trim((string) ($_POST['username'] ?? ''));

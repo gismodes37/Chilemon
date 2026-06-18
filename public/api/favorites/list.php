@@ -7,6 +7,7 @@ require_once ROOT_PATH . '/app/Core/Database.php';
 
 use App\Auth\Auth;
 use App\Core\Database;
+use App\Core\RateLimiter;
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -14,6 +15,15 @@ Auth::startSession();
 if (!Auth::isLoggedIn()) {
     http_response_code(401);
     echo json_encode(['success' => false, 'error' => 'Unauthorized']);
+    exit;
+}
+
+// Rate limiting: 60 requests per minute
+try {
+    RateLimiter::check('api-favorites-list', 60, 60);
+} catch (\RuntimeException $e) {
+    http_response_code(429);
+    echo json_encode(['success' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
@@ -26,7 +36,7 @@ try {
         WHERE user_id = :uid
         ORDER BY datetime(created_at) DESC, id DESC
     ");
-    $stmt->execute([':uid' => (int)$_SESSION['user_id']]);
+    $stmt->execute([':uid' => Auth::getUserId()]);
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     echo json_encode(['success' => true, 'items' => $rows], JSON_UNESCAPED_UNICODE);

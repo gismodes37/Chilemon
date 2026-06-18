@@ -4,7 +4,7 @@ declare(strict_types=1);
 echo "\n🗑 ChileMon - Uninstall\n";
 echo "----------------------------------\n";
 
-$dbPath = '/opt/chilemon/data/chilemon.sqlite';
+$dbPath = dirname(__DIR__) . '/data/chilemon.sqlite';
 
 if (!file_exists($dbPath)) {
     echo "Nada que desinstalar.\n";

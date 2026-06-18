@@ -9,7 +9,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../config/app.php';
 
 // 2. Cargar Autocargador PSR-4 Nativo (reemplaza require_once manuales)
-require_once __DIR__ . '/../app/autoload.php';
+require_once ROOT_PATH . '/app/autoload.php';
 
 use App\Auth\Auth;
 use App\Controllers\DashboardController;
@@ -23,7 +23,7 @@ Auth::startSession();
 Auth::requireLogin();
 
 // 4. Parámetros globales de estado de interfaz
-$username = $_SESSION['username'] ?? 'Usuario';
+$username = Auth::getUsername() ?: 'Usuario';
 $darkMode = (isset($_COOKIE['chilemon_darkmode']) && $_COOKIE['chilemon_darkmode'] === 'true');
 
 // 5. Invocación del Controlador
@@ -39,4 +39,4 @@ $ipv4_list    = $data['ipv4_list'];
 $ipv6_list    = $data['ipv6_list'];
 
 // 7. Renderizar Vista
-require __DIR__ . '/views/dashboard.php';
+require ROOT_PATH . '/public/views/dashboard.php';

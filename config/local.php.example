@@ -49,4 +49,18 @@ return [
     'ami_user' => 'admin',
     'ami_pass' => 'REEMPLAZAR_CON_TU_CLAVE_AMI_REAL',
     'ami_timeout' => 3,
+
+    /**
+     * Whitelist de nodos permitidos para connect/disconnect.
+     * Vacío = todos los nodos permitidos.
+     * Ejemplo: ['494780', '123456']
+     */
+    'node_whitelist' => [],
+
+    /**
+     * Whitelist de IPs exentas de rate limiting.
+     * Vacío = rate limiting para todos.
+     * Ejemplo: ['127.0.0.1', '192.168.1.100']
+     */
+    'rate_limit_whitelist' => [],
 ];

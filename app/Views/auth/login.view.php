@@ -1,8 +1,11 @@
 <?php
+
+declare(strict_types=1);
+
 // Archivo: public/views/auth/login.view.php  (o donde tengas esta vista)
 // Variables esperadas: $error, $oldUser, $_SESSION['csrf_token']
 
-$csrfEsc = htmlspecialchars((string)($_SESSION['csrf_token'] ?? ''), ENT_QUOTES, 'UTF-8');
+$csrfEsc = htmlspecialchars(\App\Auth\Auth::csrfToken(), ENT_QUOTES, 'UTF-8');
 $errorEsc = $error ? htmlspecialchars((string)$error, ENT_QUOTES, 'UTF-8') : '';
 $oldUserEsc = htmlspecialchars((string)$oldUser, ENT_QUOTES, 'UTF-8');
 
@@ -15,7 +18,7 @@ $serverLabelEsc = htmlspecialchars($serverLabel, ENT_QUOTES, 'UTF-8');
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ChileMon - System Manager</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-9ndCyUaIbzAi2FUVXJi0CjmCapSmO7SnpJef0486qhLnuZ2cdeRhO02iuK6FUUVM" crossorigin="anonymous">
 
   <style>
     :root{

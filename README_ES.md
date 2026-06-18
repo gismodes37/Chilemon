@@ -13,7 +13,7 @@ Modern dashboard for monitoring and controlling AllStarLink nodes
 </p>
 
 <p align="center">
-<img src="https://img.shields.io/badge/version-0.3.1-blue">
+<img src="https://img.shields.io/badge/version-0.4.0-blue">
 <img src="https://img.shields.io/badge/php-8.2+-blue">
 <img src="https://img.shields.io/badge/database-SQLite-green">
 <img src="https://img.shields.io/badge/ASL3-compatible-green">
@@ -69,6 +69,12 @@ ChileMon actualmente incluye:
 - Registro de actividad reciente
 - Ejecución segura de comandos mediante wrapper
 - Instalador automático para sistemas ASL3
+- **Sistema de autenticación con roles** (admin/user)
+- **Panel de administración** para gestión de usuarios e info del sistema
+- **Health check endpoint** (`/api/health.php`)
+- **Rate limiting** en todos los endpoints API
+- **Node whitelist** para control de connect/disconnect
+- **Protección CSRF** en todos los formularios
 
 ---
 
@@ -114,7 +120,7 @@ ChileMon **no ejecuta comandos Asterisk directamente desde PHP**.
 
 En su lugar utiliza un wrapper seguro:
 
-```php
+```
 /usr/local/bin/chilemon-rpt
 ```
 
@@ -127,11 +133,21 @@ Este wrapper permite ejecutar únicamente comandos específicos:
 
 Los comandos se ejecutan mediante una regla sudo restringida para el usuario:
 
-```php
+```
 www-data
 ```
 
 Esto evita la ejecución arbitraria de comandos en el sistema.
+
+### Características de seguridad adicionales
+
+- **Roles de usuario**: Admin y usuario regular. Panel admin (`/admin.php`) restringido a administradores
+- **Rate limiting**: Middleware reutilizable que limita los endpoints API para prevenir abuso
+- **Protección CSRF**: Cada formulario incluye un token CSRF por sesión validado con comparación timing-safe
+- **Session hardening**: Modo estricto, cookies HTTP-only, SameSite=Lax, timeout de inactividad
+- **Node whitelist**: Restringir qué nodos pueden conectarse/desconectarse desde el dashboard
+- **Health check**: Endpoint público para monitoreo (`/api/health.php`)
+- **Sin credenciales hardcodeadas**: Todos los secretos vienen de entorno o `config/local.php`
 
 ---
 
@@ -141,15 +157,15 @@ ChileMon obtiene información del nodo ejecutando comandos `rpt` de Asterisk.
 
 Ejemplo:
 
-```php
+```bash
 sudo -u www-data sudo -n chilemon-rpt nodes 494780
 ```
 
 
 El resultado es procesado por el servicio:
 
-```php
-src/Services/AslRptService.php
+```
+app/Services/AslRptService.php
 ```
 
 Este servicio interpreta la salida de Asterisk y extrae información como:
@@ -225,36 +241,36 @@ Esta es la forma más rápida y automática. Solo copia y pega estos comandos en
 
 ### 1.1 Clonar versión estable e instalar todo de una vez
 
-```php
-sudo git clone -b v0.1.0 https://github.com/gismodes37/Chilemon.git /opt/chilemon
+```bash
+sudo git clone https://github.com/gismodes37/Chilemon.git /opt/chilemon
 ```
 
 ### 1.2 Instalar ChileMon
-```php
+```bash
 cd /opt/chilemon && sudo bash install/install_chilemon.sh
 ```
 ---
 
 ## 🧪 Opción 2: Rama Main (Experimentación y Desarrollo)
 
-Si deseas probar las últimas características en desarrollo (v0.2.x), puedes clonar directamente el repositorio:
+Si deseas probar las últimas características en desarrollo, puedes clonar directamente el repositorio (igual que Opción 1):
 
 ### 2.1 Clonar el repositorio
 
-```php
+```bash
 sudo git clone https://github.com/gismodes37/Chilemon.git /opt/chilemon
 ```
 
 ### 2.2 Entrar a la carpeta
 
-```php
+```bash
 cd /opt/chilemon
 ```
 
 ### 2.3 Ejecutar el instalador automático
 #### (Asegúrate de tener a mano tu N° de nodo y clave AMI)
 
-```php
+```bash
 sudo bash install/install_chilemon.sh
 ```
 
@@ -291,32 +307,46 @@ Entra a `http://localhost:8080`. El entorno usa un *mock script* que simula las 
     chilemon/
       │
       ├── app/
-      │   └── Core/
-      │       └── Database.php
+      │   ├── Asterisk/         ← AslRptService, NodeTracker
+      │   ├── Auth/             ← Auth (login, csrf, roles)
+      │   ├── Controllers/      ← Dashboard, NodeApi
+      │   ├── Core/             ← Database, RateLimiter
+      │   ├── Services/         ← AslRptService (legacy compat)
+      │   └── Views/            ← auth/login.view.php
       │
       ├── config/
-      │   ├── app.php
+      │   ├── app.php           ← Bootstrap + AMI + seguridad
       │   └── database.php
       │
       ├── data/
-      │   └── chilemon.sqlite   (no debería versionarse)
+      │   └── chilemon.sqlite   (no versionar)
       │
       ├── logs/
       │
       ├── public/
-      │   ├── index.php
+      │   ├── index.php         ← Dashboard
       │   ├── login.php
       │   ├── logout.php
+      │   ├── admin.php         ← Panel admin (usuarios + sistema)
       │   ├── api/
-      │   │   ├── log-call.php
+      │   │   ├── health.php    ← Health check endpoint
       │   │   ├── nodes.php
-      │   │   └── stats.php
-      │   └── assets/
+      │   │   ├── stats.php
+      │   │   ├── connect.php
+      │   │   ├── disconnect.php
+      │   │   ├── delete_node.php
+      │   │   ├── system_action.php
+      │   │   ├── favorites/    ← CRUD favoritos
+      │   │   └── ami/          ← AMI status endpoints
+      │   └── views/
+      │       └── partials/     ← head, header, footer, scripts
       │
+      ├── tests/                ← Pruebas PHPUnit
       ├── install/
       ├── bin/
-      ├── README_ES.md
+      ├── phpunit.xml.dist
       ├── README.md
+      ├── README_ES.md
       ├── CHANGELOG.md
       ├── LICENSE.md
       └── .gitignore
@@ -341,7 +371,7 @@ Integración total de Favoritos y Simplificación del Instalador (Nueva)
 
 <img alt="Static Badge" src="https://img.shields.io/badge/Version-0.4.0-blue">
 
-Eventos y estadísticas extendidas
+Overhaul de seguridad, mejoras de calidad, panel admin, health check, rate limiting, CSRF, roles
 
 <img alt="Static Badge" src="https://img.shields.io/badge/Version-1.0-green">
 
@@ -350,6 +380,20 @@ Release estable
 ---
 
 # 📦 Releases
+
+## v0.4.0
+- **Overhaul de seguridad**: Eliminación de credenciales hardcodeadas, local.php obligatorio, SRI en todos los CDN
+- **Rate limiting**: Middleware RateLimiter aplicado a todos los endpoints API (12+ endpoints)
+- **Roles de usuario**: Sistema admin/user con control de acceso en acciones sensibles
+- **Protección CSRF**: Tokens por sesión con validación timing-safe en todos los formularios
+- **Panel admin**: Nuevo `/admin.php` con gestión de usuarios (crear/eliminar/promover) e info del sistema
+- **Health check**: Nuevo endpoint `/api/health.php` (30 req/min, modo degradado en fallo DB)
+- **Node whitelist**: Lista configurable de nodos permitidos para connect/disconnect
+- **Rate limit whitelist**: IPs de confianza exentas de rate limiting
+- **Refactor sesiones**: Todo acceso a `$_SESSION` centralizado mediante métodos de `Auth`
+- **Calidad**: `declare(strict_types=1)` en 13 archivos, require_once unificado a ROOT_PATH
+- **Código muerto**: Eliminados `ami/connect.php` y `ami/disconnect.php` vacíos
+- **PHPUnit scaffold**: `phpunit.xml.dist` + directorio tests con pruebas de Auth e infraestructura
 
 ## v0.3.1
 - **Entorno Local (Docker)**: Soporte completo para desarrollo local mediante Docker Compose.

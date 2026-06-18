@@ -39,7 +39,7 @@ class DashboardController
 
             // v0.2.x — Cargar favoritos para el usuario actual
             $favorites = [];
-            $userId = (int)($_SESSION['user_id'] ?? 0);
+            $userId = \App\Auth\Auth::getUserId();
             if ($userId > 0) {
                 try {
                     $db = \App\Core\Database::getConnection();

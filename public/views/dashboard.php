@@ -66,8 +66,8 @@ $systemInfo = $systemInfo ?? [
 
 ?>
 
-<?php require __DIR__ . '/partials/head.php'; ?>
-<?php require __DIR__ . '/partials/header.php'; ?>
+<?php require ROOT_PATH . '/public/views/partials/head.php'; ?>
+<?php require ROOT_PATH . '/public/views/partials/header.php'; ?>
 
 <main class="container mt-4">
 
@@ -799,6 +799,6 @@ function confirmarReinicio(servicio, action) {
 
 
 <?php
-require __DIR__ . '/partials/footer.php';
-require __DIR__ . '/partials/scripts.php';
+require ROOT_PATH . '/public/views/partials/footer.php';
+require ROOT_PATH . '/public/views/partials/scripts.php';
 ?>

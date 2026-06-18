@@ -7,6 +7,7 @@ require_once ROOT_PATH . '/app/Core/Database.php';
 
 use App\Auth\Auth;
 use App\Core\Database;
+use App\Core\RateLimiter;
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -21,6 +22,15 @@ $token = (string)($_POST['csrf_token'] ?? '');
 if (!Auth::validateCsrf($token)) {
     http_response_code(400);
     echo json_encode(['success' => false, 'error' => 'Bad Request']);
+    exit;
+}
+
+// Rate limiting: 20 favorites writes per minute
+try {
+    RateLimiter::check('api-favorites-save', 20, 60);
+} catch (\RuntimeException $e) {
+    http_response_code(429);
+    echo json_encode(['success' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
@@ -45,7 +55,7 @@ if ($desc !== '') {
 
 try {
     $db = Database::getConnection();
-    $uid = (int)$_SESSION['user_id'];
+    $uid = Auth::getUserId();
 
     // upsert SQLite
     $stmt = $db->prepare("

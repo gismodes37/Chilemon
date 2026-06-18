@@ -53,6 +53,16 @@ if (!defined('APP_ENV')) {
     // dev|prod (default prod)
     define('APP_ENV', getenv('CHILEMON_ENV') ?: 'prod');
 }
+
+/**
+ * Forzar config/local.php en producción.
+ */
+if (APP_ENV !== 'dev' && !file_exists($localConfigFile)) {
+    throw new RuntimeException(
+        'config/local.php no encontrado. Copia config/local.php.example a config/local.php y configura tus credenciales.'
+    );
+}
+
 if (!defined('ASL_NODE')) {
     /**
      * Prioridad:
@@ -224,7 +234,17 @@ if (!defined('AMI_PASS')) {
     define(
         'AMI_PASS',
         getenv('CHILEMON_AMI_PASS')
-            ?: ($localConfig['ami_pass'] ?? 'angE29angE64')
+            ?: ($localConfig['ami_pass'] ?? '')
+    );
+}
+
+/**
+ * Validación: en producción, AMI_HOST y AMI_PASS no pueden estar vacíos.
+ * local.php debe proporcionarlos.
+ */
+if (AMI_PASS === '' && !$isCli) {
+    throw new RuntimeException(
+        'AMI_PASS no está configurado. Define CHILEMON_AMI_PASS o agregalo en config/local.php => ami_pass'
     );
 }
 
@@ -233,4 +253,31 @@ if (!defined('AMI_TIMEOUT')) {
         'AMI_TIMEOUT',
         (int) ($localConfig['ami_timeout'] ?? 3)
     );
+}
+
+if (!defined('RATE_LIMIT_WHITELIST')) {
+    /**
+     * Lista de IPs que NO están sujetas a rate limiting.
+     * Vacío = rate limiting para todos (default).
+     * Ejemplo en local.php: 'rate_limit_whitelist' => ['127.0.0.1', '192.168.1.100'],
+     */
+    $rawRlWhitelist = $localConfig['rate_limit_whitelist'] ?? [];
+    if (is_string($rawRlWhitelist)) {
+        $rawRlWhitelist = array_map('trim', explode(',', $rawRlWhitelist));
+    }
+    define('RATE_LIMIT_WHITELIST', is_array($rawRlWhitelist) ? $rawRlWhitelist : []);
+}
+
+if (!defined('NODE_WHITELIST')) {
+    /**
+     * Lista de IDs de nodos permitidos para connect/disconnect.
+     * Vacío = todos los nodos permitidos (backwards compatible).
+     * Ejemplo en local.php: 'node_whitelist' => ['494780', '123456'],
+     */
+    $rawWhitelist = $localConfig['node_whitelist'] ?? [];
+    if (is_string($rawWhitelist)) {
+        // Permitir comma-separated string por simplicidad
+        $rawWhitelist = array_map('trim', explode(',', $rawWhitelist));
+    }
+    define('NODE_WHITELIST', is_array($rawWhitelist) ? $rawWhitelist : []);
 }

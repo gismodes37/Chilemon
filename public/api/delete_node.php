@@ -1,61 +1,91 @@
 <?php
 declare(strict_types=1);
 
-session_start();
+/**
+ * public/api/delete_node.php
+ * -----------------------------------------------
+ * Elimina un nodo del registro local (tabla nodes).
+ * Usa el sistema de autenticación ChileMon, validación CSRF,
+ * y la conexión DB centralizada.
+ *
+ * Seguridad:
+ *   - Requiere sesión activa (Auth::isLoggedIn)
+ *   - Valida token CSRF
+ *   - Solo acepta POST
+ *   - Sanitiza parámetros con ctype_digit
+ * -----------------------------------------------
+ */
+
 require_once __DIR__ . '/../../config/app.php';
+require_once ROOT_PATH . '/app/autoload.php';
+
+use App\Auth\Auth;
+use App\Core\Database;
+use App\Core\RateLimiter;
 
 header('Content-Type: application/json; charset=utf-8');
 
-if (!isset($_SESSION['user_id'])) {
-  http_response_code(401);
-  echo json_encode(['success' => false, 'error' => 'Unauthorized']);
-  exit;
+// Solo POST
+if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+    http_response_code(405);
+    echo json_encode(['success' => false, 'error' => 'Método no permitido']);
+    exit;
 }
 
+// Validar sesión
+Auth::startSession();
+if (!Auth::isLoggedIn()) {
+    http_response_code(401);
+    echo json_encode(['success' => false, 'error' => 'Unauthorized']);
+    exit;
+}
+
+// Validar CSRF
+$token = (string)($_POST['csrf_token'] ?? '');
+if (!Auth::validateCsrf($token)) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'error' => 'Bad Request (CSRF)']);
+    exit;
+}
+
+// Rate limiting: 20 delete requests per minute
+try {
+    RateLimiter::check('api-delete-node', 20, 60);
+} catch (\RuntimeException $e) {
+    http_response_code(429);
+    echo json_encode(['success' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+// Validar parámetro node — solo dígitos (IDs de nodo ASL)
 $node = trim((string)($_POST['node'] ?? ''));
-if ($node === '') {
-  http_response_code(400);
-  echo json_encode(['success' => false, 'error' => 'Falta parámetro node']);
-  exit;
+if ($node === '' || !ctype_digit($node)) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'error' => 'Parámetro node inválido']);
+    exit;
 }
-
-$node = preg_replace('/[^0-9A-Za-z_-]/', '', $node);
-
-$dbFile = DATA_PATH . '/chilemon.sqlite';
 
 try {
-  $db = new PDO('sqlite:' . $dbFile);
-  $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-  $db->exec("PRAGMA foreign_keys = ON;");
+    $db = Database::getConnection();
 
-  // Tablas mínimas (safe)
-  $db->exec("
-    CREATE TABLE IF NOT EXISTS nodes (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      node_id TEXT NOT NULL UNIQUE,
-      users INTEGER DEFAULT 0,
-      last_seen TEXT DEFAULT NULL
+    // Eliminar nodo (scope por usuario si aplica, o global si es admin)
+    $stmt = $db->prepare("DELETE FROM nodes WHERE node_id = :node");
+    $stmt->execute([':node' => $node]);
+
+    // Registrar en node_events
+    $stmt = $db->prepare(
+        "INSERT INTO node_events (node_id, event_type, username, created_at)
+         VALUES (:node, 'delete', :user, datetime('now'))"
     );
-    CREATE TABLE IF NOT EXISTS calls (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      node_id TEXT NOT NULL,
-      action TEXT NOT NULL,
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-  ");
-  $db->exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_nodes_node_id ON nodes(node_id);");
+    $stmt->execute([
+        ':node' => $node,
+        ':user' => Auth::getUsername() ?: 'system',
+    ]);
 
-  // Eliminar nodo
-  $st = $db->prepare("DELETE FROM nodes WHERE node_id = :node");
-  $st->execute([':node' => $node]);
-
-  // Log
-  $stCall = $db->prepare("INSERT INTO calls(node_id, action, created_at) VALUES(:node, 'delete', datetime('now'))");
-  $stCall->execute([':node' => $node]);
-
-  echo json_encode(['success' => true, 'node' => $node]);
+    echo json_encode(['success' => true, 'node' => $node]);
 
 } catch (Throwable $e) {
-  http_response_code(500);
-  echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    error_log('[delete_node.php] Error: ' . $e->getMessage());
+    http_response_code(500);
+    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
 }
