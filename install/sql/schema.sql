@@ -2,6 +2,7 @@ CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   username TEXT NOT NULL UNIQUE,
   password_hash TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'user',
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -62,4 +63,15 @@ ON node_events(created_at);
 
 CREATE INDEX IF NOT EXISTS idx_node_events_node
 ON node_events(node_number);
+
+-- API Rate limiting
+CREATE TABLE IF NOT EXISTS api_attempts (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    action     TEXT NOT NULL,
+    ip_address TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_api_attempts_lookup
+ON api_attempts(action, ip_address, created_at);
 
