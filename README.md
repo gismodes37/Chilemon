@@ -235,28 +235,29 @@ ChileMon **does not replace Supermon**, but instead offers a modern alternative 
 # 🚀 Installation Options
 ChileMon can be installed directly on an **ASL3** node. It is recommended to use a Debian-based system (such as the official ASL3 image).
 
-### 📦 Option 1: Stable Release (Auto-Installation)
+### 📦 Option 1: Automatic Installation (Recommended)
 
-This is the fastest and most automatic way. Just copy and paste these commands into your terminal (make sure to have your node ID and AMI password ready):
+This is the fastest way. Just copy and paste these **two commands** into your terminal:
 
-# 1.1 Clone stable version and install everything at once
-
+#### 1. Download ChileMon
 ```bash
 sudo git clone https://github.com/gismodes37/Chilemon.git /opt/chilemon
 ```
+*This creates the folder `/opt/chilemon` with all the project files.*
 
-# 1.2 Install ChileMon
-
+#### 2. Run the installer
 ```bash
 cd /opt/chilemon && sudo bash install/install_chilemon.sh
 ```
+*The installer will ask you for your ASL node number and AMI password.*
+
+> ⚠️ **Before starting**: Have your ASL **node number** and **AMI password** (from `/etc/asterisk/manager.conf`) ready. The installer will ask you for them.
 
 ---
 
-### 🧪 Option 2: Main Branch (Experimentation and Development)
-To test the latest features in development, you can clone the repository directly (same as Option 1):
+### 🧪 Option 2: Main Branch (Latest Development)
 
-### 2.1 Clone the repository
+Same as Option 1 — just clone and run:
 
 ```bash
 sudo git clone https://github.com/gismodes37/Chilemon.git /opt/chilemon

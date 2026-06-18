@@ -235,46 +235,35 @@ ChileMon **no reemplaza Supermon**, sino que ofrece una alternativa moderna para
 
 ChileMon puede instalarse directamente en un nodo **ASL3**. Se recomienda utilizar un sistema basado en Debian (como el oficial de ASL3).
 
-### 📦 Opción 1: Versión Estable (Auto-Instalación)
+### 📦 Opción 1: Instalación Automática (Recomendada)
 
-Esta es la forma más rápida y automática. Solo copia y pega estos comandos en tu terminal (asegúrate de tener a mano tu N° de nodo y clave AMI):
+La forma más rápida. Solo copia y pega estos **dos comandos** en tu terminal:
 
-### 1.1 Clonar versión estable e instalar todo de una vez
-
+#### 1. Descargar ChileMon
 ```bash
 sudo git clone https://github.com/gismodes37/Chilemon.git /opt/chilemon
 ```
+*Esto crea la carpeta `/opt/chilemon` con todos los archivos del proyecto.*
 
-### 1.2 Instalar ChileMon
+#### 2. Ejecutar el instalador
 ```bash
 cd /opt/chilemon && sudo bash install/install_chilemon.sh
 ```
+*El instalador te pedirá tu número de nodo ASL y la clave AMI.*
+
+> ⚠️ **Antes de empezar**: Ten a mano tu **número de nodo** ASL y la **clave AMI** (de `/etc/asterisk/manager.conf`). El instalador te las va a pedir.
 ---
 
-## 🧪 Opción 2: Rama Main (Experimentación y Desarrollo)
+## 🧪 Opción 2: Rama Main (Último desarrollo)
 
-Si deseas probar las últimas características en desarrollo, puedes clonar directamente el repositorio (igual que Opción 1):
-
-### 2.1 Clonar el repositorio
+Lo mismo que la Opción 1 — clonar y ejecutar el instalador. La rama main siempre tiene las últimas características:
 
 ```bash
 sudo git clone https://github.com/gismodes37/Chilemon.git /opt/chilemon
+cd /opt/chilemon && sudo bash install/install_chilemon.sh
 ```
 
-### 2.2 Entrar a la carpeta
-
-```bash
-cd /opt/chilemon
-```
-
-### 2.3 Ejecutar el instalador automático
-#### (Asegúrate de tener a mano tu N° de nodo y clave AMI)
-
-```bash
-sudo bash install/install_chilemon.sh
-```
-
-El instalador configurará automáticamente los servicios de Apache, PHP, SQLite y el wrapper de seguridad para que ChileMon esté listo en `http://tu_ip/chilemon`.
+El instalador configurará automáticamente Apache, PHP, SQLite y el wrapper de seguridad para que ChileMon esté listo en `http://tu_ip/chilemon`.
 
 ---
 
