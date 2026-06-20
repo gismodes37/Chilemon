@@ -27,6 +27,7 @@ PUBLIC_DIR="$REPO_DIR/public"
 INSTALLER_PHP="$REPO_DIR/bin/install.php"
 MANAGER_CONF="/etc/asterisk/manager.conf"
 DEFAULT_NODE_PROTO="https"
+ASL3_MODULES_ADDED=0
 
 
 # ------------------------------------------------------------------------------
@@ -412,6 +413,42 @@ run_php_user_creation() {
 }
 
 
+configure_asl3_modules() {
+    local modules_conf="/etc/asterisk/modules.conf"
+    local -a required_modules=(res_http_websocket res_aeap res_sorcery_config \
+        res_pjproject res_srtp res_rtp_asterisk bridge_softmix chan_bridge_media)
+    local added=0
+
+    if [[ ! -f "$modules_conf" ]] || ! grep -q '^autoload=no' "$modules_conf"; then
+        warn "ASL3 no detectado — se omite configuración de módulos"
+        return 0
+    fi
+
+    info "ASL3 detectado en $modules_conf"
+    backup_if_exists "$modules_conf"
+
+    local existing
+    existing=$(grep -E '^load\s*=>\s*' "$modules_conf" | sed 's/.*=>\s*//' | tr -d ' ')
+
+    for mod in "${required_modules[@]}"; do
+        if ! echo "$existing" | grep -qxF "$mod"; then
+            echo "load => $mod" >> "$modules_conf"
+            added=$((added + 1))
+            info "  load => $mod agregado"
+        fi
+    done
+
+    if [[ "$added" -gt 0 ]]; then
+        ok "Módulos Asterisk: $added load => agregados"
+        warn "Reinicie Asterisk manualmente: systemctl restart asterisk"
+    else
+        ok "Todos los módulos ya estaban presentes"
+    fi
+
+    ASL3_MODULES_ADDED="$added"
+}
+
+
 print_final_banner() {
     local local_node="$1"
     local server_host="$2"
@@ -441,6 +478,7 @@ print_final_banner() {
     echo -e " ${C_GREEN}Acceso ChileMon:${C_RESET} ${DEFAULT_NODE_PROTO}://${server_host}/chilemon"
     echo
     echo -e " ${C_GREEN}Usuario web    :${C_RESET} ${web_user}"
+    echo -e " ${C_GREEN}Módulos ASL3   :${C_RESET} ${ASL3_MODULES_ADDED:-0} load => agregados"
     echo
     echo -e "${C_CYAN}----------------------------------------------------------------${C_RESET}"
     echo -e "${C_WHITE}Pruebas rápidas:${C_RESET}"
@@ -486,11 +524,11 @@ main() {
     read -r -p "¿Desea continuar con la instalación? [s/N]: " confirm
     [[ "$confirm" =~ ^[sS]$ ]] || { echo "Instalación cancelada."; exit 0; }
 
-    step "1 de 9" "Validando estructura del repositorio"
+    step "1 de 10" "Validando estructura del repositorio"
     check_repo_structure
     ok "Estructura del repositorio validada"
 
-    step "2 de 9" "Instalando dependencias base"
+    step "2 de 10" "Instalando dependencias base"
     apt-get update
     ensure_package git
     ensure_package apache2
@@ -500,7 +538,7 @@ main() {
     ensure_package sudo
     ok "Dependencias instaladas o ya presentes"
 
-    step "3 de 9" "Detectando datos del nodo y solicitando confirmación"
+    step "3 de 10" "Detectando datos del nodo y solicitando confirmación"
 
     local local_node=""
     while [[ -z "$local_node" ]]; do
@@ -557,13 +595,13 @@ main() {
     ok "Servidor detectado/configurado: $server_host"
     ok "Usuario AMI detectado: $ami_user"
 
-    step "4 de 9" "Preparando carpetas y permisos"
+    step "4 de 10" "Preparando carpetas y permisos"
     mkdir -p "$DATA_DIR" "$LOG_DIR" "$BACKUP_DIR" "$REPO_DIR/config"
     chown -R www-data:www-data "$DATA_DIR" "$LOG_DIR" "$BACKUP_DIR"
     chmod -R 775 "$DATA_DIR" "$LOG_DIR" "$BACKUP_DIR"
     ok "Carpetas preparadas y permisos aplicados"
 
-    step "5 de 9" "Generando configuración local"
+    step "5 de 10" "Generando configuración local"
     write_local_config \
         "$local_node" \
         "$server_host" \
@@ -574,18 +612,21 @@ main() {
         "$ami_pass" \
         "$ami_timeout"
 
-    step "6 de 9" "Instalando wrapper y sudoers"
+    step "6 de 10" "Configurando módulos de Asterisk para ASL3"
+    configure_asl3_modules
+
+    step "7 de 10" "Instalando wrapper y sudoers"
     write_wrapper_if_missing
     write_sudoers
 
-    step "7 de 9" "Configurando Apache"
+    step "8 de 10" "Configurando Apache"
     write_apache_config
 
-    step "8 de 9" "Validando PHP e inicializando ChileMon"
+    step "9 de 10" "Validando PHP e inicializando ChileMon"
     validate_php_sqlite
     run_php_installer
 
-    step "9 de 9" "Creando usuario administrador de ChileMon"
+    step "10 de 10" "Creando usuario administrador de ChileMon"
     run_php_user_creation
 
     validate_installation "$local_node" "$server_host" "$ami_user" "definido durante instalación" "$web_proto"
