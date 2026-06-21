@@ -2,18 +2,32 @@
 WebRTC Audio Bridge — Browser-based Push-to-Talk for ChileMon / AllStarLink.
 
 This package implements a standalone Python daemon that bridges browser
-WebRTC (OPUS 16 kHz) to Asterisk IAX2 (ulaw 8 kHz) via a minimal IAX2
-protocol handler.
+WebRTC (OPUS 16 kHz) to Asterisk IAX2 (ulaw 8 kHz) via AMI Originate (bridge-reversal).
 
-The bridge registers as an IAX2 phone extension on the local Asterisk server,
-keys/unkeys the ASL node via DTMF (*99 / #) through app_rpt phone mode,
-and transcodes audio bidirectionally.
+Architecture
+------------
+The bridge operates as an IAX2 **server** (not a client). Asterisk originates
+outbound IAX2 calls via AMI ``Originate`` with ``Async: true``, bypassing
+ASL3's dropped-callno-0 filter. The bridge accepts inbound NEW frames on
+UDP port 9092, responds with NEWACK/ACCEPT/ANSWER, and relays audio.
 
 Components
 ----------
-- iax2 : Minimal IAX2 protocol handler (REGREQ, NEW, DTMF, voice mini-frames, HANGUP)
+- iax2 : IAX2 protocol handler — client mode (legacy) + server mode (``IAX2Server``, ``IAX2Call``)
+- ami_client : AMI client — connect, login, Originate, event monitor, reconnect
 - audio : Audio transcoding pipeline (OPUS↔PCM↔ulaw + 16 kHz↔8 kHz resampling)
-- server : aiohttp + aiortc daemon (WebSocket / WebRTC / health endpoint)
+- server : aiohttp + aiortc daemon (WebSocket / AMI / IAX2 / health endpoint)
+
+Call Flow
+---------
+    Browser WS ──(auth)──→ bridge:9091
+                              │ ami.originate(Async:true)
+                              ↓
+    Asterisk AMI ──────────→ Asterisk IAX2 ──(NEW)──→ bridge:9092
+                              │ NEWACK + ACCEPT + ANSWER
+                              ↓
+                      IAX2 VOICE ←──→ bridge ←──→ WS audio
+                      IAX2 HANGUP ──→ bridge → WS cleanup
 
 Requirements
 ------------
@@ -23,5 +37,4 @@ Requirements
 - astral (stdlib) — no extra deps for IAX2 protocol
 """
 
-__version__ = "0.1.0"
-__all__ = ["__version__"]
+__version__ = "0.2.0"

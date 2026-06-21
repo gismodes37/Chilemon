@@ -77,7 +77,7 @@
           <span class="brand-badge"><i class="bi bi-shield-lock"></i> Login seguro</span>
           <span class="brand-badge"><i class="bi bi-database"></i> SQLite</span>
           <span class="brand-badge"><i class="bi bi-terminal"></i> Instalador automático</span>
-          <span class="brand-badge"><i class="bi bi-tag"></i> v0.3.1</span>
+          <span class="brand-badge"><i class="bi bi-tag"></i> v0.4.0</span>
         </div>
 
         <h1 class="display-5 fw-semibold mb-3">ChileMon</h1>
@@ -85,7 +85,7 @@
         <p class="lead opacity-90 mb-4">
           Dashboard moderno para nodos <strong>AllStarLink ASL3</strong> y <strong>EchoLink</strong>, inspirado en el concepto de Supermon,
           pero construido con una base más ordenada, segura, modular e instalable.
-          El release v0.3.x ya permite <strong>integración total de favoritos, monitoreo RX/TX en tiempo real y gestión local segura</strong>.
+          El release v0.4.0 ya permite <strong>Push-to-Talk desde el navegador, conexión por puente de audio WebRTC, seguridad reforzada y gestión local segura</strong>.
         </p>
 
         <div class="small opacity-75 mb-3">
@@ -107,7 +107,7 @@
 
         <div class="mt-4 small opacity-75">
           <i class="bi bi-info-circle"></i>
-          Primer release funcional: ChileMon ya se conecta, desconecta, autentica, guarda favoritos, registra actividad y se instala en nodos reales.
+          Release v0.4.0: PTT desde el navegador, puente de audio WebRTC, seguridad reforzada, roles de usuario, rate limiting y gestión local segura.
         </div>
       </div>
 
@@ -287,11 +287,25 @@
           </div>
         </div>
 
+        <div class="col-md-6 col-lg-4">
+          <div class="card h-100 shadow-sm">
+            <div class="card-body p-4">
+              <div class="d-flex gap-3">
+                <div class="feature-icon"><i class="bi bi-mic"></i></div>
+                <div>
+                  <h3 class="h5 mb-1">Push-to-Talk Web</h3>
+                  <p class="text-secondary mb-0">PTT desde el navegador vía puente de audio WebRTC + IAX2. Comunicación por radio sin equipo físico.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
 
       <div class="alert alert-info mt-4">
         <i class="bi bi-lightbulb"></i>
-        Estado actual: <strong>release v0.3.1 funcional</strong>. ChileMon ya integra favoritos con alias personalizados, monitoreo RX/TX y se instala en nodos reales de forma automática.
+        Estado actual: <strong>release v0.4.0</strong>. ChileMon ahora incluye PTT desde el navegador, puente de audio WebRTC, seguridad reforzada, roles de usuario, rate limiting, CSRF y más.
       </div>
     </div>
   </section>
@@ -578,14 +592,13 @@
         </div>
 
         <div class="col-lg-3">
-          <div class="card h-100 shadow-sm border-primary">
+          <div class="card h-100 shadow-sm">
             <div class="card-body p-4">
-              <h3 class="h5"><span class="badge text-bg-primary">v0.3.1</span> Release Actual</h3>
+              <h3 class="h5"><span class="badge text-bg-success">v0.3.1</span> Favoritos + RX/TX</h3>
               <ul class="text-secondary mb-0">
-                <li><strong>Integración Favoritos</strong></li>
+                <li>Integración Favoritos</li>
                 <li>Alias personalizados</li>
                 <li>Toggle rápido en tabla</li>
-                <li>Instalador One-Step</li>
                 <li>Indicadores RX / TX</li>
                 <li>Soporte EchoLink</li>
               </ul>
@@ -594,14 +607,16 @@
         </div>
 
         <div class="col-lg-3">
-          <div class="card h-100 shadow-sm">
+          <div class="card h-100 shadow-sm border-primary">
             <div class="card-body p-4">
-              <h3 class="h5"><span class="badge text-bg-secondary">v0.4.x</span> Expansión</h3>
+              <h3 class="h5"><span class="badge text-bg-primary">v0.4.0</span> Release Actual</h3>
               <ul class="text-secondary mb-0">
-                <li>Estadísticas extendidas</li>
-                <li>Gráficos de actividad</li>
-                <li>Gestión de usuarios UI</li>
-                <li>Personalización visual</li>
+                <li><strong>PTT Audio Bridge WebRTC</strong></li>
+                <li>Inversión IAX2 (servidor)</li>
+                <li>Overhaul de seguridad</li>
+                <li>Rate limiting, CSRF, roles</li>
+                <li>Panel admin, health check</li>
+                <li>Node whitelist</li>
               </ul>
             </div>
           </div>
@@ -610,13 +625,12 @@
         <div class="col-lg-3">
           <div class="card h-100 shadow-sm">
             <div class="card-body p-4">
-              <h3 class="h5"><span class="badge text-bg-danger">v1.0</span> Release estable</h3>
+              <h3 class="h5"><span class="badge text-bg-secondary">v0.5.x</span> Próximo</h3>
               <ul class="text-secondary mb-0">
-                <li>Base madura</li>
-                <li>Operación sólida</li>
-                <li>Instalación repetible</li>
-                <li>Mayor documentación</li>
-                <li>Proyecto listo para la comunidad</li>
+                <li>Deploy & pruebas prod</li>
+                <li>TURN/STUN para PTT remoto</li>
+                <li>HTTPS/WSS</li>
+                <li>Sesiones multiusuario</li>
               </ul>
             </div>
           </div>
@@ -859,7 +873,7 @@
       </div>
       <div class="text-secondary small">
         <div><i class="bi bi-github"></i> Repo: <a href="https://github.com/gismodes37/Chilemon" target="_blank" rel="noreferrer">gismodes37/Chilemon</a></div>
-        <div><i class="bi bi-tag"></i> Release actual: v0.1.0</div>
+        <div><i class="bi bi-tag"></i> Release actual: v0.4.0</div>
         <!--div><i class="bi bi-graph-up"></i> Visitas: <span id="visit-counter">...</span></div-->
         <div><i class="bi bi-person-badge"></i> Autor: Guillermo Ismodes López (CA2IIG)</div>
       </div>

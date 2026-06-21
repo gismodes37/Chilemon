@@ -1,7 +1,7 @@
 # WebRTC Audio Bridge — Browser Push-to-Talk for ChileMon
 
-> **Status**: Cycle 1 — Core Bridge (v0.1.0)
-> **SDD Change**: `webrtc-audio-bridge`
+> **Status**: Cycles 1 & 2 — Core Bridge + IAX2 Direction Reversal (v0.2.0)
+> **SDD Changes**: `webrtc-audio-bridge`, `bridge-reversal`
 
 ## Overview
 
@@ -14,16 +14,16 @@ recovers the SuperMon PTT experience lost when migrating to ASL3.
 ```
 ┌─────────┐     WebSocket      ┌──────────────────┐     IAX2 (UDP 4569)    ┌──────────┐
 │ Browser ├───────────────────►│  Python Bridge    ├───────────────────────►│ Asterisk │
-│  PTT.js │◄───────────────────│  (aiortc + aiohttp)│◄──────────────────────│ app_rpt  │
-└─────────┘     OPUS ↔ PCM     └──────────────────┘       ulaw mini-frames └──────────┘
-                     │                                              │
-                     │ HTTP /health                                 │ IAX2 phone ext.
-                     ▼                                              ▼
-              ┌──────────────┐                           ┌──────────────────┐
-              │  PHP API     │                           │  Node 61916 (RPT)│
-              │ ptt-status   │                           │  app_rpt.so      │
-              │ ptt-ws-token │                           │  radio-ptt ctx   │
-              └──────────────┘                           └──────────────────┘
+│  PTT.js │◄───────────────────│ (aiortc+aiohttp)  │◄──────────────────────│ app_rpt  │
+└─────────┘     OPUS ↔ PCM     └────────┬─────────┘       ulaw mini-frames └──────────┘
+                      │                  │
+                      │ HTTP /health     │ AMI (TCP 5038)
+                      ▼                  ▼
+               ┌──────────────┐  ┌──────────────────┐
+               │  PHP API     │  │  AMI Originate   │
+               │ ptt-status   │  │  (call bridge)   │
+               │ ptt-ws-token │  └──────────────────┘
+               └──────────────┘
 ```
 
 - **Browser** captures OPUS audio (WebRTC) or receives decoded PCM for playback
@@ -37,6 +37,30 @@ ASL3 ships without PJSIP/SRTP support. The modules (`res_http_websocket`,
 `res_srtp`, `chan_pjsip`) are available but cannot be loaded because PJSIP
 wasn't compiled. IAX2 is always enabled in ASL3 and supports phone-mode
 registration, making it the simplest integration path.
+
+### IAX2 Direction Reversal (v0.2.0)
+
+The initial Cycle 1 design had the bridge register as an IAX2 **client** (phone
+extension) to Asterisk. This failed because ASL3 drops inbound IAX2 registration
+packets at the kernel level — specifically, any packet with `callno=0` (new
+calls) is silently filtered by the ASL3 iptables rules.
+
+**Solution**: The bridge now acts as an IAX2 **server**, and Asterisk calls *it*
+via AMI `Originate` with `Async: true`. This reversal avoids the ASL3 filter
+entirely.
+
+Key changes:
+- **New file `ami_client.py`**: Async TCP AMI client with automatic reconnection
+  and exponential backoff. Connects to Asterisk Manager Interface, logs in, and
+  issues `Originate` commands to initiate bridge calls.
+- **Modified `iax2.py`**: Added `IAX2Server` and `IAX2Call` classes. The server
+  listens for incoming IAX2 calls from Asterisk; `IAX2Call` handles the full
+  call lifecycle (ACCEPT, voice frames, DTMF, HANGUP).
+- **Modified `server.py`**: Replaced direct `IAX2Session` with the server-based
+  flow. The bridge now waits for calls instead of initiating them.
+- **Key discovery**: `IAX_CMD_ACCEPT = 0x0E` — same opcode as `PONG` per RFC
+  5456, distinguished by call context (PONG is only valid in a `callno=0`
+  register exchange; ACCEPT is valid in an active call).
 
 ## System Requirements
 
@@ -72,6 +96,7 @@ Installed by `install_webrtc.sh`:
 | `iax2.py` | IAX2 protocol handler — REGREQ/NEW/DTMF/HANGUP + mini voice frames |
 | `audio.py` | Audio transcoding — OPUS↔PCM↔ulaw, 16kHz↔8kHz resampling |
 | `server.py` | aiohttp daemon — WebSocket `/ws`, health `/health`, IAX2 lifecycle |
+| `ami_client.py` | AMI async TCP client — connect, login, originate, call monitoring |
 
 ### Asterisk Config (`install/asterisk/`)
 
@@ -226,7 +251,7 @@ Messages are JSON:
 
 | Issue | Impact | Workaround |
 |-------|--------|------------|
-| No Asterisk restart recovery | Bridge won't auto-reconnect if Asterisk restarts | Manual `systemctl restart chilemon-webrtc` |
+| ~~No Asterisk restart recovery~~ | **Resolved**: bridge-reversal (v0.2.0) | AMI client auto-reconnects and re-originates on restart |
 | DTMF sent fire-and-forget | No retry on missed DTMF | Generally reliable on localhost |
 | No hardware check | Won't warn if <1GB RAM | Monitor with `htop` |
 | `audioop` deprecated in Python 3.13+ | Currently on Python 3.11 (Debian 12) | Plan migration before OS upgrade |

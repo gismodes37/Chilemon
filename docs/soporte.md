@@ -1,6 +1,6 @@
 # 🛠️ Soporte Técnico — ChileMon ASL3
 
-> Plataforma de monitoreo para nodos AllStarLink 3 | PHP 8.2+ · Bootstrap 5 · SQLite · Apache2  
+> Plataforma de monitoreo para nodos AllStarLink 3 | PHP 8.2+ · Bootstrap 5 · SQLite · Apache2 · WebRTC Bridge  
 > Desarrollado por **CA2IIG – Guillermo Ismodes López** · La Serena, Chile
 
 ---
@@ -357,4 +357,4 @@ Copia y completa este bloque al reportar cualquier problema:
 
 ---
 
-*Última actualización: Marzo 2026 — ChileMon ASL3*
+*Última actualización: Junio 2026 — ChileMon ASL3*

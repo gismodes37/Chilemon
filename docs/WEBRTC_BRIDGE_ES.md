@@ -1,7 +1,7 @@
 # Puente de Audio WebRTC — Push-to-Talk desde el Navegador para ChileMon
 
-> **Estado**: Ciclo 1 — Puente Base (v0.1.0)
-> **Cambio SDD**: `webrtc-audio-bridge`
+> **Estado**: Ciclos 1 y 2 — Puente Base + Inversión de Dirección IAX2 (v0.2.0)
+> **Cambios SDD**: `webrtc-audio-bridge`, `bridge-reversal`
 
 ## Visión General
 
@@ -16,15 +16,15 @@ migrar a ASL3.
 ┌─────────┐     WebSocket      ┌──────────────────┐     IAX2 (UDP 4569)    ┌──────────┐
 │ Browser ├───────────────────►│  Puente Python   ├───────────────────────►│ Asterisk │
 │  PTT.js │◄───────────────────│ (aiortc+aiohttp) │◄──────────────────────│ app_rpt  │
-└─────────┘     OPUS ↔ PCM     └──────────────────┘       ulaw mini-frames └──────────┘
-                     │                                              │
-                     │ HTTP /health                                 │ Ext. teléf. IAX2
-                     ▼                                              ▼
-              ┌──────────────┐                           ┌──────────────────┐
-              │  API PHP     │                           │  Nodo 61916 (RPT)│
-              │ ptt-status   │                           │  app_rpt.so      │
-              │ ptt-ws-token │                           │  ctx radio-ptt   │
-              └──────────────┘                           └──────────────────┘
+└─────────┘     OPUS ↔ PCM     └────────┬─────────┘       ulaw mini-frames └──────────┘
+                      │                  │
+                      │ HTTP /health     │ AMI (TCP 5038)
+                      ▼                  ▼
+               ┌──────────────┐  ┌──────────────────┐
+               │  API PHP     │  │  AMI Originate   │
+               │ ptt-status   │  │  (llamar bridge) │
+               │ ptt-ws-token │  └──────────────────┘
+               └──────────────┘
 ```
 
 - **Navegador** captura audio OPUS (WebRTC) o reproduce PCM decodificado
@@ -38,6 +38,33 @@ ASL3 no incluye soporte para PJSIP/SRTP. Los módulos (`res_http_websocket`,
 `res_srtp`, `chan_pjsip`) existen pero no pueden cargarse porque PJSIP no se
 compiló. IAX2 está siempre disponible en ASL3 y soporta registro phone-mode,
 lo que lo convierte en la ruta de integración más simple.
+
+### Inversión de Dirección IAX2 (v0.2.0)
+
+El diseño inicial del Ciclo 1 hacía que el bridge se registrara como **cliente**
+IAX2 (extensión telefónica) en Asterisk. Esto falló porque ASL3 descarta los
+paquetes de registro IAX2 entrantes a nivel de kernel — específicamente,
+cualquier paquete con `callno=0` (nuevas llamadas) es silenciosamente filtrado
+por las reglas iptables de ASL3.
+
+**Solución**: El bridge ahora actúa como **servidor** IAX2, y Asterisk lo llama
+a través de AMI `Originate` con `Async: true`. Esta inversión evita por
+completo el filtro de ASL3.
+
+Cambios clave:
+- **Nuevo archivo `ami_client.py`**: Cliente AMI TCP asíncrono con reconexión
+  automática y exponential backoff. Se conecta al Asterisk Manager Interface,
+  inicia sesión y emite comandos `Originate` para iniciar llamadas del bridge.
+- **Modificado `iax2.py`**: Se agregaron las clases `IAX2Server` e `IAX2Call`.
+  El servidor escucha llamadas IAX2 entrantes de Asterisk; `IAX2Call` maneja
+  el ciclo de vida completo (ACCEPT, tramas de voz, DTMF, HANGUP).
+- **Modificado `server.py`**: Se reemplazó el flujo directo de `IAX2Session`
+  por el flujo basado en servidor. El bridge ahora espera llamadas en lugar
+  de iniciarlas.
+- **Descubrimiento clave**: `IAX_CMD_ACCEPT = 0x0E` — mismo código de operación
+  que `PONG` según RFC 5456, distinguido por contexto de llamada (PONG solo es
+  válido en un intercambio de registro `callno=0`; ACCEPT es válido en una
+  llamada activa).
 
 ## Requisitos del Sistema
 
@@ -73,6 +100,7 @@ Instaladas por `install_webrtc.sh`:
 | `iax2.py` | Manejador de protocolo IAX2 — REGREQ/NEW/DTMF/HANGUP + mini voice |
 | `audio.py` | Transcodificación de audio — OPUS↔PCM↔ulaw, remuestreo 16kHz↔8kHz |
 | `server.py` | Demonio aiohttp — WebSocket `/ws`, health `/health`, ciclo de vida IAX2 |
+| `ami_client.py` | Cliente AMI TCP asíncrono — conectar, login, originate, monitoreo de llamadas |
 
 ### Configuración Asterisk (`install/asterisk/`)
 
@@ -227,7 +255,7 @@ Los mensajes son JSON:
 
 | Problema | Impacto | Solución Temporal |
 |----------|---------|-------------------|
-| Sin recuperación tras reinicio de Asterisk | El bridge no se reconecta automáticamente | `systemctl restart chilemon-webrtc` manual |
+| ~~Sin recuperación tras reinicio de Asterisk~~ | **Resuelto**: bridge-reversal (v0.2.0) | Cliente AMI se reconecta y re-origina automáticamente |
 | DTMF enviado sin reintento | Sin reintento en caso de DTMF perdido | Generalmente confiable en localhost |
 | Sin verificación de hardware | No advierte si <1GB RAM | Monitorear con `htop` |
 | `audioop` obsoleto en Python 3.13+ | Actualmente en Python 3.11 (Debian 12) | Planificar migración antes de actualizar SO |

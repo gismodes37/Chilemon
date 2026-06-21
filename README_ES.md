@@ -13,7 +13,7 @@ Modern dashboard for monitoring and controlling AllStarLink nodes
 </p>
 
 <p align="center">
-<img src="https://img.shields.io/badge/version-0.4.0-blue">
+<img src="https://img.shields.io/badge/version-0.4.0-brightgreen">
 <img src="https://img.shields.io/badge/php-8.2+-blue">
 <img src="https://img.shields.io/badge/database-SQLite-green">
 <img src="https://img.shields.io/badge/ASL3-compatible-green">
@@ -75,6 +75,8 @@ ChileMon actualmente incluye:
 - **Rate limiting** en todos los endpoints API
 - **Node whitelist** para control de connect/disconnect
 - **Protección CSRF** en todos los formularios
+- **Puente de Audio WebRTC** — Push-to-Talk (PTT) desde el navegador
+- **Inversión de Dirección IAX2** — Bridge como servidor IAX2 para compatibilidad ASL3
 
 ---
 
@@ -111,6 +113,12 @@ ChileMon está construido utilizando tecnologías simples y robustas.
 ### Servidor
 
 - Apache
+
+### Puente WebRTC
+
+- Python 3.10+ (aiortc + aiohttp)
+- WebSocket para audio en tiempo real
+- Protocolo IAX2 para integración con Asterisk
 
 ---
 
@@ -300,7 +308,8 @@ Entra a `http://localhost:8080`. El entorno usa un *mock script* que simula las 
       │   ├── Auth/             ← Auth (login, csrf, roles)
       │   ├── Controllers/      ← Dashboard, NodeApi
       │   ├── Core/             ← Database, RateLimiter
-      │   ├── Services/         ← AslRptService (legacy compat)
+      │   ├── Services/         ← AslRptService (legacy compat), WebRTCBridge
+      │   │   └── WebRTCBridge/ ← Python bridge (ami_client, iax2, audio, server)
       │   └── Views/            ← auth/login.view.php
       │
       ├── config/
@@ -345,32 +354,27 @@ Entra a `http://localhost:8080`. El entorno usa un *mock script* que simula las 
 
 # 📈 Roadmap
 
-  
-<img src="https://img.shields.io/badge/version-0.1.0-blue">
+<img alt="Static Badge" src="https://img.shields.io/badge/Version-0.4.0-brightgreen">
 
-Release inicial funcional
+**Release Actual** — Overhaul de seguridad, PTT Audio Bridge, inversión IAX2, rate limiting, CSRF, roles, panel admin, health check
 
-<img alt="Static Badge" src="https://img.shields.io/badge/Version-0.2.0-blue">
+<img alt="Static Badge" src="https://img.shields.io/badge/Version-0.5.x-blue">
 
-Actividad RX/TX en tiempo real (Disponible)
-
-<img alt="Static Badge" src="https://img.shields.io/badge/Version-0.3.0-blue">
-
-Integración total de Favoritos y Simplificación del Instalador (Nueva)
-
-<img alt="Static Badge" src="https://img.shields.io/badge/Version-0.4.0-blue">
-
-Overhaul de seguridad, mejoras de calidad, panel admin, health check, rate limiting, CSRF, roles
+**Siguiente** — Despliegue y pruebas en producción, TURN/STUN para PTT remoto, HTTPS/WSS, sesiones multiusuario, imagen Docker production
 
 <img alt="Static Badge" src="https://img.shields.io/badge/Version-1.0-green">
 
-Release estable
+**Release estable** — Listo para producción, documentación completa, probado por la comunidad
 
 ---
 
 # 📦 Releases
 
 ## v0.4.0
+- **Puente de Audio WebRTC**: Push-to-Talk (PTT) desde el navegador vía puente Python — audio WebRTC desde el dashboard a Asterisk IAX2
+- **Inversión IAX2**: El bridge ahora actúa como servidor IAX2; Asterisk lo llama vía AMI Originate (corrige filtro callno=0 de ASL3)
+- **Cliente AMI**: Nuevo cliente TCP asíncrono para Asterisk Manager Interface con reconexión y backoff exponencial
+- **Soporte DTMF**: DTMF en llamada para keying/unkeying de nodos ASL (inmediato, no futuro)
 - **Overhaul de seguridad**: Eliminación de credenciales hardcodeadas, local.php obligatorio, SRI en todos los CDN
 - **Rate limiting**: Middleware RateLimiter aplicado a todos los endpoints API (12+ endpoints)
 - **Roles de usuario**: Sistema admin/user con control de acceso en acciones sensibles
@@ -378,10 +382,7 @@ Release estable
 - **Panel admin**: Nuevo `/admin.php` con gestión de usuarios (crear/eliminar/promover) e info del sistema
 - **Health check**: Nuevo endpoint `/api/health.php` (30 req/min, modo degradado en fallo DB)
 - **Node whitelist**: Lista configurable de nodos permitidos para connect/disconnect
-- **Rate limit whitelist**: IPs de confianza exentas de rate limiting
-- **Refactor sesiones**: Todo acceso a `$_SESSION` centralizado mediante métodos de `Auth`
 - **Calidad**: `declare(strict_types=1)` en 13 archivos, require_once unificado a ROOT_PATH
-- **Código muerto**: Eliminados `ami/connect.php` y `ami/disconnect.php` vacíos
 - **PHPUnit scaffold**: `phpunit.xml.dist` + directorio tests con pruebas de Auth e infraestructura
 
 ## v0.3.1

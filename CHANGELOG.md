@@ -10,6 +10,37 @@ https://semver.org/lang/es/
 
 ---
 
+# [0.4.0] - 2026-06-21
+
+## ✨ WebRTC Audio Bridge + Seguridad v0.4.x
+
+Esta actualización marca dos grandes áreas: el nuevo **Puente de Audio WebRTC** para Push-to-Talk desde el navegador, y un **overhaul completo de seguridad**.
+
+### 📡 Añadido
+- **Puente de Audio WebRTC**: Push-to-Talk (PTT) desde el navegador vía Python bridge (aiortc + aiohttp). Audio WebRTC (OPUS) → IAX2 (ulaw) hacia Asterisk.
+- **Widget PTT en Dashboard**: Botón flotante con espacio/click para transmitir, barra de volumen, indicador de estado.
+- **Inversión de Dirección IAX2 (bridge-reversal)**: El bridge ahora actúa como servidor IAX2; Asterisk lo llama mediante AMI `Originate` con `Async: true`, evitando el filtro callno=0 de ASL3.
+- **Cliente AMI asíncrono**: Nuevo `ami_client.py` con reconexión automática y exponential backoff.
+- **Soporte DTMF**: Envío de DTMF durante llamada para key/unkey del nodo ASL (implementado inmediato, no futuro).
+- **Overhaul de seguridad**: Eliminación de credenciales AMI hardcodeadas, `config/local.php` obligatorio, SRI en todos los CDN.
+- **Rate limiting**: Middleware RateLimiter aplicado a todos los endpoints API (12+ endpoints).
+- **Roles de usuario**: Sistema admin/user con control de acceso en acciones sensibles.
+- **Protección CSRF**: Tokens por sesión con validación timing-safe en todos los formularios.
+- **Panel admin**: Nuevo `/admin.php` con gestión de usuarios (crear/eliminar/promover) e info del sistema.
+- **Health check**: Nuevo endpoint `/api/health.php` (30 req/min, modo degradado en fallo DB).
+- **Node whitelist**: Lista configurable de nodos permitidos para connect/disconnect.
+- **Rate limit whitelist**: IPs de confianza exentas de rate limiting.
+- **PHPUnit scaffold**: `phpunit.xml.dist` + tests de Auth e infraestructura.
+
+### 🔧 Corregido
+- IAX2 mini frames: Corrección de ACK innecesario en mini frames de voz (fire-and-forget).
+- IAX2 seqno tracking: `iseqno` ahora se actualiza condicionalmente, no se copia ciegamente.
+- Código muerto: Eliminados `ami/connect.php` y `ami/disconnect.php` vacíos.
+- `declare(strict_types=1)` añadido a 13 archivos PHP faltantes.
+- Refactor de sesiones: Todo acceso a `$_SESSION` centralizado mediante métodos de `Auth`.
+
+---
+
 # [0.3.1] - 2026-04-27
 
 ## ✨ Entorno Local y Docker

@@ -90,9 +90,14 @@ Thumbs.db
 *.sql
 *.dump
 
-# archivos de prueba local
+# archivos de prueba temporal
+tmp_*
 test.php
 debug.php
+
+# Python cache
+__pycache__/
+*.pyc
 
 # --------------------------
 # PHPUnit (testing)

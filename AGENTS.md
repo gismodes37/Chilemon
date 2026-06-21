@@ -128,24 +128,24 @@ www-data ALL=(root) NOPASSWD: /usr/local/bin/chilemon-rpt
 
 ---
 
-## Roadmap recomendado
+## Roadmap actual
 
 ```
-FASE 1 ( inmedi ata)
-├── [1.1] Eliminar credenciales por defecto
-├── [1.2] Agregar whitelist comandos
-└── [1.3] Agregar verificación de rol admin
+COMPLETADO (v0.4.0)
+├── [1.1-1.5] Seguridad: credenciales, whitelist, rate limiting, roles, SRI
+├── [2.1] WebRTC Audio Bridge — PTT desde el navegador
+├── [2.2] Bridge IAX2 Direction Reversal — servidor IAX2 + cliente AMI
+├── [3.1] Return types completos
+├── [4.1] PHPUnit scaffold + tests
+└── [5.1] Docker development environment
 
-FASE 2 (2 semanas)
-├── [3.1] Agregar return types completos
-├── [3.2] Agregar phpstan config
-└── [4.1] Setup PHPUnit
-
-FASE 3 (1 mes)
-├── [5.1] Crear Dockerfile
-├── [5.2] Setup GitHub Actions
-├── [5.3] Endpoint health
-└── [2.1] Refactor MVC
+PRÓXIMO (v0.5.x)
+├── Deploy a producción + validación end-to-end
+├── TURN/STUN para acceso remoto
+├── HTTPS/WSS con Let's Encrypt
+├── Sesiones multi-usuario en el bridge
+├── GitHub Actions CI
+└── Docker production image
 ```
 
 ---

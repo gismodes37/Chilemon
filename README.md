@@ -13,7 +13,7 @@ Modern dashboard for monitoring and controlling AllStarLink nodes
 </p>
 
 <p align="center">
-<img src="https://img.shields.io/badge/version-0.4.0-blue">
+<img src="https://img.shields.io/badge/version-0.4.0-brightgreen">
 <img src="https://img.shields.io/badge/php-8.2+-blue">
 <img src="https://img.shields.io/badge/database-SQLite-green">
 <img src="https://img.shields.io/badge/ASL3-compatible-green">
@@ -74,6 +74,8 @@ ChileMon currently includes:
 - **Rate limiting** on all API endpoints
 - **Node whitelist** for connect/disconnect control
 - **CSRF protection** on all forms
+- **WebRTC Audio Bridge** — Browser-based Push-to-Talk (PTT) from the dashboard
+- **Bridge IAX2 Direction Reversal** — Robust IAX2 server mode for ASL3 compatibility
 
 ---
 
@@ -110,6 +112,12 @@ ChileMon is built using simple and robust technologies.
 ### Server
 
 - Apache
+
+### WebRTC Bridge
+
+- Python 3.10+ (aiortc + aiohttp)
+- WebSocket for real-time audio
+- IAX2 protocol for Asterisk integration
 
 ---
 
@@ -314,7 +322,8 @@ Go to `http://localhost:8080`. The environment uses a mock script that simulates
      │   ├── Auth/             ← Auth (login, csrf, roles)
      │   ├── Controllers/      ← Dashboard, NodeApi
      │   ├── Core/             ← Database, RateLimiter
-     │   ├── Services/         ← AslRptService (legacy compat)
+      │   ├── Services/         ← AslRptService (legacy compat), WebRTCBridge
+      │   │   └── WebRTCBridge/ ← Python bridge (ami_client, iax2, audio, server)
      │   └── Views/            ← auth/login.view.php
      │
      ├── config/
@@ -358,25 +367,17 @@ Go to `http://localhost:8080`. The environment uses a mock script that simulates
 
 ## 📈 Roadmap
 
-<img src="https://img.shields.io/badge/version-0.1.0-blue">
+<img alt="Static Badge" src="https://img.shields.io/badge/Version-0.4.0-brightgreen">
 
-Initial functional release
+**Current Release** — Security overhaul, PTT Audio Bridge, Bridge IAX2 reversal, rate limiting, CSRF protection, user roles, admin panel, health check
 
-<img alt="Static Badge" src="https://img.shields.io/badge/Version-0.2.0-blue">
+<img alt="Static Badge" src="https://img.shields.io/badge/Version-0.5.x-blue">
 
-Real-time RX/TX activity (Available)
-
-<img alt="Static Badge" src="https://img.shields.io/badge/Version-0.3.0-blue">
-
-Full Favorites Integration & Simplified Installer (New)
-
-<img alt="Static Badge" src="https://img.shields.io/badge/Version-0.4.0-blue">
-
-Security overhaul, quality improvements, admin panel, health endpoint, rate limiting, CSRF protection, roles
+**Next** — Deploy & production testing, TURN/STUN for remote PTT access, HTTPS/WSS, multi-user sessions, Docker production image
 
 <img alt="Static Badge" src="https://img.shields.io/badge/Version-1.0-green">
 
-Stable release
+**Stable release** — Production-ready, full documentation, community tested
 
 ---
 
@@ -385,6 +386,10 @@ Stable release
 # 📦 Releases
 
 ## v0.4.0
+- **WebRTC Audio Bridge**: Browser-based Push-to-Talk (PTT) via Python bridge — WebRTC audio from dashboard to Asterisk IAX2
+- **Bridge IAX2 Reversal**: Bridge now acts as IAX2 server; Asterisk calls it via AMI Originate (fixes ASL3 callno=0 filter)
+- **AMI Client**: New async TCP client for Asterisk Manager Interface with reconnect and exponential backoff
+- **DTMF Support**: In-call DTMF for keying/unkeying ASL nodes (immediate, not future)
 - **Security overhaul**: Removed hardcoded AMI credentials, forced local.php configuration, SRI in all CDN links
 - **Rate limiting**: Reusable RateLimiter middleware applied to all API endpoints (12+ endpoints)
 - **User roles**: Admin/user system with access control on sensitive actions
@@ -392,10 +397,7 @@ Stable release
 - **Admin panel**: New `/admin.php` with user management (create/delete/promote) and system information
 - **Health check**: New `/api/health.php` endpoint (30 req/min rate limit, degraded mode on DB failure)
 - **Node whitelist**: Configurable list of allowed nodes for connect/disconnect
-- **Rate limit whitelist**: Exempt trusted IPs from rate limiting
-- **Session refactor**: All `$_SESSION` access centralized through `Auth` getter methods
 - **Quality**: `declare(strict_types=1)` added to 13 files, require_once unified to ROOT_PATH
-- **Dead code**: Removed empty `ami/connect.php` and `ami/disconnect.php`
 - **PHPUnit scaffold**: `phpunit.xml.dist` + test directory with Auth and infrastructure tests
 
 ## v0.3.1
