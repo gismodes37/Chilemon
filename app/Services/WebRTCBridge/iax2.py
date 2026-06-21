@@ -959,10 +959,10 @@ class IAX2Server:
         # --- Keepalive at transport level (no call context needed) ---
         if frametype == IAX_TYPE_IAX:
             if subclass == IAX_CMD_PING:
-                self._send_pong(dest_callno=0, src_callno=0, addr=addr)
+                self._send_pong(dest_callno=src_callno, src_callno=0, addr=addr)
                 return
             if subclass == IAX_CMD_LAGRQ:
-                self._send_lagrp(dest_callno=0, src_callno=0, addr=addr)
+                self._send_lagrp(dest_callno=src_callno, src_callno=0, addr=addr)
                 return
 
         # --- Dispatch to active call ---
