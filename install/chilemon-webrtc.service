@@ -1,0 +1,27 @@
+[Unit]
+Description=ChileMon WebRTC Audio Bridge
+Documentation=https://github.com/gismodes37/Chilemon
+After=network.target asterisk.target
+Wants=asterisk.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/opt/chilemon
+EnvironmentFile=-/etc/default/chilemon-webrtc
+ExecStart=/usr/bin/python3 app/Services/WebRTCBridge/server.py
+Restart=always
+RestartSec=5
+
+# Hardening
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=full
+ReadWritePaths=/opt/chilemon/logs
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_NET_RAW
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+
+[Install]
+WantedBy=multi-user.target

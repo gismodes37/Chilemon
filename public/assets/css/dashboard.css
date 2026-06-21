@@ -664,3 +664,191 @@ html, body{
     background-color: #6f42c1 !important;
     color: #fff !important;
 }
+
+/* =========================================
+   ChileMon — PTT Widget (WebRTC Audio Bridge)
+   ========================================= */
+
+.ptt-widget {
+    position: fixed;
+    bottom: 80px;
+    right: 20px;
+    z-index: 1050;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    background: rgba(4, 18, 85, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 16px;
+    padding: 12px 14px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+/* Widget header: status dot + text */
+.ptt-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    justify-content: center;
+    margin-bottom: 2px;
+}
+
+/* Status indicator dot */
+.ptt-status-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    transition: background-color 0.3s ease;
+}
+
+.ptt-status-connected {
+    background-color: #28a745;
+    box-shadow: 0 0 6px rgba(40, 167, 69, 0.6);
+}
+
+.ptt-status-disconnected {
+    background-color: #6c757d;
+    box-shadow: 0 0 4px rgba(108, 117, 125, 0.3);
+}
+
+.ptt-status-transmitting {
+    background-color: #ffc107;
+    box-shadow: 0 0 8px rgba(255, 193, 7, 0.7);
+    animation: pttPulse 0.8s ease-in-out infinite;
+}
+
+.ptt-status-error {
+    background-color: #dc3545;
+    box-shadow: 0 0 6px rgba(220, 53, 69, 0.6);
+}
+
+@keyframes pttPulse {
+    0%   { opacity: 1; transform: scale(1); }
+    50%  { opacity: 0.6; transform: scale(1.3); }
+    100% { opacity: 1; transform: scale(1); }
+}
+
+/* Status text */
+.ptt-status-text {
+    font-size: 0.7rem;
+    color: rgba(255, 255, 255, 0.85);
+    white-space: nowrap;
+    letter-spacing: 0.3px;
+}
+
+/* Volume bar container */
+.ptt-volume-bar {
+    width: 100%;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 2px;
+    overflow: hidden;
+    transition: opacity 0.3s ease;
+}
+
+.ptt-volume-disabled {
+    opacity: 0.3;
+}
+
+/* Volume bar fill */
+.ptt-volume-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #28a745, #ffc107, #dc3545);
+    border-radius: 2px;
+    transition: width 0.1s ease-out;
+}
+
+/* Main PTT button — circular with mic icon */
+.ptt-button {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.25);
+    background: radial-gradient(circle at 30% 30%, #2a3a7a, #0f1f4a);
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 1.4rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.ptt-button:hover:not(:disabled) {
+    border-color: rgba(255, 255, 255, 0.5);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    transform: scale(1.05);
+}
+
+.ptt-button:active:not(:disabled) {
+    transform: scale(0.95);
+}
+
+.ptt-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* PTT active (transmitting) state */
+.ptt-button.ptt-active {
+    background: radial-gradient(circle at 30% 30%, #dc3545, #8a1a1a);
+    border-color: #ff6b6b;
+    color: #fff;
+    box-shadow: 0 0 20px rgba(220, 53, 69, 0.5);
+    animation: pttButtonPulse 1s ease-in-out infinite;
+}
+
+@keyframes pttButtonPulse {
+    0%   { box-shadow: 0 0 20px rgba(220, 53, 69, 0.5); }
+    50%  { box-shadow: 0 0 30px rgba(220, 53, 69, 0.8); }
+    100% { box-shadow: 0 0 20px rgba(220, 53, 69, 0.5); }
+}
+
+/* PTT label text below button */
+.ptt-label {
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.5);
+    transition: color 0.2s ease;
+}
+
+.ptt-label-active {
+    color: #ffc107;
+}
+
+/* =========================================
+   PTT — Responsive adjustments
+   ========================================= */
+@media (max-width: 576px) {
+    .ptt-widget {
+        bottom: 16px;
+        right: 12px;
+        padding: 10px 12px;
+        border-radius: 14px;
+    }
+
+    .ptt-button {
+        width: 48px;
+        height: 48px;
+        font-size: 1.2rem;
+    }
+
+    .ptt-status-text {
+        font-size: 0.65rem;
+    }
+}

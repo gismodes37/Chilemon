@@ -255,6 +255,64 @@ if (!defined('AMI_TIMEOUT')) {
     );
 }
 
+/**
+ * -----------------------------------------------------
+ * WebRTC Audio Bridge Configuration
+ * -----------------------------------------------------
+ * Parámetros de conexión para el bridge WebRTC ↔ IAX2.
+ * El bridge es un daemon Python que corre junto a Asterisk.
+ */
+
+if (!defined('WEBRTC_PORT')) {
+    define(
+        'WEBRTC_PORT',
+        (int) (
+            getenv('CHILEMON_WEBRTC_PORT')
+                ?: ($localConfig['webrtc_port'] ?? 9091)
+        )
+    );
+}
+
+if (!defined('IAX_PHONE_USER')) {
+    define(
+        'IAX_PHONE_USER',
+        getenv('CHILEMON_IAX_PHONE_USER')
+            ?: ($localConfig['iax_phone_user'] ?? 'webrtc-bridge')
+    );
+}
+
+if (!defined('IAX_PHONE_PASS')) {
+    define(
+        'IAX_PHONE_PASS',
+        getenv('CHILEMON_IAX_PHONE_PASS')
+            ?: ($localConfig['iax_phone_pass'] ?? '')
+    );
+}
+
+if (!defined('WEBRTC_SECRET')) {
+    define(
+        'WEBRTC_SECRET',
+        getenv('CHILEMON_WEBRTC_SECRET')
+            ?: ($localConfig['webrtc_secret'] ?? '')
+    );
+}
+
+/**
+ * Validación: en producción, IAX_PHONE_PASS y WEBRTC_SECRET
+ * deben estar configurados en config/local.php.
+ */
+if (IAX_PHONE_PASS === '' && !$isCli) {
+    throw new RuntimeException(
+        'IAX_PHONE_PASS no está configurado. Defínelo en config/local.php => iax_phone_pass'
+    );
+}
+
+if (WEBRTC_SECRET === '' && !$isCli) {
+    throw new RuntimeException(
+        'WEBRTC_SECRET no está configurado. Defínelo en config/local.php => webrtc_secret'
+    );
+}
+
 if (!defined('RATE_LIMIT_WHITELIST')) {
     /**
      * Lista de IPs que NO están sujetas a rate limiting.

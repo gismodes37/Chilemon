@@ -63,4 +63,20 @@ return [
      * Ejemplo: ['127.0.0.1', '192.168.1.100']
      */
     'rate_limit_whitelist' => [],
+
+    /**
+     * WebRTC Audio Bridge — Configuración del daemon Python.
+     *
+     * El bridge corre en un puerto HTTP/WS separado (default 9091)
+     * y se conecta a Asterisk vía IAX2 como un phone extension.
+     *
+     * webrtc_port:    Puerto donde escucha el bridge (GET /health, WS /ws)
+     * webrtc_secret:  Clave HMAC para autenticar tokens WebSocket
+     * iax_phone_user: Usuario IAX2 para registrarse en Asterisk
+     * iax_phone_pass: Clave IAX2 del phone extension
+     */
+    'webrtc_port' => 9091,
+    'webrtc_secret' => 'REEMPLAZAR_CON_WEBRTC_SECRET_REAL',
+    'iax_phone_user' => 'webrtc-bridge',
+    'iax_phone_pass' => 'REEMPLAZAR_CON_IAX_PHONE_PASS_REAL',
 ];

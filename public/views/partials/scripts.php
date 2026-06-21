@@ -16,5 +16,20 @@ $jsPath = dirname(__DIR__, 2) . '/assets/js/dashboard.js';
 $jsVer  = file_exists($jsPath) ? (string)filemtime($jsPath) : (string)APP_VERSION;
 ?>
 <script src="<?= rtrim(BASE_URL, '/') ?>/assets/js/dashboard.js?v=<?= time() ?>"></script>
+
+<?php
+$pttJsPath = dirname(__DIR__, 2) . '/assets/js/ptt-widget.js';
+$pttJsVer  = file_exists($pttJsPath) ? (string)filemtime($pttJsPath) : (string)APP_VERSION;
+?>
+<script src="<?= rtrim(BASE_URL, '/') ?>/assets/js/ptt-widget.js?v=<?= $pttJsVer ?>"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    if (typeof PTTWidget !== 'undefined') {
+        window.pttWidget = new PTTWidget();
+        window.pttWidget.init();
+    }
+});
+</script>
 </body>
 </html>

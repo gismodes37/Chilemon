@@ -798,6 +798,14 @@ function confirmarReinicio(servicio, action) {
 </div>
 
 
+<!-- =========================================
+     PTT Widget — WebRTC Audio Bridge
+     Initialized by ptt-widget.js
+     ========================================= -->
+<div id="ptt-widget-container">
+    <!-- The PTTWidget class creates its own DOM inside #ptt-widget -->
+</div>
+
 <?php
 require ROOT_PATH . '/public/views/partials/footer.php';
 require ROOT_PATH . '/public/views/partials/scripts.php';
