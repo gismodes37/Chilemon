@@ -301,7 +301,7 @@ class WebRTCBridgeApp:
             aid = await self.ami.originate(
                 channel=f"IAX2/webrtc-bridge/{self.config.asl_node}",
                 context="webrtc",
-                exten="s",
+                exten=self.config.asl_node,
                 priority=1,
                 callerid=f"\"WebRTC\" <{self.config.asl_node}>",
             )
