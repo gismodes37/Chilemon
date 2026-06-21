@@ -142,10 +142,10 @@ class AMIClient:
                 f"Cannot connect AMI to {host}:{port}: {exc}"
             ) from exc
 
-        # Read banner (ends with \r\n\r\n)
+        # Read banner (ends with \r\n — Asterisk 11+ sends a single line)
         try:
             banner = await asyncio.wait_for(
-                self._reader.readuntil(b"\r\n\r\n"),
+                self._reader.readuntil(b"\r\n"),
                 timeout=5.0,
             )
             logger.info("AMI connected — banner: %s", banner.decode("utf-8", errors="replace").strip())
@@ -180,7 +180,7 @@ class AMIClient:
         if response is None:
             raise ConnectionError("AMI login: no response")
 
-        if "Response: Success" in response:
+        if response.get("Response") == "Success":
             self._logged_in = True
             logger.info("AMI logged in as '%s'", user)
         else:
