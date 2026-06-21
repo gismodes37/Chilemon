@@ -10,7 +10,7 @@ User=root
 Group=root
 WorkingDirectory=/opt/chilemon
 EnvironmentFile=-/etc/default/chilemon-webrtc
-ExecStart=/usr/bin/python3 app/Services/WebRTCBridge/server.py
+ExecStart=/usr/bin/python3 -m app.Services.WebRTCBridge.server
 Restart=always
 RestartSec=5
 
