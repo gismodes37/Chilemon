@@ -7,7 +7,7 @@ It provides:
 - WebSocket endpoint at ``/ws`` for PTT signaling and audio relay
 - WebRTC peer connection at ``/webrtc`` (aiortc)
 - Health check at ``/health`` returning ``{"status":"ok"}``
-- IAX2 server mode (inbound NEW via AMI Originate) via ``IAX2Server``
+- IAX2 phone registration (client mode, receives inbound calls) via ``IAX2Session``
 - AMI client (connect, login, Originate) via ``AMIClient``
 
 Configuration
@@ -18,7 +18,10 @@ All values are read from environment variables:
 Variable                 Default            Required Description
 ========================  =================  ======  ===========================
 WEBRTC_PORT              9091               No       HTTP/WS listen port
-IAX_LISTEN_PORT          9092               No       IAX2 server listen port
+IAX_HOST                 127.0.0.1          No       Asterisk IAX2 bind address
+IAX_PORT                 4569               No       Asterisk IAX2 UDP port
+IAX_PHONE_USER           webrtc-bridge      No       IAX2 phone extension username
+IAX_PHONE_PASS           —                  Yes      IAX2 phone extension secret
 AMI_HOST                 127.0.0.1          No       Asterisk AMI bind address
 AMI_PORT                 5038               No       Asterisk AMI TCP port
 AMI_USER                 admin              No       Asterisk AMI username
@@ -50,7 +53,7 @@ from typing import Any, Optional
 import aiohttp
 from aiohttp import web
 
-from app.Services.WebRTCBridge.iax2 import IAX2Server, IAX2Call, CALL_STATE_ACTIVE, CALL_STATE_HUNGUP
+from app.Services.WebRTCBridge.iax2 import IAX2Session
 from app.Services.WebRTCBridge.ami_client import AMIClient
 from app.Services.WebRTCBridge.audio import tx_process, rx_process
 
@@ -94,7 +97,10 @@ class BridgeConfig:
 
     def __init__(self) -> None:
         self.webrtc_port: int = _env_int("WEBRTC_PORT", 9091)
-        self.iax_listen_port: int = _env_int("IAX_LISTEN_PORT", 9092)
+        self.iax_host: str = _env_str("IAX_HOST", "127.0.0.1")
+        self.iax_port: int = _env_int("IAX_PORT", 4569)
+        self.iax_user: str = _env_str("IAX_PHONE_USER", "webrtc-bridge")
+        self.iax_pass: str = _env_str("IAX_PHONE_PASS", "")
         self.ami_host: str = _env_str("AMI_HOST", "127.0.0.1")
         self.ami_port: int = _env_int("AMI_PORT", 5038)
         self.ami_user: str = _env_str("AMI_USER", "admin")
@@ -109,6 +115,8 @@ class BridgeConfig:
             errors.append("AMI_PASS is required")
         if not self.webrtc_secret:
             errors.append("WEBRTC_SECRET is required")
+        if not self.iax_pass:
+            errors.append("IAX_PHONE_PASS is required")
         return errors
 
 
@@ -117,12 +125,13 @@ class BridgeConfig:
 # ---------------------------------------------------------------------------
 
 class WebRTCBridgeApp:
-    """Main bridge application — ties AMI, IAX2 server, WebSocket together.
+    """Main bridge application — ties AMI, IAX2 phone, WebSocket together.
 
-    The bridge listens on UDP 9092 for inbound IAX2 calls triggered by
-    AMI ``Originate``. On WebSocket auth success, it calls
-    ``ami.originate()`` which causes Asterisk to send an IAX2 NEW frame
-    to the bridge. Audio is relayed bidirectionally between WS and IAX2.
+    The bridge registers as an IAX2 phone extension with Asterisk.
+    On WebSocket auth success, it calls ``ami.originate()`` which triggers
+    Asterisk to place an IAX2 call back to the registered phone extension.
+    The bridge answers the inbound NEW frame, then audio/DTMF flow
+    bidirectionally between WS and IAX2.
     """
 
     def __init__(self, config: BridgeConfig) -> None:
@@ -131,8 +140,13 @@ class WebRTCBridgeApp:
         # AMI client (connect/login to Asterisk manager)
         self.ami: AMIClient = AMIClient()
 
-        # IAX2 server (listens for inbound NEW frames)
-        self.iax_server: IAX2Server = IAX2Server()
+        # IAX2 phone session (registers with Asterisk as an extension)
+        self.iax_session: IAX2Session = IAX2Session(
+            host=config.iax_host,
+            port=config.iax_port,
+            username=config.iax_user,
+            password=config.iax_pass,
+        )
 
         # Connected WebSocket peers
         self._ws_peers: set[web.WebSocketResponse] = set()
@@ -141,11 +155,10 @@ class WebRTCBridgeApp:
         self._ptt_active: bool = False
         self._call_active: bool = False
 
-        # Active IAX2 call (single-call model for v1)
-        self._active_call: Optional[IAX2Call] = None
-
-        # Wire IAX2 server callback
-        self.iax_server.on_new_call = self._on_iax_new_call
+        # Wire IAX2 session callbacks
+        self.iax_session.on_inbound_call = self._on_iax_inbound_call
+        self.iax_session.on_audio_frame = self._on_iax_audio
+        self.iax_session.on_disconnect = self._on_iax_disconnect
 
     # -- Auth --
 
@@ -174,27 +187,21 @@ class WebRTCBridgeApp:
 
     # -- IAX2 Inbound Call --
 
-    async def _on_iax_new_call(self, call: IAX2Call) -> None:
-        """Handle an inbound IAX2 NEW from Asterisk.
+    async def _on_iax_inbound_call(self, called_num: str) -> None:
+        """Handle an inbound IAX2 call from Asterisk.
 
-        Sets the active call, sends ACCEPT + ANSWER to complete setup,
-        wires audio/hangup callbacks, and broadcasts status to WS peers.
+        Asterisk called our registered phone extension. Sends ACCEPT +
+        ANSWER to complete setup, then broadcasts status.
         """
-        self._active_call = call
         self._call_active = True
         logger.info(
-            "Inbound IAX2 call from peer_callno=%d called_num=%s",
-            call.peer_callno, call.called_num,
+            "Inbound IAX2 call from Asterisk — called=%s", called_num,
         )
 
-        # Wire callbacks
-        call.on_voice = self._on_iax_audio
-        call.on_hangup = self._on_iax_disconnect
-
-        # Complete call setup
-        call.send_accept()
+        # Complete call setup via IAX2 session
+        self.iax_session.accept_inbound()
         await asyncio.sleep(0.05)  # small gap between frames
-        call.send_answer()
+        self.iax_session.answer_inbound()
 
         await self._broadcast_status()
 
@@ -224,7 +231,6 @@ class WebRTCBridgeApp:
     async def _on_iax_disconnect(self) -> None:
         """Handle remote HANGUP from Asterisk — reset call state."""
         logger.info("IAX2 disconnect received — resetting call state")
-        self._active_call = None
         self._call_active = False
         self._ptt_active = False
         await self._broadcast_status()
@@ -236,12 +242,12 @@ class WebRTCBridgeApp:
 
         Requires an active IAX2 call (established via AMI Originate).
         """
-        if not self._active_call or self._active_call.state == CALL_STATE_HUNGUP:
+        if not self._call_active:
             logger.warning("PTT key ignored: no active IAX2 call")
             return
 
         logger.debug("PTT key: sending *99")
-        self._active_call.send_dtmf_string("*99")
+        self.iax_session.send_dtmf_string("*99")
         self._ptt_active = True
 
         await self._broadcast_status()
@@ -252,8 +258,7 @@ class WebRTCBridgeApp:
             return
 
         logger.debug("PTT unkey: sending #")
-        if self._active_call:
-            self._active_call.send_dtmf("#")
+        self.iax_session.send_dtmf("#")
         self._ptt_active = False
 
         await self._broadcast_status()
@@ -263,7 +268,7 @@ class WebRTCBridgeApp:
         status = {
             "type": "status",
             "ami_connected": self.ami.connected,
-            "iax_server_running": self.iax_server.is_running,
+            "iax_registered": self.iax_session.is_registered,
             "active_call": self._call_active,
             "in_call": self._call_active,
             "ptt_active": self._ptt_active,
@@ -296,10 +301,17 @@ class WebRTCBridgeApp:
         self._ws_peers.add(ws)
         logger.info("WS client connected (%d peers)", len(self._ws_peers))
 
+        # Ensure IAX2 phone is registered before originating
+        if not self.iax_session.is_registered:
+            logger.warning("IAX2 not registered — cannot originate")
+            await self._broadcast_status()
+            return ws
+
         # Trigger AMI Originate to establish inbound IAX2 call
+        # Asterisk will send an IAX2 NEW to our registered phone
         try:
             aid = await self.ami.originate(
-                channel=f"IAX2/webrtc-bridge/{self.config.asl_node}",
+                channel=f"IAX2/{self.config.iax_user}/{self.config.asl_node}",
                 context="webrtc",
                 exten=self.config.asl_node,
                 priority=1,
@@ -325,10 +337,9 @@ class WebRTCBridgeApp:
             logger.info("WS client disconnected (%d peers)", len(self._ws_peers))
 
             # If no more peers, hang up the IAX2 call
-            if not self._ws_peers and self._active_call is not None:
-                logger.info("Last WS peer gone — sending IAX2 HANGUP")
-                self._active_call.send_hangup()
-                self._active_call = None
+            if not self._ws_peers and self.iax_session.in_call:
+                logger.info("Last WS peer gone — hanging up IAX2 call")
+                await self.iax_session.hangup_call()
                 self._call_active = False
                 self._ptt_active = False
 
@@ -355,19 +366,19 @@ class WebRTCBridgeApp:
 
         elif msg_type == "dtmf":
             digit = payload.get("digit", "")
-            if digit and self._active_call:
-                self._active_call.send_dtmf(digit)
+            if digit and self.iax_session.in_call:
+                self.iax_session.send_dtmf(digit)
 
         elif msg_type == "audio_tx":
             # Transmit audio: hex-encoded float32 PCM 16 kHz from browser
-            if not self._active_call:
+            if not self.iax_session.in_call:
                 return
             try:
                 pcm_f32_hex = payload.get("data", "")
                 if pcm_f32_hex:
                     pcm_f32 = bytes.fromhex(pcm_f32_hex)
                     ulaw = tx_process(pcm_f32)
-                    self._active_call.send_voice(ulaw)
+                    self.iax_session.send_voice(ulaw)
             except (ValueError, KeyError) as exc:
                 logger.warning("audio_tx parse error: %s", exc)
 
@@ -384,7 +395,8 @@ class WebRTCBridgeApp:
         return web.json_response({
             "status": "ok",
             "ami_connected": self.ami.connected,
-            "iax_server_running": self.iax_server.is_running,
+            "iax_registered": self.iax_session.is_registered,
+            "in_call": self.iax_session.in_call,
             "active_call": self._call_active,
             "ptt_active": self._ptt_active,
             "peers": len(self._ws_peers),
@@ -416,35 +428,38 @@ class WebRTCBridgeApp:
 # ---------------------------------------------------------------------------
 
 async def _on_startup(app: web.Application) -> None:
-    """Start IAX2 server and connect AMI on application startup."""
+    """Register IAX2 phone and connect AMI on application startup."""
     bridge: WebRTCBridgeApp = app["bridge"]
-    logger.info("Starting WebRTC Audio Bridge v0.2.0 (bridge-reversal)")
+    logger.info("Starting WebRTC Audio Bridge v0.2.1 (phone-registration)")
 
-    # 1. Start IAX2 server (must be listening before AMI Originate)
-    try:
-        await bridge.iax_server.start(
-            host="0.0.0.0",
-            port=bridge.config.iax_listen_port,
-        )
-        logger.info("IAX2 server listening on port %d", bridge.config.iax_listen_port)
-    except ConnectionError as exc:
-        logger.error("IAX2 server start failed: %s", exc)
-
-    # 2. Connect and login to AMI
+    # 1. Connect and login to AMI
     try:
         await bridge.ami.connect(bridge.config.ami_host, bridge.config.ami_port)
         await bridge.ami.login(bridge.config.ami_user, bridge.config.ami_pass)
         logger.info("AMI connected and logged in as '%s'", bridge.config.ami_user)
 
-        # 3. Start background event monitor
+        # Start background event monitor
         bridge.ami._monitor_task = asyncio.create_task(bridge.ami.monitor_events())
     except (ConnectionError, PermissionError, OSError) as exc:
         logger.error("AMI startup failed: %s", exc)
         # Don't crash — health endpoint will show ami_connected=false
 
+    # 2. Register IAX2 phone extension with Asterisk
+    try:
+        ok = await bridge.iax_session.register()
+        if ok:
+            logger.info(
+                "IAX2 registered as '%s' with %s:%d",
+                bridge.config.iax_user, bridge.config.iax_host, bridge.config.iax_port,
+            )
+        else:
+            logger.error("IAX2 registration returned False")
+    except (ConnectionError, PermissionError, TimeoutError) as exc:
+        logger.error("IAX2 registration failed: %s", exc)
+
 
 async def _on_shutdown(app: web.Application) -> None:
-    """Cleanly tear down AMI and IAX2 server on shutdown."""
+    """Cleanly tear down AMI and IAX2 phone on shutdown."""
     bridge: WebRTCBridgeApp = app["bridge"]
     logger.info("Shutting down WebRTC Audio Bridge")
 
@@ -454,11 +469,11 @@ async def _on_shutdown(app: web.Application) -> None:
     except Exception as exc:
         logger.warning("AMI close error: %s", exc)
 
-    # Stop IAX2 server
+    # Close IAX2 session (hangup + unregister + close transport)
     try:
-        await bridge.iax_server.stop()
+        await bridge.iax_session.close()
     except Exception as exc:
-        logger.warning("IAX2 server stop error: %s", exc)
+        logger.warning("IAX2 session close error: %s", exc)
 
 
 # ---------------------------------------------------------------------------

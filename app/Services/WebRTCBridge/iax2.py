@@ -179,9 +179,13 @@ class IAX2Session:
         self._response_data: Optional[str] = None
         self._loop: Optional[asyncio.AbstractEventLoop] = None
 
+        # Inbound call state (set when Asterisk calls our registered phone)
+        self._inbound_called_num: str = ""
+
         # -- Public callbacks --
         self.on_audio_frame: Optional[Callable[[bytes], Awaitable[None]]] = None
         self.on_disconnect: Optional[Callable[[], Awaitable[None]]] = None
+        self.on_inbound_call: Optional[Callable[[str], Awaitable[None]]] = None
 
     # -- Properties --
 
@@ -445,6 +449,48 @@ class IAX2Session:
             payload=payload,
         )
 
+    # -- Inbound call helpers (Asterisk calls the registered phone) --
+
+    def accept_inbound(self) -> None:
+        """Send ACCEPT frame for an inbound call."""
+        if self._dest_callno == 0:
+            logger.warning("accept_inbound: no dest_callno (no inbound call)")
+            return
+        self._send_full_frame(
+            dest_callno=self._dest_callno,
+            frametype=IAX_TYPE_IAX,
+            subclass=IAX_CMD_ACCEPT,
+        )
+        logger.debug("ACCEPT sent for inbound call (dest_callno=%d)", self._dest_callno)
+
+    def answer_inbound(self) -> None:
+        """Send ANSWER control frame for an inbound call."""
+        if self._dest_callno == 0:
+            logger.warning("answer_inbound: no dest_callno (no inbound call)")
+            return
+        self._send_full_frame(
+            dest_callno=self._dest_callno,
+            frametype=IAX_TYPE_CONTROL,
+            subclass=CONTROL_ANSWER,
+        )
+        self._state = self.STATE_ACTIVE
+        logger.info("ANSWER sent for inbound call — STATE_ACTIVE")
+
+    @staticmethod
+    def _parse_called_number(payload: bytes) -> str:
+        """Extract IE_CALLED_NUMBER from NEW frame payload."""
+        offset = 0
+        while offset + 2 <= len(payload):
+            ie_type = payload[offset]
+            ie_len = payload[offset + 1]
+            if offset + 2 + ie_len > len(payload):
+                break
+            ie_value = payload[offset + 2: offset + 2 + ie_len]
+            if ie_type == IE_CALLED_NUMBER:
+                return ie_value.decode("utf-8", errors="replace")
+            offset += 2 + ie_len
+        return ""
+
     def _send_hangup(self) -> None:
         payload = _make_ie(IE_CAUSE, struct.pack("!B", 16))
         self._send_full_frame(
@@ -593,10 +639,32 @@ class IAX2Session:
             self._response_data = "NEWACK"
             self._response_event.set()
 
+        elif subclass == IAX_CMD_NEW and self._state >= self.STATE_REGISTERED:
+            """Inbound NEW: Asterisk is calling our registered phone."""
+            self._inbound_called_num = self._parse_called_number(payload)
+            self._dest_callno = src_callno
+            self._state = self.STATE_CALLING
+            logger.info(
+                "Inbound NEW from Asterisk — called=%s peer_callno=%d",
+                self._inbound_called_num, src_callno,
+            )
+            # NEWACK immediately
+            ie_called = _make_ie(IE_CALLED_NUMBER, self._inbound_called_num)
+            self._send_full_frame(
+                dest_callno=self._dest_callno,
+                frametype=IAX_TYPE_IAX,
+                subclass=IAX_CMD_NEWACK,
+                payload=ie_called,
+            )
+            # Invoke callback so server.py sends ACCEPT + ANSWER
+            if self.on_inbound_call:
+                asyncio.ensure_future(self.on_inbound_call(self._inbound_called_num))
+
         elif subclass == IAX_CMD_HANGUP:
             logger.info("Remote HANGUP received")
             self._state = self.STATE_REGISTERED
             self._dest_callno = 0
+            self._inbound_called_num = ""
             self._response_data = "HANGUP"
             self._response_event.set()
             if self.on_disconnect:
