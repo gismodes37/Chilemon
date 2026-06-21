@@ -48,8 +48,8 @@ from typing import Any, Optional
 import aiohttp
 from aiohttp import web
 
-from .iax2 import IAX2Session
-from .audio import tx_process, rx_process
+from app.Services.WebRTCBridge.iax2 import IAX2Session
+from app.Services.WebRTCBridge.audio import tx_process, rx_process
 
 # ---------------------------------------------------------------------------
 # Logging
