@@ -299,14 +299,14 @@ class WebRTCBridgeApp:
         # Trigger AMI Originate to establish inbound IAX2 call
         try:
             aid = await self.ami.originate(
-                Channel=f"IAX2/webrtc-bridge/{self.config.asl_node}",
-                Context="webrtc",
-                Exten="s",
-                Priority=1,
-                CallerID=f"WebRTC <{self.config.asl_node}>",
+                channel=f"IAX2/webrtc-bridge/{self.config.asl_node}",
+                context="webrtc",
+                exten="s",
+                priority=1,
+                callerid=f"\"WebRTC\" <{self.config.asl_node}>",
             )
             logger.info("AMI Originate sent — ActionID=%s", aid)
-        except (RuntimeError, ConnectionError) as exc:
+        except (RuntimeError, ConnectionError, TypeError) as exc:
             logger.error("AMI Originate failed: %s", exc)
 
         # Send initial status
