@@ -47,29 +47,38 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 # -- Frame types (byte 10 of full header) --
+# NOTE: chan_iax2 uses DIFFERENT frame type values than RFC 5456 §8.2.
+# We must match chan_iax2's values (not the RFC) for interoperability.
+#   chan_iax2:  0x01=DTMF  0x02=VOICE  0x03=VIDEO  0x04=CONTROL  0x05=TEXT  0x06=IAX
+#   RFC 5456:   0x01=DTMF  0x02=res    0x03=CTRL  0x04=res      0x05=TEXT  0x06=IAX
 IAX_TYPE_DTMF = 0x01
 IAX_TYPE_VOICE = 0x02
 IAX_TYPE_CONTROL = 0x04
-IAX_TYPE_IAX = 0x05
+IAX_TYPE_IAX = 0x06   # IAX Control
 
-# -- IAX control subclasses (IAX_TYPE_IAX) --
-IAX_CMD_REGREQ = 0x01
-IAX_CMD_REGACK = 0x02
-IAX_CMD_REGREJ = 0x03
-IAX_CMD_REGREL = 0x04
-IAX_CMD_NEW = 0x06
-IAX_CMD_NEWACK = 0x07
-IAX_CMD_ACK = 0x0A
-IAX_CMD_PING = 0x0D
-IAX_CMD_PONG = 0x0E
-IAX_CMD_ACCEPT = 0x0E   # Same value as PONG — distinguished by call context
-IAX_CMD_LAGRQ = 0x20
-IAX_CMD_LAGRP = 0x21
-IAX_CMD_HANGUP = 0x16
+# -- IAX control subclasses (IAX_TYPE_IAX, RFC 5456 §8.4) --
+IAX_CMD_NEW = 0x01
+IAX_CMD_PING = 0x02
+IAX_CMD_PONG = 0x03
+IAX_CMD_ACK = 0x04
+IAX_CMD_HANGUP = 0x05
+IAX_CMD_REJECT = 0x06
+IAX_CMD_ACCEPT = 0x07
+IAX_CMD_AUTHREQ = 0x08
+IAX_CMD_AUTHREP = 0x09
+IAX_CMD_INVAL = 0x0A
+IAX_CMD_LAGRQ = 0x0B
+IAX_CMD_LAGRP = 0x0C
+IAX_CMD_REGREQ = 0x0D
+IAX_CMD_REGAUTH = 0x0E
+IAX_CMD_REGACK = 0x0F
+IAX_CMD_REGREJ = 0x10
+IAX_CMD_REGREL = 0x11
+IAX_CMD_TXACC = 0x12   # Transmit Accept — Asterisk accepted our ACCEPT
 
-# -- Control subclasses (IAX_TYPE_CONTROL) --
+# -- Control subclasses (IAX_TYPE_CONTROL, RFC 5456 §8.3) --
 CONTROL_RINGING = 0x03
-CONTROL_ANSWER = 0x0B
+CONTROL_ANSWER = 0x04
 
 # -- Information Element types --
 IE_USERNAME = 0x01
@@ -79,7 +88,8 @@ IE_CALLING_NUMBER = 0x0A
 IE_CALLING_NAME = 0x0B
 IE_DATAFORMAT = 0x1D
 IE_CODEC = 0x1E
-IE_CALLED_NUMBER = 0x1F
+IE_CALLED_NUMBER = 0x01  # RFC 5456 §8.7
+IE_FORMAT = 0x09         # RFC 5456 §8.7 — codec format bitmask
 IE_VERSION = 0x2B
 
 # -- Codec IDs --
@@ -534,8 +544,10 @@ class IAX2Session:
 
         # Per RFC 5456 §4.2:
         # Word 0: F(bit15) + source call number(bits14-0)
-        first_word = src & 0x7FFF
+        # F=1 for full frames (required by RFC 5456 §4)
+        first_word = 0x8000 | (src & 0x7FFF)
         # Word 1: R(bit15) + destination call number(bits14-0)
+        # R=0 because this is NOT a retransmission
         second_word = dest_callno & 0x7FFF
         # c_subclass: C (bit 7) + subclass (bits 6-0)
         cs = ((c & 1) << 7) | (subclass & 0x7F)
@@ -633,7 +645,7 @@ class IAX2Session:
             self._response_data = "REGREJ"
             self._response_event.set()
 
-        elif subclass == IAX_CMD_NEWACK:
+        elif subclass == IAX_CMD_ACCEPT:
             self._dest_callno = src_callno
             logger.debug("NEWACK received, dest_callno=%d", self._dest_callno)
             self._response_data = "NEWACK"
@@ -653,7 +665,7 @@ class IAX2Session:
             self._send_full_frame(
                 dest_callno=self._dest_callno,
                 frametype=IAX_TYPE_IAX,
-                subclass=IAX_CMD_NEWACK,
+                subclass=IAX_CMD_ACCEPT,
                 payload=ie_called,
             )
             # Invoke callback so server.py sends ACCEPT + ANSWER
@@ -736,12 +748,13 @@ class IAX2Call:
         # Internal
         self._transport = transport
         self._start_ts = start_ts
-        self.oseqno: int = 1
+        self.oseqno: int = 0
         self.iseqno: int = 0
 
         # -- Public callbacks (set by server.py) --
         self.on_voice: Optional[Callable[[bytes], Awaitable[None]]] = None
         self.on_hangup: Optional[Callable[[], Awaitable[None]]] = None
+        self.on_accepted: Optional[Callable[["IAX2Call"], Awaitable[None]]] = None
 
     # -- Frame sending helpers --
 
@@ -754,7 +767,8 @@ class IAX2Call:
     ) -> None:
         """Build and send a full IAX2 frame for this call."""
         ts = int((time.monotonic() - self._start_ts) * 1000) & 0xFFFFFFFF
-        first_word = self.callno & 0x7FFF
+        # F=1 for full frames (RFC 5456 §4)
+        first_word = 0x8000 | (self.callno & 0x7FFF)
         second_word = self.peer_callno & 0x7FFF
         cs = ((c & 1) << 7) | (subclass & 0x7F)
 
@@ -768,21 +782,58 @@ class IAX2Call:
             frametype & 0xFF,
             cs & 0xFF,
         )
+        log_frametype = {0x06: "IAX", 0x01: "DTMF", 0x03: "CTRL", 0x04: "VOICE"}.get(frametype & 0xFF, f"0x{frametype:02X}")
+        log_subclass = subclass & 0x7F
+        c_bit = (subclass >> 7) & 1
+        logger.debug("send_full: %s.%s (C=%d) src=%d dst=%d ts=%d oseq=%d iseq=%d hex=%s",
+                     log_frametype, log_subclass, c_bit,
+                     first_word & 0x7FFF, second_word & 0x7FFF,
+                     ts, self.oseqno & 0xFF, self.iseqno & 0xFF,
+                     (header + payload).hex())
         self._transport.sendto(header + payload, self.peer_addr)
         self.oseqno = (self.oseqno + 1) & 0xFF
 
-    def send_newack(self) -> None:
-        """Send NEWACK acknowledging an incoming NEW frame.
+    def _send_ack(self) -> None:
+        """Send a standalone ACK (C=1) without consuming an oseqno slot.
 
-        Includes IE_CALLED_NUMBER to echo back the called number.
+        Uses the current oseqno with C=1 so Asterisk does NOT advance its
+        rxseq — the ACK is purely an acknowledgment, not a sequenced frame.
+        The iseqno reflects frames already received (advanced by the caller
+        in _on_full_frame before dispatch).
         """
-        ie_called = _make_ie(IE_CALLED_NUMBER, self.called_num)
-        self._send_full_frame(IAX_TYPE_IAX, IAX_CMD_NEWACK, payload=ie_called)
-        logger.debug("NEWACK sent for callno=%d", self.callno)
+        ts = int((time.monotonic() - self._start_ts) * 1000) & 0xFFFFFFFF
+        first_word = 0x8000 | (self.callno & 0x7FFF)
+        second_word = self.peer_callno & 0x7FFF
+        cs = (1 << 7) | (IAX_CMD_ACK & 0x7F)  # C=1 | subclass=ACK
+        ack = struct.pack(
+            "!HHIBBBB",
+            first_word, second_word, ts,
+            self.oseqno & 0xFF,       # don't advance oseqno (C=1)
+            self.iseqno & 0xFF,       # already advanced by _on_full_frame
+            IAX_TYPE_IAX, cs,
+        )
+        self._transport.sendto(ack, self.peer_addr)
+
+    def send_newack(self) -> None:
+        """Send ACCEPT acknowledging an incoming NEW frame.
+
+        Delegates to send_accept which includes both IE_CALLED_NUMBER and
+        IE_FORMAT.  Kept as a separate method for API clarity but no longer
+        duplicates the payload logic.
+        """
+        self.send_accept()
 
     def send_accept(self) -> None:
-        """Send ACCEPT frame (IAX2 subclass 0x0E) — accept the incoming call."""
-        self._send_full_frame(IAX_TYPE_IAX, IAX_CMD_ACCEPT)
+        """Send ACCEPT frame (subclass 0x07 per RFC 5456) — accept the incoming call.
+
+        Includes IE_CALLED_NUMBER (echo) and IE_FORMAT (confirm ULAW).
+        Asterisk requires format confirmation or it ignores ACCEPT.
+        """
+        payload = (
+            _make_ie(IE_CALLED_NUMBER, self.called_num)
+            + _make_ie(IE_FORMAT, struct.pack("!I", CODEC_ULAW))
+        )
+        self._send_full_frame(IAX_TYPE_IAX, IAX_CMD_ACCEPT, payload=payload)
         logger.debug("ACCEPT sent for callno=%d", self.callno)
 
     def send_answer(self) -> None:
@@ -842,6 +893,9 @@ class IAX2Call:
         """Dispatch an incoming full frame to this call.
 
         Called by IAX2Server when a frame matches this call.
+        After dispatch, sends a standalone ACK (C=1) for non-IAX frames
+        that aren't themselves ACKs, so Asterisk knows we received them
+        and doesn't retransmit.
         """
         self.last_activity = time.monotonic()
 
@@ -849,15 +903,27 @@ class IAX2Call:
             # Update input sequence tracking
             pass  # caller already updated iseqno
 
+        maybe_ack = True  # set False for frames that handle their own response
+
         if frametype == IAX_TYPE_IAX:
+            maybe_ack = False  # _handle_iax handles its own ACK/response
             self._handle_iax(subclass, payload)
         elif frametype == IAX_TYPE_CONTROL:
             self._handle_control(subclass)
         elif frametype == IAX_TYPE_VOICE and c == 0 and payload and self.on_voice:
+            logger.debug("VOICE payload: %d bytes", len(payload))
             asyncio.ensure_future(self.on_voice(payload))
         elif frametype == IAX_TYPE_DTMF:
             logger.debug("DTMF received from peer: 0x%02X", subclass)
             # DTMF from Asterisk → forward to WS (future use)
+        else:
+            logger.debug("Unhandled frame type=0x%02X sub=0x%02X c=%d", frametype, subclass, c)
+
+        # Send standalone ACK for C=0 frames that advanced iseqno and weren't
+        # already responded to.  Without this, Asterisk retransmits and
+        # eventually drops the call.
+        if c == 0 and maybe_ack:
+            self._send_ack()
 
     def _handle_iax(self, subclass: int, payload: bytes) -> None:
         """Handle IAX control frames for this call."""
@@ -876,6 +942,15 @@ class IAX2Call:
             self._send_full_frame(IAX_TYPE_IAX, IAX_CMD_LAGRP)
         elif subclass == IAX_CMD_PONG:
             pass  # Ignore PONG — we didn't send PING
+        elif subclass == IAX_CMD_TXACC:
+            # TXACC means Asterisk acknowledged our ACCEPT — call is established.
+            # _send_ack() sends a C=1 ACK with the correct iseqno
+            # (self.iseqno was already advanced by _on_full_frame).
+            logger.info("TXACC received for callno=%d — call established", self.callno)
+            self._send_ack()
+            self.state = CALL_STATE_ACTIVE
+            if self.on_accepted:
+                asyncio.ensure_future(self.on_accepted(self))
         else:
             logger.debug("Unhandled IAX frame: subclass=0x%02X", subclass)
 
@@ -978,31 +1053,56 @@ class IAX2Server:
         type_field = struct.unpack("!H", data[:2])[0]
         f = (type_field >> 15) & 1
 
+        logger.debug("DG: %dB from %s:%d first=0x%04X f=%d", len(data), *addr, type_field, f)
+
         if f:
-            self._on_mini_frame(data, addr)
+            self._on_full_frame(data, addr)     # F=1 → Full frame (RFC 5456 §4)
         else:
-            self._on_full_frame(data, addr)
+            self._on_mini_frame(data, addr)      # F=0 → Mini frame
 
     def _on_mini_frame(self, data: bytes, addr: tuple[str, int]) -> None:
-        """Handle incoming mini voice frame."""
+        """Handle incoming mini (or misclassified full) voice frame."""
         if len(data) < 4:
             return
 
-        type_field, _ts_low = struct.unpack("!HH", data[:4])
+        type_field = struct.unpack("!H", data[:2])[0]
         dest_callno = type_field & 0x7FFF
-        voice_payload = data[4:]
 
-        call = self._find_call(dest_callno)
-        if call is None:
-            logger.debug("Mini frame for unknown callno=%d", dest_callno)
+        # V2 mini frame detection: first byte 0x00 + F=0 → extended format
+        # V2 header: [00 | SCallno(24bit) | Timestamp(32bit)]
+        if data[0] == 0 and len(data) >= 8:
+            sc = (data[1] << 16) | (data[2] << 8) | data[3]
+            ts_v2 = struct.unpack("!I", data[4:8])[0]
+            call = self._find_call_by_peer(sc)
+            voice_payload = data[8:]
+            if call is not None and voice_payload and call.on_voice:
+                call.last_activity = time.monotonic()
+                asyncio.ensure_future(call.on_voice(voice_payload))
+                return
+            if call is None:
+                logger.debug("V2 mini frame for unknown peer_callno=%d", sc)
+                # fall through to full-frame parse attempt below
+        else:
+            # Classic 4-byte mini frame: [DCallno | Timestamp16]
+            _ts_low = struct.unpack("!H", data[2:4])[0]
+            call = self._find_call(dest_callno)
+            if call is not None:
+                call.last_activity = time.monotonic()
+                voice_payload = data[4:]
+                if voice_payload and call.on_voice:
+                    asyncio.ensure_future(call.on_voice(voice_payload))
+                return
+
+        # Fallback: if call not found and data looks like a full frame
+        if len(data) >= 12:
+            logger.debug(
+                "Mini frame has no call for callno=%d — trying full-frame parse",
+                dest_callno,
+            )
+            self._on_full_frame(data, addr)
             return
 
-        call.last_activity = time.monotonic()
-        if voice_payload and call.on_voice:
-            asyncio.ensure_future(call.on_voice(voice_payload))
-
-        # Mini frames are fire-and-forget — no ACK sent.
-        # Full-frame ACKs would confuse Asterisk's seqno tracking.
+        logger.debug("Mini frame for unknown callno=%d", dest_callno)
 
     def _on_full_frame(self, data: bytes, addr: tuple[str, int]) -> None:
         """Parse and dispatch a full frame."""
@@ -1026,11 +1126,25 @@ class IAX2Server:
 
         # --- Keepalive at transport level (no call context needed) ---
         if frametype == IAX_TYPE_IAX:
+            logger.debug("IAX frame from %s:%d sub=0x%02X c=%d src=%d dst=%d ts=%d",
+                         *addr, subclass, c, src_callno, dest_callno, ts)
             if subclass == IAX_CMD_PING:
-                self._send_pong(dest_callno=src_callno, src_callno=0, addr=addr)
+                logger.debug("PING from %s:%d — echoing ts=%d", *addr, ts)
+                self._send_pong(dest_callno=first_word, src_callno=0, ts=ts, addr=addr)
+                logger.debug("PONG sent to %s:%d", *addr)
                 return
             if subclass == IAX_CMD_LAGRQ:
-                self._send_lagrp(dest_callno=src_callno, src_callno=0, addr=addr)
+                self._send_lagrp(dest_callno=first_word, src_callno=0, ts=ts, addr=addr)
+                return
+            # POKE (0x1E) — Asterisk qualify/keepalive for out-of-call peers
+            if subclass == 0x1E:
+                logger.debug("POKE from %s:%d — echoing ts=%d  hex=%s",
+                             *addr, ts, data[:16].hex())
+                # dest_callno = first_word (raw, no masking) so Asterisk can
+                # find the call with its full 16-bit callno even when F=1
+                # (callno overflow workaround).
+                self._send_pong(dest_callno=first_word, src_callno=0, ts=ts, addr=addr)
+                logger.debug("PONG sent to %s:%d (POKE reply)", *addr)
                 return
 
         # --- Dispatch to active call ---
@@ -1061,6 +1175,7 @@ class IAX2Server:
         (in ``on_new_call``) to complete setup.
         """
         payload = data[12:]
+        logger.debug("NEW frame payload hex=%s len=%d", payload.hex(), len(payload))
 
         # Parse IEs to extract called number
         called_num = ""
@@ -1129,26 +1244,48 @@ class IAX2Server:
                 return call
         return None
 
+    def _find_call_by_peer(self, peer_callno: int) -> IAX2Call | None:
+        """Find a call by the peer's call number (Asterisk-side)."""
+        for call in self._calls.values():
+            if call.peer_callno == peer_callno:
+                return call
+        return None
+
     def _send_pong(self, dest_callno: int, src_callno: int,
-                   addr: tuple[str, int]) -> None:
-        """Send PONG to keepalive PING (transport level)."""
-        ts = int((time.monotonic() - self._start_ts) * 1000) & 0xFFFFFFFF
-        first_word = src_callno & 0x7FFF
+                   ts: int, addr: tuple[str, int]) -> None:
+        """Send PONG echoing the PING's timestamp for RTT measurement."""
+        # Per RFC 5456 §8.3, PONG MUST echo the received timestamp so
+        # Asterisk can calculate round-trip time.  Generating a fresh
+        # timestamp causes bogus RTT → Asterisk marks peer UNREACHABLE.
+        # first_word MUST have F=1 (bit 15) for full frames — Asterisk
+        # discards frames with F=0 as mini frames (RFC 5456 §4).
+        first_word = 0x8000 | (src_callno & 0x7FFF)
+        # second_word: R=0 (not a retransmission) + dest call number.
+        # src_callno may have F=1 from Asterisk — mask to 15 bits.
         second_word = dest_callno & 0x7FFF
         cs = IAX_CMD_PONG & 0x7F
 
-        header = struct.pack(
-            "!HHIBBBB",
-            first_word, second_word, ts, 0, 0,
-            IAX_TYPE_IAX, cs,
-        )
-        self._transport.sendto(header, addr)
+        try:
+            header = struct.pack(
+                "!HHIBBBB",
+                first_word, second_word, ts, 0, 0,
+                IAX_TYPE_IAX, cs,
+            )
+            if self._transport is None:
+                logger.error("_send_pong FAIL: _transport is None")
+                return
+            logger.debug("_send_pong: sending to %s:%d (first=0x%04X second=0x%04X ts=%d hex=%s)",
+                         *addr, first_word, second_word, ts, header.hex())
+            self._transport.sendto(header, addr)
+        except Exception as exc:
+            logger.error("_send_pong FAIL: %s", exc)
 
     def _send_lagrp(self, dest_callno: int, src_callno: int,
-                    addr: tuple[str, int]) -> None:
-        """Send LAGRP in response to LAGRQ."""
-        ts = int((time.monotonic() - self._start_ts) * 1000) & 0xFFFFFFFF
-        first_word = src_callno & 0x7FFF
+                    ts: int, addr: tuple[str, int]) -> None:
+        """Send LAGRP echoing the LAGRQ's timestamp for RTT measurement."""
+        # Same RTT echo rule as PONG: the response timestamp MUST match
+        # the received timestamp so Asterisk can compute latency.
+        first_word = 0x8000 | (src_callno & 0x7FFF)
         second_word = dest_callno & 0x7FFF
         cs = IAX_CMD_LAGRP & 0x7F
 

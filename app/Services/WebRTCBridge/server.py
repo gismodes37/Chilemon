@@ -189,19 +189,30 @@ class WebRTCBridgeApp:
         # Wire call-level callbacks
         call.on_voice = self._on_iax_audio
         call.on_hangup = self._on_iax_hangup
+        call.on_accepted = self._on_iax_accepted
 
-        # Complete call setup: ACCEPT then ANSWER
-        call.send_accept()
-        await asyncio.sleep(0.05)
+        # send_newack() is already called by IAX2Server._on_new with
+        # IE_CALLED_NUMBER + IE_FORMAT.  Now send ANSWER so the call
+        # transitions to active on Asterisk's side.
         call.send_answer()
 
+        await self._broadcast_status()
+
+    async def _on_iax_accepted(self, call: IAX2Call) -> None:
+        """Called when TXACC is received — call established."""
+        logger.info(
+            "Call accepted by Asterisk — callno=%d state=ACTIVE",
+            call.callno,
+        )
         await self._broadcast_status()
 
     # -- IAX2 Audio Callback --
 
     async def _on_iax_audio(self, ulaw_payload: bytes) -> None:
         """Forward received ulaw audio from Asterisk to all WS peers."""
-        if not self._ws_peers:
+        peers = len(self._ws_peers)
+        if not peers:
+            logger.debug("Audio dropped: no WS peers")
             return
 
         try:
@@ -212,10 +223,15 @@ class WebRTCBridgeApp:
                 "data": pcm_f32.hex(),
                 "rate": 16000,
             })
+            logger.debug("Broadcasting audio to %d WS peer(s): %d bytes → %d floats",
+                         peers, len(ulaw_payload), len(pcm_f32))
             for ws in list(self._ws_peers):
                 try:
                     await ws.send_str(msg)
                 except ConnectionResetError:
+                    self._ws_peers.discard(ws)
+                except Exception as exc:
+                    logger.warning("WS send error: %s", exc)
                     self._ws_peers.discard(ws)
         except Exception as exc:
             logger.exception("Audio RX callback error: %s", exc)

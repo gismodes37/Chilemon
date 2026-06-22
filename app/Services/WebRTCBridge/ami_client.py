@@ -390,6 +390,8 @@ class AMIClient:
             return
 
         logger.debug("AMI event: %s", event_type)
+        if event_type in ("OriginateResponse", "VarSet"):
+            logger.debug("AMI %s — %s", event_type, " | ".join(f"{k}={v}" for k, v in params.items()))
         callbacks = self._event_callbacks.get(event_type, [])
         for cb in callbacks:
             try:
