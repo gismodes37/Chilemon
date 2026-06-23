@@ -119,67 +119,39 @@ def float32_to_s16(float32_data: bytes) -> bytes:
 
 
 # ---------------------------------------------------------------------------
-# Resampling 16 kHz ↔ 8 kHz (linear interpolation)
+# Resampling 16 kHz ↔ 8 kHz (via audioop.ratecv)
 # ---------------------------------------------------------------------------
+
+# Separate ratecv state for each direction (shared state corrupts both)
+_RATECV_16K_TO_8K: tuple[bytes, int] | None = None
+_RATECV_8K_TO_16K: tuple[bytes, int] | None = None
+
 
 def resample_16k_to_8k(pcm_16k: bytes) -> bytes:
     """Downsample PCM s16le from 16 kHz to 8 kHz.
 
-    Uses simple linear interpolation (every other sample).
-    For production, consider scipy.signal.resample if artifacts appear.
-
-    Parameters
-    ----------
-    pcm_16k : bytes
-        PCM s16le audio at 16 kHz.
-
-    Returns
-    -------
-    bytes
-        PCM s16le audio at 8 kHz (half the length).
+    Uses ``audioop.ratecv`` with persistent state for artifact-free
+    frame-boundary transitions.  Each direction has its own state.
     """
-    samples = len(pcm_16k) // 2
-    fmt = f"<{samples}h"
-    data = struct.unpack(fmt, pcm_16k)
-
-    # Take every other sample (simple decimation)
-    decimated = data[0::2]
-
-    return struct.pack(f"<{len(decimated)}h", *decimated)
+    global _RATECV_16K_TO_8K
+    result, _RATECV_16K_TO_8K = audioop.ratecv(
+        pcm_16k, 2, 1, 16000, 8000, _RATECV_16K_TO_8K
+    )
+    return result
 
 
 def resample_8k_to_16k(pcm_8k: bytes) -> bytes:
     """Upsample PCM s16le from 8 kHz to 16 kHz.
 
-    Uses linear interpolation between adjacent samples.
-
-    Parameters
-    ----------
-    pcm_8k : bytes
-        PCM s16le audio at 8 kHz.
-
-    Returns
-    -------
-    bytes
-        PCM s16le audio at 16 kHz (twice the length).
+    Uses ``audioop.ratecv`` with persistent state for artifact-free
+    frame-boundary transitions.  Always produces exactly 2x the
+    input sample count.
     """
-    samples = len(pcm_8k) // 2
-    fmt = f"<{samples}h"
-    data = struct.unpack(fmt, pcm_8k)
-
-    result = []
-    for i in range(samples - 1):
-        a = data[i]
-        b = data[i + 1]
-        result.append(a)
-        # Linear interpolate midpoint
-        result.append((a + b) // 2)
-
-    # Handle last sample (duplicate)
-    if samples > 0:
-        result.append(data[-1])
-
-    return struct.pack(f"<{len(result)}h", *result)
+    global _RATECV_8K_TO_16K
+    result, _RATECV_8K_TO_16K = audioop.ratecv(
+        pcm_8k, 2, 1, 8000, 16000, _RATECV_8K_TO_16K
+    )
+    return result
 
 
 # ---------------------------------------------------------------------------
