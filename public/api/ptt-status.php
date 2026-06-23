@@ -16,7 +16,7 @@ declare(strict_types=1);
  * -----------------------------------------------
  */
 
-require_once __DIR__ . '/../../../config/app.php';
+require_once __DIR__ . '/../../config/app.php';
 require_once ROOT_PATH . '/app/autoload.php';
 
 use App\Auth\Auth;
