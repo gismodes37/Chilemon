@@ -18,6 +18,12 @@ $jsVer  = file_exists($jsPath) ? (string)filemtime($jsPath) : (string)APP_VERSIO
 <script src="<?= rtrim(BASE_URL, '/') ?>/assets/js/dashboard.js?v=<?= time() ?>"></script>
 
 <?php
+$vizJsPath = dirname(__DIR__, 2) . '/assets/js/audio-visualizer.js';
+$vizJsVer  = file_exists($vizJsPath) ? (string)filemtime($vizJsPath) : (string)APP_VERSION;
+?>
+<script src="<?= rtrim(BASE_URL, '/') ?>/assets/js/audio-visualizer.js?v=<?= $vizJsVer ?>"></script>
+
+<?php
 $pttJsPath = dirname(__DIR__, 2) . '/assets/js/ptt-widget.js';
 $pttJsVer  = file_exists($pttJsPath) ? (string)filemtime($pttJsPath) : (string)APP_VERSION;
 ?>

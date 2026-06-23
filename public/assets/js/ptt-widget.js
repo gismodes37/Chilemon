@@ -60,6 +60,16 @@ class PTTWidget {
         this._onKeyUp = this._onKeyUp.bind(this);
         this._onMouseUp = this._onMouseUp.bind(this);
         this._onBeforeUnload = this._onBeforeUnload.bind(this);
+
+        // TX (mic capture) state
+        /** @type {MediaStream|null} */
+        this._micStream = null;
+        /** @type {MediaStreamAudioSourceNode|null} */
+        this._micSource = null;
+        /** @type {ScriptProcessorNode|null} */
+        this._micProcessor = null;
+        /** @type {AudioContext|null} */
+        this._txCtx = null;
     }
 
     // ---------------------------------------------------------------
@@ -71,7 +81,15 @@ class PTTWidget {
         this._createDOM();
         this._bindGlobalEvents();
         this._startStatusPolling();
+        this._initVisualizer();
         this._fetchToken();
+    }
+
+    /** Wire up the spectrum visualizer if the canvas exists. */
+    _initVisualizer() {
+        if (typeof AudioVisualizer !== 'undefined' && document.getElementById('audio-canvas')) {
+            this._visualizer = new AudioVisualizer('audio-canvas');
+        }
     }
 
     /** Tear down: close WS, stop timers, unbind events. */
@@ -80,6 +98,11 @@ class PTTWidget {
         this._stopStatusPolling();
         this._closeWebSocket();
         this._unbindGlobalEvents();
+        this.stopCapture();
+        if (this._visualizer) {
+            this._visualizer.destroy();
+            this._visualizer = null;
+        }
         if (this.audioCtx) {
             this.audioCtx.close().catch(() => {});
             this.audioCtx = null;
@@ -306,6 +329,11 @@ class PTTWidget {
         // Update volume
         this._pushVolume(rms);
 
+        // Feed to visualizer
+        if (this._visualizer) {
+            this._visualizer.feedPCM(floats);
+        }
+
         // Play via Web Audio API
         this._playAudioBuffer(floats, sampleRate);
     }
@@ -322,6 +350,12 @@ class PTTWidget {
         rms = Math.sqrt(rms / floats.length);
 
         this._pushVolume(rms);
+
+        // Feed to visualizer
+        if (this._visualizer) {
+            this._visualizer.feedPCM(floats);
+        }
+
         this._playAudioBuffer(floats, 16000);
     }
 
@@ -343,6 +377,105 @@ class PTTWidget {
             src.connect(this.audioCtx.destination);
             src.start(0);
         } catch (_) { /* audio not available */ }
+    }
+
+    // ---------------------------------------------------------------
+    //  TX — Microphone capture & send
+    // ---------------------------------------------------------------
+
+    /**
+     * Start capturing microphone audio and sending it over WebSocket.
+     * Called automatically from keyPtt().
+     * Uses a dedicated AudioContext at 16 kHz (separate from RX) so TX
+     * sample rate is always correct regardless of when RX started.
+     */
+    startCapture() {
+        if (this._micStream) return; // already capturing
+
+        // Dedicated TX AudioContext — try 16 kHz, fallback to default
+        try {
+            this._txCtx = new (window.AudioContext || window.webkitAudioContext)({
+                sampleRate: 16000,
+            });
+        } catch (_) {
+            this._txCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (this._txCtx.state === 'suspended') {
+            this._txCtx.resume().catch(() => {});
+        }
+
+        navigator.mediaDevices.getUserMedia({ audio: true })
+            .then((stream) => {
+                this._micStream = stream;
+                this._micSource = this._txCtx.createMediaStreamSource(stream);
+                this._micProcessor = this._txCtx.createScriptProcessor(1024, 1, 1);
+
+                this._micProcessor.onaudioprocess = (e) => {
+                    if (!this.pttActive) return;
+                    const input = e.inputBuffer.getChannelData(0);
+                    this._sendAudioChunk(input);
+                };
+
+                this._micSource.connect(this._micProcessor);
+            })
+            .catch((err) => {
+                console.warn('PTT: Mic access denied —', err.message);
+                this._setStatus('error', 'Mic access denied');
+                // Undo PTT key so the bridge isn't left hanging
+                this.unkeyPtt();
+            });
+    }
+
+    /** Stop mic capture and release the MediaStream + TX AudioContext. */
+    stopCapture() {
+        if (this._micProcessor) {
+            try { this._micProcessor.disconnect(); } catch (_) { /* ignore */ }
+            this._micProcessor = null;
+        }
+        this._micSource = null;
+
+        if (this._micStream) {
+            this._micStream.getTracks().forEach((t) => t.stop());
+            this._micStream = null;
+        }
+
+        if (this._txCtx) {
+            this._txCtx.close().catch(() => {});
+            this._txCtx = null;
+        }
+    }
+
+    /**
+     * Convert a Float32Array of audio samples to a hex string.
+     * Each float32 → 4 bytes (little-endian) → 8 hex chars.
+     * Matches what server.py:audio_tx expects.
+     */
+    _samplesToHex(samples) {
+        // Copy to a contiguous buffer (samples may be a view into a larger buffer)
+        const copy = new Float32Array(samples);
+        const bytes = new Uint8Array(copy.buffer);
+        let hex = '';
+        for (let i = 0; i < bytes.length; i++) {
+            const b = bytes[i];
+            hex += b < 16 ? '0' + b.toString(16) : b.toString(16);
+        }
+        return hex;
+    }
+
+    /** Send an audio chunk over the WebSocket as audio_tx. */
+    _sendAudioChunk(samples) {
+        // Feed to visualizer (TX audio)
+        if (this._visualizer) {
+            this._visualizer.feedPCM(samples);
+        }
+
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+        try {
+            const hex = this._samplesToHex(samples);
+            this.ws.send(JSON.stringify({ type: 'audio_tx', data: hex }));
+        } catch (_) {
+            // Silently drop on send error (connection may be closing)
+        }
     }
 
     /** Push an RMS volume sample and update the volume bar. */
@@ -389,16 +522,20 @@ class PTTWidget {
 
         this.ws.send(JSON.stringify({ type: 'ptt', action: 'key' }));
         this.pttActive = true;
+        if (this._visualizer) this._visualizer.setTransmitting(true);
         this._setStatus('transmitting', 'TRANSMITTING');
         this._updateUI();
+        this.startCapture();
     }
 
     unkeyPtt() {
         if (!this.pttActive) return;
+        this.stopCapture();
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
             this.ws.send(JSON.stringify({ type: 'ptt', action: 'unkey' }));
         }
         this.pttActive = false;
+        if (this._visualizer) this._visualizer.setTransmitting(false);
         this._setStatus('connected', 'Bridge Connected');
         this._updateUI();
     }

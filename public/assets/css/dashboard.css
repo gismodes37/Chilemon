@@ -852,3 +852,54 @@ html, body{
         font-size: 0.65rem;
     }
 }
+
+/* =========================================
+   ChileMon — Audio Spectrum Visualizer
+   ========================================= */
+
+.audio-visualizer-card {
+    background: #0a0a0a !important;
+    border: 1px solid #222 !important;
+    border-radius: 12px;
+    overflow: hidden;
+    height: 110px;
+    box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.audio-visualizer-card .card-body {
+    height: 100%;
+    padding: 0 !important;
+}
+
+.audio-visualizer-canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    cursor: default;
+}
+
+/* Subtle green glow border when there's activity (added via JS) */
+.audio-visualizer-card.active {
+    border-color: rgba(40, 167, 69, 0.3) !important;
+    box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.5),
+                0 0 20px rgba(40, 167, 69, 0.15),
+                0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.audio-visualizer-card.transmitting {
+    border-color: rgba(255, 193, 7, 0.3) !important;
+    box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.5),
+                0 0 20px rgba(255, 193, 7, 0.15),
+                0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* =========================================
+   Visualizer — Responsive
+   ========================================= */
+
+@media (max-width: 576px) {
+    .audio-visualizer-card {
+        height: 80px;
+        border-radius: 8px;
+    }
+}
