@@ -629,11 +629,15 @@ class IAX2Session:
         elif frametype == IAX_TYPE_CONTROL:
             self._on_control(subclass, src_callno)
         elif frametype == IAX_TYPE_VOICE:
-            # Incoming voice full-frame (not mini) — rare from phone context
+            # Incoming voice full-frame (not mini) — voice audio from Asterisk
             if c == 1:
-                pass  # ACK-only, no payload
+                pass  # Retransmission or ACK-only, no payload
             elif payload and self.on_audio_frame:
                 asyncio.ensure_future(self.on_audio_frame(payload))
+            # ACK every voice full frame so Asterisk keeps sending audio.
+            # Without this, Asterisk retransmits a few times then hangs up.
+            # Mirrors the ACK pattern in _on_mini_frame (line 601).
+            self._send_ack(dest_callno=src_callno, src_callno=self._callno)
 
     def _on_iax_control(self, subclass: int, src_callno: int, payload: bytes) -> None:
         """Handle IAX control frames (registration, call setup)."""
@@ -794,25 +798,32 @@ class IAX2Call:
         self.oseqno = (self.oseqno + 1) & 0xFF
 
     def _send_ack(self) -> None:
-        """Send a standalone ACK (C=1) without consuming an oseqno slot.
+        """Send a standalone ACK frame (C=0, subclass=ACK).
 
-        Uses the current oseqno with C=1 so Asterisk does NOT advance its
-        rxseq — the ACK is purely an acknowledgment, not a sequenced frame.
-        The iseqno reflects frames already received (advanced by the caller
-        in _on_full_frame before dispatch).
+        Uses C=0 because Asterisk's chan_iax2 marks C=1 IAX frames as
+        ``Subclass: Unknown`` and immediately hangs up.  With C=0 the
+        ACK consumes an oseqno slot, matching how Asterisk itself sends
+        ACKs internally.
         """
         ts = int((time.monotonic() - self._start_ts) * 1000) & 0xFFFFFFFF
         first_word = 0x8000 | (self.callno & 0x7FFF)
         second_word = self.peer_callno & 0x7FFF
-        cs = (1 << 7) | (IAX_CMD_ACK & 0x7F)  # C=1 | subclass=ACK
+        cs = IAX_CMD_ACK & 0x7F  # C=0 | subclass=ACK
+        oseq = self.oseqno & 0xFF          # capture before advancing
         ack = struct.pack(
             "!HHIBBBB",
             first_word, second_word, ts,
-            self.oseqno & 0xFF,       # don't advance oseqno (C=1)
-            self.iseqno & 0xFF,       # already advanced by _on_full_frame
+            oseq,                           # current oseq (C=0, will advance)
+            self.iseqno & 0xFF,             # already advanced by _on_full_frame
             IAX_TYPE_IAX, cs,
         )
+        self.oseqno = (self.oseqno + 1) & 0xFF
+        logger.debug("ACK sent to %s:%d callno=%d peer_callno=%d oseq=%d iseq=%d",
+                     self.peer_addr[0], self.peer_addr[1],
+                     self.callno, self.peer_callno,
+                     oseq, self.iseqno & 0xFF)
         self._transport.sendto(ack, self.peer_addr)
+
 
     def send_newack(self) -> None:
         """Send ACCEPT acknowledging an incoming NEW frame.
@@ -1084,8 +1095,12 @@ class IAX2Server:
                 # fall through to full-frame parse attempt below
         else:
             # Classic 4-byte mini frame: [DCallno | Timestamp16]
+            # NOTE: AllStar Asterisk places its OWN callno in the DCallno
+            # field (not the bridge's), so we must search by peer_callno too.
             _ts_low = struct.unpack("!H", data[2:4])[0]
             call = self._find_call(dest_callno)
+            if call is None:
+                call = self._find_call_by_peer(dest_callno)
             if call is not None:
                 call.last_activity = time.monotonic()
                 voice_payload = data[4:]
@@ -1157,12 +1172,18 @@ class IAX2Server:
             return
 
         call.last_activity = time.monotonic()
-        # Update inbound seqno: only advance if the received oseqno matches our
-        # expected iseqno. Non-matching seqnos indicate retransmit or OOO — skip
-        # the update but still dispatch (Asterisk expects duplicate handling for
-        # DTMF/control frames).
+
+        # Sequence number tracking
+        seq_advanced = False
         if oseqno == call.iseqno:
             call.iseqno = (call.iseqno + 1) & 0xFF
+            seq_advanced = True
+        logger.debug(
+            "RX frame: type=0x%02X sub=0x%02X c=%d oseq=%d iseq=%d "
+            "src=%d dst=%d seq_advanced=%s",
+            frametype, subclass, c, oseqno, call.iseqno - 1 if seq_advanced else call.iseqno,
+            src_callno, dest_callno, seq_advanced,
+        )
         call.handle_frame(frametype, subclass, c, payload)
 
     def _on_new(self, data: bytes, addr: tuple[str, int],

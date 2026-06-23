@@ -311,17 +311,21 @@ class WebRTCBridgeApp:
         self._ws_peers.add(ws)
         logger.info("WS client connected (%d peers)", len(self._ws_peers))
 
+        # Determine extension to call (overridable via query param)
+        exten = request.query.get("exten", self.config.asl_node)
+        context = request.query.get("context", "webrtc")
+
         # Trigger AMI Originate to establish inbound IAX2 call
         # Asterisk sends an IAX2 NEW frame to our bridge listener
         try:
             aid = await self.ami.originate(
                 channel=f"IAX2/webrtc-bridge/{self.config.asl_node}",
-                context="webrtc",
-                exten=self.config.asl_node,
+                context=context,
+                exten=exten,
                 priority=1,
                 callerid=f"\"WebRTC\" <{self.config.asl_node}>",
             )
-            logger.info("AMI Originate sent — ActionID=%s", aid)
+            logger.info("AMI Originate sent — exten=%s ActionID=%s", exten, aid)
         except (RuntimeError, ConnectionError, TypeError) as exc:
             logger.error("AMI Originate failed: %s", exc)
 
