@@ -119,44 +119,55 @@ def float32_to_s16(float32_data: bytes) -> bytes:
 
 
 # ---------------------------------------------------------------------------
-# Resampling 16 kHz ↔ 8 kHz (via audioop.ratecv)
+# Resampling 16 kHz ↔ 8 kHz (linear interpolation)
 # ---------------------------------------------------------------------------
 
-# Separate ratecv state for each direction (shared state corrupts both)
-_RATECV_16K_TO_8K: tuple[bytes, int] | None = None
-_RATECV_8K_TO_16K: tuple[bytes, int] | None = None
-
-
-def _ratecv_state(state: tuple[bytes, int] | None) -> tuple[bytes, int]:
-    """Initialize audioop.ratecv state if None."""
-    return (b"", 0) if state is None else state
+# RX volume boost applied before sending to WebSocket peers.
+# 1.5 = 50% louder.  Adjust if clipping occurs.
+RX_VOLUME: float = 1.5
 
 
 def resample_16k_to_8k(pcm_16k: bytes) -> bytes:
-    """Downsample PCM s16le from 16 kHz to 8 kHz.
+    """Downsample PCM s16le from 16 kHz to 8 kHz via decimation.
 
-    Uses ``audioop.ratecv`` with persistent state for artifact-free
-    frame-boundary transitions.  Each direction has its own state.
+    Takes every other sample — simple, deterministic, artifact-free.
+    For 16→8 kHz this is safe because the input has already been
+    bandlimited to 4 kHz by the ulaw codec.
     """
-    global _RATECV_16K_TO_8K
-    result, _RATECV_16K_TO_8K = audioop.ratecv(
-        pcm_16k, 2, 1, 16000, 8000, _ratecv_state(_RATECV_16K_TO_8K)
-    )
-    return result
+    samples = len(pcm_16k) // 2
+    data = struct.unpack(f"<{samples}h", pcm_16k)
+    decimated = data[0::2]
+    return struct.pack(f"<{len(decimated)}h", *decimated)
 
 
 def resample_8k_to_16k(pcm_8k: bytes) -> bytes:
-    """Upsample PCM s16le from 8 kHz to 16 kHz.
+    """Upsample PCM s16le from 8 kHz to 16 kHz via linear interpolation.
 
-    Uses ``audioop.ratecv`` with persistent state for artifact-free
-    frame-boundary transitions.  Always produces exactly 2x the
-    input sample count.
+    Produces exactly 2x the input sample count.  Each pair of original
+    samples generates two output samples: the first original and the
+    interpolated midpoint.
+
+    Uses ``int(x / 2)`` instead of ``x // 2`` because floor division
+    rounds toward -inf for negatives, introducing DC offset distortion.
+    ``int()`` truncates toward zero, which is correct for audio midpoints.
     """
-    global _RATECV_8K_TO_16K
-    result, _RATECV_8K_TO_16K = audioop.ratecv(
-        pcm_8k, 2, 1, 8000, 16000, _ratecv_state(_RATECV_8K_TO_16K)
-    )
-    return result
+    samples = len(pcm_8k) // 2
+    data = struct.unpack(f"<{samples}h", pcm_8k)
+
+    result: list[int] = []
+    for i in range(samples - 1):
+        a = data[i]
+        b = data[i + 1]
+        result.append(a)
+        # Linear interpolate midpoint — int() truncates toward zero,
+        # which is the correct rounding for signed audio interpolation.
+        result.append(int((a + b) / 2))
+
+    # Duplicate last sample
+    if samples > 0:
+        result.append(data[-1])
+
+    return struct.pack(f"<{len(result)}h", *result)
 
 
 # ---------------------------------------------------------------------------
@@ -182,7 +193,7 @@ def tx_process(pcm_16k_f32: bytes) -> bytes:
 
 
 def rx_process(ulaw_data: bytes) -> bytes:
-    """Full receive pipeline: ulaw 8 kHz → float32 16 kHz.
+    """Full receive pipeline: ulaw 8 kHz → float32 16 kHz + volume boost.
 
     Parameters
     ----------
@@ -192,8 +203,18 @@ def rx_process(ulaw_data: bytes) -> bytes:
     Returns
     -------
     bytes
-        Float32 PCM audio at 16 kHz, ready for aiortc OPUS encode.
+        Float32 PCM audio at 16 kHz, gain-adjusted, ready for aiortc
+        OPUS encode or direct WebSocket relay.
     """
     s16_8k = ulaw_to_pcm(ulaw_data)
     s16_16k = resample_8k_to_16k(s16_8k)
-    return s16_to_float32(s16_16k)
+    f32 = s16_to_float32(s16_16k)
+
+    # Apply volume gain (clamped to [-1.0, 1.0] to prevent clipping)
+    if RX_VOLUME != 1.0:
+        samples = len(f32) // 4
+        floats = struct.unpack(f"<{samples}f", f32)
+        boosted = [max(-1.0, min(1.0, s * RX_VOLUME)) for s in floats]
+        return struct.pack(f"<{samples}f", *boosted)
+
+    return f32
