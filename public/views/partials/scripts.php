@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 <script>
   window.CHILEMON_BASE = "<?= rtrim(BASE_URL, '/') ?>/";
+  window.CHILEMON_PATH = "<?= rtrim(BASE_PATH, '/') ?>/";
 </script>
 
 <?php

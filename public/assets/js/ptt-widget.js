@@ -119,7 +119,8 @@ class PTTWidget {
     /** Fetch WS token from PHP API then open WebSocket. */
     async _fetchToken() {
         try {
-            const resp = await fetch('/api/ptt-ws-token.php');
+            const apiBase = window.CHILEMON_PATH || '/';
+            const resp = await fetch(apiBase + 'api/ptt-ws-token.php');
             if (!resp.ok) {
                 this._setStatus('error', 'Auth failed');
                 return;
@@ -141,7 +142,16 @@ class PTTWidget {
         this._closeWebSocket();
 
         const host = window.location.hostname;
-        const url = `ws://${host}:${this.wsPort}/ws?token=${encodeURIComponent(this.token)}`;
+
+        let url;
+        if (window.location.protocol === 'https:') {
+            // Via Apache proxy: wss://host/chilemon/ws → ws://127.0.0.1:9091/ws
+            const wsPath = window.CHILEMON_PATH || '/';
+            url = `wss://${host}${wsPath}ws?token=${encodeURIComponent(this.token)}`;
+        } else {
+            // Direct (dev): ws://host:9091/ws
+            url = `ws://${host}:${this.wsPort}/ws?token=${encodeURIComponent(this.token)}`;
+        }
 
         this.ws = new WebSocket(url);
         this.ws.binaryType = 'arraybuffer';
@@ -229,7 +239,8 @@ class PTTWidget {
 
     async _pollStatus() {
         try {
-            const resp = await fetch('/api/ptt-status.php');
+            const apiBase = window.CHILEMON_PATH || '/';
+            const resp = await fetch(apiBase + 'api/ptt-status.php');
             if (!resp.ok) {
                 this._setStatus('error', 'Bridge unreachable');
                 return;
