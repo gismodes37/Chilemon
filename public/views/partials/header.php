@@ -59,7 +59,7 @@ $headerStyle = $headerImgUrl
         <p class="mb-1 opacity-40">
           <i class="bi bi-wifi"></i> Dashboard para nodos
           <span class="badge text-dark" style="background-color:#66A01B;">AllStar Link</span>
-          de Chile parea el mundo.
+          de Chile para el mundo.
         </p> 
 
         <?php if ($headerTaglineEsc !== ''): ?>
