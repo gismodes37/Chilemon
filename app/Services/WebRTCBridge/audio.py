@@ -127,6 +127,11 @@ _RATECV_16K_TO_8K: tuple[bytes, int] | None = None
 _RATECV_8K_TO_16K: tuple[bytes, int] | None = None
 
 
+def _ratecv_state(state: tuple[bytes, int] | None) -> tuple[bytes, int]:
+    """Initialize audioop.ratecv state if None."""
+    return (b"", 0) if state is None else state
+
+
 def resample_16k_to_8k(pcm_16k: bytes) -> bytes:
     """Downsample PCM s16le from 16 kHz to 8 kHz.
 
@@ -135,7 +140,7 @@ def resample_16k_to_8k(pcm_16k: bytes) -> bytes:
     """
     global _RATECV_16K_TO_8K
     result, _RATECV_16K_TO_8K = audioop.ratecv(
-        pcm_16k, 2, 1, 16000, 8000, _RATECV_16K_TO_8K
+        pcm_16k, 2, 1, 16000, 8000, _ratecv_state(_RATECV_16K_TO_8K)
     )
     return result
 
@@ -149,7 +154,7 @@ def resample_8k_to_16k(pcm_8k: bytes) -> bytes:
     """
     global _RATECV_8K_TO_16K
     result, _RATECV_8K_TO_16K = audioop.ratecv(
-        pcm_8k, 2, 1, 8000, 16000, _RATECV_8K_TO_16K
+        pcm_8k, 2, 1, 8000, 16000, _ratecv_state(_RATECV_8K_TO_16K)
     )
     return result
 
