@@ -42,8 +42,9 @@ class PTTWidget {
         /** @type {AudioContext|null} */
         this.audioCtx = null;
 
-        // Audio scheduling: next play time for gapless playback
-        this._nextAudioTime = 0;
+        // Previous audio source (stopped before starting new one to prevent overlap)
+        /** @type {AudioBufferSourceNode|null} */
+        this._audioSource = null;
 
         // Volume-smoothing: RMS from last N audio messages
         this.volumeSamples = [];
@@ -105,6 +106,11 @@ class PTTWidget {
         if (this._visualizer) {
             this._visualizer.destroy();
             this._visualizer = null;
+        }
+        if (this._audioSource) {
+            try { this._audioSource.stop(); } catch (_) {}
+            try { this._audioSource.disconnect(); } catch (_) {}
+            this._audioSource = null;
         }
         if (this.audioCtx) {
             this.audioCtx.close().catch(() => {});
@@ -373,33 +379,29 @@ class PTTWidget {
         this._playAudioBuffer(floats, 16000);
     }
 
-    /** Play an AudioBuffer from float32 PCM data with gapless scheduling. */
+    /** Play an AudioBuffer from float32 PCM data. */
     _playAudioBuffer(samples, sampleRate) {
         try {
             if (!this.audioCtx) {
                 this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                this._nextAudioTime = 0;
             }
             if (this.audioCtx.state === 'suspended') {
                 this.audioCtx.resume().catch(() => {});
             }
 
+            // Stop previous source to prevent frame overlap (crackling)
+            if (this._audioSource) {
+                try { this._audioSource.stop(); } catch (_) {}
+                try { this._audioSource.disconnect(); } catch (_) {}
+            }
+
             const buf = this.audioCtx.createBuffer(1, samples.length, sampleRate);
             buf.copyToChannel(samples, 0);
 
-            const now = this.audioCtx.currentTime;
-            // If we fell behind (gap in frames), jump to now
-            if (this._nextAudioTime < now) {
-                this._nextAudioTime = now;
-            }
-
-            const src = this.audioCtx.createBufferSource();
-            src.buffer = buf;
-            src.connect(this.audioCtx.destination);
-            src.start(this._nextAudioTime);
-
-            // Advance schedule by buffer duration
-            this._nextAudioTime += buf.duration;
+            this._audioSource = this.audioCtx.createBufferSource();
+            this._audioSource.buffer = buf;
+            this._audioSource.connect(this.audioCtx.destination);
+            this._audioSource.start(0);
         } catch (_) { /* audio not available */ }
     }
 
