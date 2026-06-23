@@ -42,6 +42,9 @@ class PTTWidget {
         /** @type {AudioContext|null} */
         this.audioCtx = null;
 
+        // Audio scheduling: next play time for gapless playback
+        this._nextAudioTime = 0;
+
         // Volume-smoothing: RMS from last N audio messages
         this.volumeSamples = [];
         this.maxVolumeSamples = 10;
@@ -370,11 +373,12 @@ class PTTWidget {
         this._playAudioBuffer(floats, 16000);
     }
 
-    /** Play an AudioBuffer from float32 PCM data. */
+    /** Play an AudioBuffer from float32 PCM data with gapless scheduling. */
     _playAudioBuffer(samples, sampleRate) {
         try {
             if (!this.audioCtx) {
                 this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                this._nextAudioTime = 0;
             }
             if (this.audioCtx.state === 'suspended') {
                 this.audioCtx.resume().catch(() => {});
@@ -383,10 +387,19 @@ class PTTWidget {
             const buf = this.audioCtx.createBuffer(1, samples.length, sampleRate);
             buf.copyToChannel(samples, 0);
 
+            const now = this.audioCtx.currentTime;
+            // If we fell behind (gap in frames), jump to now
+            if (this._nextAudioTime < now) {
+                this._nextAudioTime = now;
+            }
+
             const src = this.audioCtx.createBufferSource();
             src.buffer = buf;
             src.connect(this.audioCtx.destination);
-            src.start(0);
+            src.start(this._nextAudioTime);
+
+            // Advance schedule by buffer duration
+            this._nextAudioTime += buf.duration;
         } catch (_) { /* audio not available */ }
     }
 

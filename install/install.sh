@@ -13,7 +13,7 @@ fi
 
 echo "[*] Installing dependencies..."
 apt update -y
-apt install -y apache2 php php-sqlite3 libapache2-mod-php
+apt install -y apache2 php php-sqlite3 php-curl libapache2-mod-php
 
 echo "[*] Creating directories..."
 mkdir -p "${APP_DIR}/data" "${APP_DIR}/logs"

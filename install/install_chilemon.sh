@@ -124,8 +124,8 @@ ensure_package() {
     fi
 }
 
-validate_php_sqlite() {
-    info "Validando módulos PHP requeridos para SQLite"
+validate_php_modules() {
+    info "Validando módulos PHP requeridos"
 
     local missing=0
 
@@ -144,17 +144,22 @@ validate_php_sqlite() {
         missing=1
     fi
 
+    if ! php -m | grep -q '^curl$'; then
+        echo "[ERROR] PHP no tiene cargado el módulo curl."
+        missing=1
+    fi
+
     if [[ "$missing" -ne 0 ]]; then
         echo
-        echo "[ERROR] La instalación no puede continuar porque PHP/SQLite no está listo."
+        echo "[ERROR] La instalación no puede continuar porque faltan módulos PHP."
         echo "[ERROR] Revise la configuración de PHP en este nodo."
         echo "[ERROR] Sugerencia inicial:"
-        echo "        sudo apt install --reinstall -y php8.4-common php8.4-cli libapache2-mod-php8.4 php8.4-sqlite3 php-sqlite3"
-        echo "        php -m | grep -E 'PDO|pdo_sqlite|sqlite3'"
+        echo "        sudo apt install --reinstall -y php8.4-common php8.4-cli libapache2-mod-php8.4 php8.4-sqlite3 php-sqlite3 php-curl"
+        echo "        php -m | grep -E 'PDO|pdo_sqlite|sqlite3|curl'"
         exit 1
     fi
 
-    ok "PHP tiene cargados PDO, pdo_sqlite y sqlite3"
+    ok "PHP tiene cargados PDO, pdo_sqlite, sqlite3 y curl"
 }
 
 detect_server_host() {
@@ -534,6 +539,7 @@ main() {
     ensure_package apache2
     ensure_package php
     ensure_package php-sqlite3
+    ensure_package php-curl
     ensure_package sqlite3
     ensure_package sudo
     ok "Dependencias instaladas o ya presentes"
@@ -623,7 +629,7 @@ main() {
     write_apache_config
 
     step "9 de 10" "Validando PHP e inicializando ChileMon"
-    validate_php_sqlite
+    validate_php_modules
     run_php_installer
 
     step "10 de 10" "Creando usuario administrador de ChileMon"

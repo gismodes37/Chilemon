@@ -144,6 +144,9 @@ class WebRTCBridgeApp:
         # PTT state
         self._ptt_active: bool = False
 
+        # Keepalive task reference
+        self._keepalive_task: Optional[asyncio.Task[None]] = None
+
         # Wire IAX2 server callback
         self.iax_server.on_new_call = self._on_iax_new_call
 
@@ -290,6 +293,43 @@ class WebRTCBridgeApp:
             except ConnectionResetError:
                 self._ws_peers.discard(ws)
 
+    # -- Keepalive --
+
+    async def _keepalive_loop(self) -> None:
+        """Send periodic keepalive pings to all connected WS peers.
+
+        Prevents reverse proxies (Apache) from dropping idle WS connections.
+        Interval: 15 seconds.
+        """
+        while True:
+            await asyncio.sleep(15)
+            if not self._ws_peers:
+                continue
+            msg = json.dumps({"type": "ping"})
+            for ws in list(self._ws_peers):
+                try:
+                    await ws.send_str(msg)
+                except (ConnectionResetError, ConnectionError) as exc:
+                    logger.debug("Keepalive send error, discarding peer: %s", exc)
+                    self._ws_peers.discard(ws)
+
+    def _start_keepalive(self) -> None:
+        """Launch the keepalive background task."""
+        if self._keepalive_task is None or self._keepalive_task.done():
+            self._keepalive_task = asyncio.create_task(self._keepalive_loop())
+            logger.debug("Keepalive task started")
+
+    async def _stop_keepalive(self) -> None:
+        """Cancel the keepalive background task."""
+        if self._keepalive_task is not None and not self._keepalive_task.done():
+            self._keepalive_task.cancel()
+            try:
+                await self._keepalive_task
+            except asyncio.CancelledError:
+                pass
+            self._keepalive_task = None
+            logger.debug("Keepalive task stopped")
+
     # -- WebSocket Handler --
 
     async def handle_ws(self, request: web.Request) -> web.StreamResponse:
@@ -338,11 +378,23 @@ class WebRTCBridgeApp:
                     await self._handle_ws_message(ws, msg.data)
                 elif msg.type == aiohttp.WSMsgType.ERROR:
                     logger.error("WS error: %s", ws.exception())
+                elif msg.type == aiohttp.WSMsgType.CLOSE:
+                    logger.info(
+                        "WS client sent close — code=%s reason=%s",
+                        msg.data,  # close code
+                        getattr(msg, "extra", ""),
+                    )
         except asyncio.CancelledError:
             pass
+        except Exception as exc:
+            logger.error("WS handler exception: %s", exc)
         finally:
+            close_code = ws.close_code if hasattr(ws, "close_code") else "?"
             self._ws_peers.discard(ws)
-            logger.info("WS client disconnected (%d peers)", len(self._ws_peers))
+            logger.info(
+                "WS client disconnected (close_code=%s, peers=%d)",
+                close_code, len(self._ws_peers),
+            )
 
             # If no more peers, hang up the IAX2 call
             if not self._ws_peers and self._active_call:
@@ -376,6 +428,14 @@ class WebRTCBridgeApp:
             digit = payload.get("digit", "")
             if digit and self._active_call:
                 self._active_call.send_dtmf(digit)
+
+        elif msg_type == "ping":
+            # Respond to client keepalive pings
+            try:
+                await ws.send_str(json.dumps({"type": "pong"}))
+            except (ConnectionResetError, ConnectionError) as exc:
+                logger.debug("Pong send error: %s", exc)
+                self._ws_peers.discard(ws)
 
         elif msg_type == "audio_tx":
             # Transmit audio: hex-encoded float32 PCM 16 kHz from browser
@@ -464,9 +524,12 @@ async def _on_startup(app: web.Application) -> None:
         logger.error("AMI startup failed: %s", exc)
         # Don't crash — health endpoint will show ami_connected=false
 
+    # 3. Start keepalive background task
+    bridge._start_keepalive()
+
 
 async def _on_shutdown(app: web.Application) -> None:
-    """Cleanly tear down IAX2 server and AMI on shutdown."""
+    """Cleanly tear down IAX2 server, AMI, and keepalive on shutdown."""
     bridge: WebRTCBridgeApp = app["bridge"]
     logger.info("Shutting down WebRTC Audio Bridge")
 
@@ -475,6 +538,9 @@ async def _on_shutdown(app: web.Application) -> None:
         await bridge.iax_server.stop()
     except Exception as exc:
         logger.warning("IAX2 server stop error: %s", exc)
+
+    # Stop keepalive background task
+    await bridge._stop_keepalive()
 
     # Close AMI connection
     try:
