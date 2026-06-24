@@ -239,9 +239,12 @@ class WebRTCBridgeApp:
         except Exception as exc:
             logger.exception("Audio RX callback error: %s", exc)
 
-    async def _on_iax_hangup(self) -> None:
-        """Handle remote HANGUP from Asterisk — reset call state."""
-        logger.info("IAX2 HANGUP received — resetting call state")
+    async def _on_iax_hangup(self, call: "IAX2Call") -> None:
+        """Handle remote HANGUP from Asterisk — reset call state only if active."""
+        if call is not self._active_call:
+            logger.info("Ignoring HANGUP for stale callno=%d (active=%s)", call.callno, self._active_call)
+            return
+        logger.info("IAX2 HANGUP received for active call — resetting state")
         self._active_call = None
         self._ptt_active = False
         await self._broadcast_status()
@@ -249,28 +252,32 @@ class WebRTCBridgeApp:
     # -- PTT Handlers --
 
     async def _ptt_key(self) -> None:
-        """Key the transmitter via DTMF *99.
+        """Key the transmitter via DTMF * (simplex toggle).
 
+        In Simplex Dumb Phone (S) mode, * toggles PTT on/off.
         Requires an active IAX2 call (established via AMI Originate).
         """
         if not self._active_call:
             logger.warning("PTT key ignored: no active IAX2 call")
             return
 
-        logger.debug("PTT key: sending *99")
-        self._active_call.send_dtmf_string("*99")
+        logger.debug("PTT key: sending * (simplex toggle ON)")
+        self._active_call.send_dtmf("*")
         self._ptt_active = True
 
         await self._broadcast_status()
 
     async def _ptt_unkey(self) -> None:
-        """Unkey the transmitter via DTMF #."""
+        """Unkey the transmitter via DTMF * (simplex toggle).
+
+        In Simplex Dumb Phone (S) mode, * toggles PTT on/off.
+        """
         if not self._ptt_active:
             return
 
-        logger.debug("PTT unkey: sending #")
+        logger.debug("PTT unkey: sending * (simplex toggle OFF)")
         if self._active_call:
-            self._active_call.send_dtmf("#")
+            self._active_call.send_dtmf("*")
         self._ptt_active = False
 
         await self._broadcast_status()

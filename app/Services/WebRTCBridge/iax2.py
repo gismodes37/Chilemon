@@ -757,7 +757,7 @@ class IAX2Call:
 
         # -- Public callbacks (set by server.py) --
         self.on_voice: Optional[Callable[[bytes], Awaitable[None]]] = None
-        self.on_hangup: Optional[Callable[[], Awaitable[None]]] = None
+        self.on_hangup: Optional[Callable[["IAX2Call"], Awaitable[None]]] = None
         self.on_accepted: Optional[Callable[["IAX2Call"], Awaitable[None]]] = None
 
     # -- Frame sending helpers --
@@ -942,7 +942,7 @@ class IAX2Call:
             logger.info("Remote HANGUP for callno=%d", self.callno)
             self.state = CALL_STATE_HUNGUP
             if self.on_hangup:
-                asyncio.ensure_future(self.on_hangup())
+                asyncio.ensure_future(self.on_hangup(self))
         elif subclass == IAX_CMD_ACK:
             pass  # No action needed
         elif subclass == IAX_CMD_PING:
