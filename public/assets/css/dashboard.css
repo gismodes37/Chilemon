@@ -351,10 +351,10 @@
 
 #fav_tbody td,
 #fav_tbody th {
-    padding: 0.2rem 0.4rem;
-    font-size: 0.85rem;
-    line-height: 1.1;
-    vertical-align: middle;
+    padding: 0.2rem 0.4rem !important;
+    font-size: 0.85rem !important;
+    line-height: 1.1 !important;
+    vertical-align: middle !important;
 }
 
 .modal-body thead th {
