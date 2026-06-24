@@ -132,7 +132,7 @@ class AudioVisualizer {
             );
             // Normalize: divide by fftSize, clamp to ~1.0
             // Higher multiplier = more sensitive bars
-            let normalized = (mag / this.fftSize) * 10;
+            let normalized = (mag / this.fftSize) * 14;
             if (normalized > 1) normalized = 1;
 
             // Smooth towards target
@@ -217,7 +217,7 @@ class AudioVisualizer {
 
         for (let i = 0; i < this.barCount; i++) {
             const barH = Math.min(this.bars[i], 1) * hScale;
-            if (barH < 0.5) continue;
+            if (barH < 0.2) continue;
 
             const x = i * barTotal;
 
