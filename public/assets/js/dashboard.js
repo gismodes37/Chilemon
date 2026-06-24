@@ -855,6 +855,12 @@ function setupFavoritesModal() {
     });
   }
 
+  // Paginador — Previous / Next
+  const btnPrev = document.getElementById("fav-page-prev");
+  const btnNext = document.getElementById("fav-page-next");
+  if (btnPrev) btnPrev.addEventListener("click", () => favGoToPage(favCurrentPage - 1));
+  if (btnNext) btnNext.addEventListener("click", () => favGoToPage(favCurrentPage + 1));
+
   const form = document.getElementById("favForm");
   if (form) {
     form.addEventListener("submit", async (e) => {
@@ -920,6 +926,163 @@ function favoritesClearForm() {
   }
 }
 
+/* =============================================================
+ *  FAVORITES PAGINATION
+ * ============================================================= */
+const FAV_PAGE_SIZE = 15;
+let favCurrentPage = 1;
+let favAllItems = [];
+
+/**
+ * Navega a una página específica de favoritos.
+ * @param {number} page - Número de página (1-based).
+ */
+function favGoToPage(page) {
+  const totalPages = Math.ceil(favAllItems.length / FAV_PAGE_SIZE);
+  if (page < 1 || page > totalPages) return;
+  favCurrentPage = page;
+  renderFavoritesPage();
+}
+
+/**
+ * Renderiza la página actual de favoritos (sin re-vincular listeners).
+ */
+function renderFavoritesPage() {
+  const tbody = document.getElementById("fav_tbody");
+  if (!tbody) return;
+
+  const total = favAllItems.length;
+  const totalPages = Math.ceil(total / FAV_PAGE_SIZE);
+
+  if (total === 0) {
+    tbody.innerHTML = `<tr><td colspan="4" class="text-muted">Sin favoritos aún.</td></tr>`;
+    _favUpdatePagination(0, 0);
+    return;
+  }
+
+  const start = (favCurrentPage - 1) * FAV_PAGE_SIZE;
+  const page = favAllItems.slice(start, start + FAV_PAGE_SIZE);
+
+  tbody.innerHTML = page
+    .map((it) => {
+      const node = escapeHtml((it.node_id || "").toString());
+      const alias = escapeHtml((it.alias || "").toString());
+      const desc = escapeHtml((it.description || "").toString());
+
+      return `
+      <tr>
+        <td class="fw-semibold">${node}</td>
+        <td>${alias}</td>
+        <td class="text-muted">${desc}</td>
+        <td class="text-end">
+          <div class="btn-group btn-group-sm">
+            <button class="btn btn-success" data-fav-connect="${node}">
+              <i class="bi bi-telephone"></i> Conectar
+            </button>
+            <button class="btn btn-outline-primary" data-fav-edit="${node}" data-fav-alias="${escapeHtml(it.alias || "")}" data-fav-desc="${escapeHtml(it.description || "")}">
+              <i class="bi bi-pencil"></i>
+            </button>
+            <button class="btn btn-outline-danger" data-fav-delete="${node}">
+              <i class="bi bi-trash"></i>
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+    })
+    .join("");
+
+  _favUpdatePagination(start + 1, Math.min(start + FAV_PAGE_SIZE, total));
+  _favBindRowEvents(tbody);
+}
+
+/**
+ * Actualiza los controles de paginación (info + botones prev/next).
+ */
+function _favUpdatePagination(showStart, showEnd) {
+  const container = document.getElementById("fav-pagination");
+  const info = document.getElementById("fav-page-info");
+  const btnPrev = document.getElementById("fav-page-prev");
+  const btnNext = document.getElementById("fav-page-next");
+
+  if (!container) return;
+
+  const total = favAllItems.length;
+  const totalPages = Math.ceil(total / FAV_PAGE_SIZE);
+
+  if (total === 0) {
+    container.style.display = "none";
+    return;
+  }
+
+  container.style.display = "flex";
+  if (info) info.textContent = `${showStart}–${showEnd} de ${total}`;
+  if (btnPrev) btnPrev.disabled = favCurrentPage <= 1;
+  if (btnNext) btnNext.disabled = favCurrentPage >= totalPages;
+}
+
+/**
+ * Vincula los event listeners de Conectar/Editar/Eliminar en el tbody.
+ * @param {HTMLElement} tbody
+ */
+function _favBindRowEvents(tbody) {
+  // Conectar
+  tbody.querySelectorAll("[data-fav-connect]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const node = btn.getAttribute("data-fav-connect") || "";
+      if (!confirm(`¿Conectar al nodo ${node}?`)) return;
+      try {
+        await postForm("api/connect.php", { node });
+        const modalEl = document.getElementById("favoritesModal");
+        if (modalEl && window.bootstrap) {
+          const inst = window.bootstrap.Modal.getInstance(modalEl);
+          if (inst) inst.hide();
+        }
+        afterNodeActionLive();
+      } catch (err) {
+        if (err.message !== "Unauthorized") {
+          alert(`Error al conectar: ${err.message}`);
+        }
+      }
+    });
+  });
+
+  // Eliminar
+  tbody.querySelectorAll("[data-fav-delete]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const node = btn.getAttribute("data-fav-delete") || "";
+      if (!confirm(`¿Eliminar favorito ${node}?`)) return;
+      try {
+        await postForm("api/favorites/delete.php", { node_id: node });
+        await favoritesReload();
+      } catch (err) {
+        if (err.message !== "Unauthorized") {
+          alert(`Error eliminando favorito: ${err.message}`);
+        }
+      }
+    });
+  });
+
+  // Editar
+  tbody.querySelectorAll("[data-fav-edit]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const node = btn.getAttribute("data-fav-edit") || "";
+      const alias = btn.getAttribute("data-fav-alias") || "";
+      const desc = btn.getAttribute("data-fav-desc") || "";
+
+      document.getElementById("fav_node_id").value = node;
+      document.getElementById("fav_alias").value = alias;
+      document.getElementById("fav_desc").value = desc;
+      document.getElementById("fav_node_id").disabled = true;
+
+      const submitBtn = document.querySelector('#favForm button[type="submit"]');
+      if (submitBtn) {
+        submitBtn.innerHTML = '<i class="bi bi-save"></i> Actualizar';
+      }
+    });
+  });
+}
+
 /**
  * Carga la lista de favoritos del usuario desde la API
  * y actualiza el tbody #fav_tbody del modal.
@@ -946,7 +1109,7 @@ async function favoritesReload() {
 
 /**
  * Renderiza la lista de favoritos en el tbody del modal.
- * Enlaza los botones "Conectar" y "Eliminar" con delegación de eventos.
+ * Almacena todos los items y muestra la primera página.
  *
  * Seguridad: todos los valores del servidor se pasan por escapeHtml()
  * antes de insertarlos en innerHTML.
@@ -954,112 +1117,9 @@ async function favoritesReload() {
  * @param {Array} items - Array de objetos { node_id, alias, description }.
  */
 function renderFavorites(items) {
-  const tbody = document.getElementById("fav_tbody");
-  if (!tbody) return;
-
-  // Estado vacío
-  if (!items || items.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="4" class="text-muted">Sin favoritos aún.</td></tr>`;
-    return;
-  }
-
-  // Generar filas de la tabla con valores escapados
-  tbody.innerHTML = items
-    .map((it) => {
-      const node = escapeHtml((it.node_id || "").toString());
-      const alias = escapeHtml((it.alias || "").toString());
-      const desc = escapeHtml((it.description || "").toString());
-
-      // data-fav-connect y data-fav-delete son los selectores para
-      // los event listeners que se enlazan justo debajo
-      return `
-      <tr>
-        <td class="fw-semibold">${node}</td>
-        <td>${alias}</td>
-        <td class="text-muted">${desc}</td>
-        <td class="text-end">
-          <div class="btn-group btn-group-sm">
-            <button class="btn btn-success" data-fav-connect="${node}">
-              <i class="bi bi-telephone"></i> Conectar
-            </button>
-            <button class="btn btn-outline-primary" data-fav-edit="${node}" data-fav-alias="${escapeHtml(it.alias || "")}" data-fav-desc="${escapeHtml(it.description || "")}">
-              <i class="bi bi-pencil"></i>
-            </button>
-            <button class="btn btn-outline-danger" data-fav-delete="${node}">
-              <i class="bi bi-trash"></i>
-            </button>
-          </div>
-        </td>
-      </tr>
-    `;
-    })
-    .join("");
-
-  // Enlazar botones "Conectar" — conecta al nodo y cierra el modal
-  tbody.querySelectorAll("[data-fav-connect]").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      const node = btn.getAttribute("data-fav-connect") || "";
-      if (!confirm(`¿Conectar al nodo ${node}?`)) return;
-
-      try {
-        await postForm("api/connect.php", { node });
-
-        // Cerrar el modal Bootstrap 5 programáticamente antes de recargar
-        const modalEl = document.getElementById("favoritesModal");
-        if (modalEl && window.bootstrap) {
-          const inst = window.bootstrap.Modal.getInstance(modalEl);
-          if (inst) inst.hide();
-        }
-
-        afterNodeActionLive();
-      } catch (err) {
-        if (err.message !== "Unauthorized") {
-          alert(`Error al conectar: ${err.message}`);
-        }
-      }
-    });
-  });
-
-  // Enlazar botones "Eliminar" — borra el favorito y recarga la lista
-  tbody.querySelectorAll("[data-fav-delete]").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      const node = btn.getAttribute("data-fav-delete") || "";
-      if (!confirm(`¿Eliminar favorito ${node}?`)) return;
-
-      try {
-        await postForm("api/favorites/delete.php", {
-          node_id: node,
-        });
-        await favoritesReload(); // refrescar lista sin recargar la página
-      } catch (err) {
-        if (err.message !== "Unauthorized") {
-          alert(`Error eliminando favorito: ${err.message}`);
-        }
-      }
-    });
-  });
-
-  // Enlazar botones "Editar" — carga datos en el formulario para editar
-  tbody.querySelectorAll("[data-fav-edit]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const node = btn.getAttribute("data-fav-edit") || "";
-      const alias = btn.getAttribute("data-fav-alias") || "";
-      const desc = btn.getAttribute("data-fav-desc") || "";
-
-      document.getElementById("fav_node_id").value = node;
-      document.getElementById("fav_alias").value = alias;
-      document.getElementById("fav_desc").value = desc;
-
-      // Deshabilitar node_id ya que no se puede cambiar al editar
-      document.getElementById("fav_node_id").disabled = true;
-
-      // Cambiar texto del botón submit
-      const submitBtn = document.querySelector('#favForm button[type="submit"]');
-      if (submitBtn) {
-        submitBtn.innerHTML = '<i class="bi bi-save"></i> Actualizar';
-      }
-    });
-  });
+  favAllItems = Array.isArray(items) ? items : [];
+  favCurrentPage = 1;
+  renderFavoritesPage();
 }
 
 /**

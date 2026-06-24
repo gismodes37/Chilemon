@@ -673,6 +673,18 @@ $systemInfo = $systemInfo ?? [
                         </table>
                     </div>
 
+                    <div id="fav-pagination" class="d-flex justify-content-between align-items-center mt-2" style="display:none !important;">
+                        <small class="text-muted" id="fav-page-info"></small>
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-outline-secondary" id="fav-page-prev" disabled>
+                                <i class="bi bi-chevron-left"></i>
+                            </button>
+                            <button class="btn btn-outline-secondary" id="fav-page-next" disabled>
+                                <i class="bi bi-chevron-right"></i>
+                            </button>
+                        </div>
+                    </div>
+
                     <small class="text-muted">
                         Al hacer clic en “Conectar” se pedirá confirmación y volverás al dashboard.
                     </small>
