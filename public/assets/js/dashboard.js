@@ -1276,7 +1276,97 @@ function startChilemonAutoRefresh() {
 }
 
 /* =============================================================
- * 12. INIT — DOMContentLoaded
+ *  AUDIO SETTINGS MODAL
+ * ============================================================= */
+
+/**
+ * Inicializa el modal de configuración de audio.
+ * Sliders RX/TX controlan gain del PTTWidget en tiempo real.
+ * Valores persistidos en localStorage.
+ */
+function setupAudioSettings() {
+  const btnOpen = document.getElementById("btn-audio-settings");
+  const modalEl = document.getElementById("audioSettingsModal");
+  if (!btnOpen || !modalEl) return;
+
+  const rxSlider = document.getElementById("rx-gain-slider");
+  const txSlider = document.getElementById("tx-gain-slider");
+  const rxLabel = document.getElementById("rx-gain-value");
+  const txLabel = document.getElementById("tx-gain-value");
+  const btnReset = document.getElementById("audio-reset-defaults");
+  const btnTest = document.getElementById("audio-test-tone");
+
+  // Load stored values
+  const storedRx = parseFloat(localStorage.getItem("chilemon_rx_gain"));
+  const storedTx = parseFloat(localStorage.getItem("chilemon_tx_gain"));
+  const rxInit = isNaN(storedRx) ? 100 : Math.round(storedRx * 100);
+  const txInit = isNaN(storedTx) ? 100 : Math.round(storedTx * 100);
+
+  rxSlider.value = rxInit;
+  txSlider.value = txInit;
+  rxLabel.textContent = rxInit + "%";
+  txLabel.textContent = txInit + "%";
+
+  // Apply on slider move
+  rxSlider.addEventListener("input", () => {
+    const pct = parseInt(rxSlider.value, 10);
+    rxLabel.textContent = pct + "%";
+    const gain = pct / 100;
+    localStorage.setItem("chilemon_rx_gain", String(gain));
+    if (window.pttWidget) window.pttWidget.setRxGain(gain);
+  });
+
+  txSlider.addEventListener("input", () => {
+    const pct = parseInt(txSlider.value, 10);
+    txLabel.textContent = pct + "%";
+    const gain = pct / 100;
+    localStorage.setItem("chilemon_tx_gain", String(gain));
+    if (window.pttWidget) window.pttWidget.setTxGain(gain);
+  });
+
+  // Reset to defaults
+  btnReset.addEventListener("click", () => {
+    rxSlider.value = 100;
+    txSlider.value = 100;
+    rxLabel.textContent = "100%";
+    txLabel.textContent = "100%";
+    localStorage.setItem("chilemon_rx_gain", "1");
+    localStorage.setItem("chilemon_tx_gain", "1");
+    if (window.pttWidget) {
+      window.pttWidget.setRxGain(1);
+      window.pttWidget.setTxGain(1);
+    }
+  });
+
+  // Test tone — play a short sine wave to check RX volume
+  btnTest.addEventListener("click", () => {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const gain = parseFloat(localStorage.getItem("chilemon_rx_gain")) || 1;
+      const g = ctx.createGain();
+      g.gain.value = gain * 0.3; // keep test tone moderate
+      g.connect(ctx.destination);
+
+      const osc = ctx.createOscillator();
+      osc.type = "sine";
+      osc.frequency.value = 440;
+      osc.connect(g);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.5);
+
+      btnTest.disabled = true;
+      setTimeout(() => { btnTest.disabled = false; }, 600);
+    } catch (_) {}
+  });
+
+  // Open modal
+  btnOpen.addEventListener("click", () => {
+    new bootstrap.Modal(modalEl).show();
+  });
+}
+
+/* =============================================================
+ *  12. INIT — DOMContentLoaded
  * -------------------------------------------------------------
  * Punto de entrada único del script.
  * Orden de inicialización:
@@ -1296,6 +1386,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // 2. Enlazar todos los eventos del modal de favoritos
   setupFavoritesModal();
+
+  // 2b. Enlazar modal de configuración de audio
+  setupAudioSettings();
 
   // 3. Obtener snapshot inicial para que el primer tick del auto refresh
   //    tenga una base de comparación y no recargue innecesariamente.

@@ -920,3 +920,39 @@ html, body{
         border-radius: 8px;
     }
 }
+
+/* =========================================
+   Audio Settings Modal — Sliders
+   ========================================= */
+
+.audio-slider {
+    height: 6px;
+    cursor: pointer;
+}
+
+.audio-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #0dcaf0;
+    border: 2px solid #0a0a0a;
+    box-shadow: 0 0 6px rgba(13, 202, 240, 0.4);
+    cursor: pointer;
+}
+
+.audio-slider::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #0dcaf0;
+    border: 2px solid #0a0a0a;
+    box-shadow: 0 0 6px rgba(13, 202, 240, 0.4);
+    cursor: pointer;
+}
+
+#audioSettingsModal .modal-content {
+    background: #1a1a2e;
+    border: 1px solid #333;
+}

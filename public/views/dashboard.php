@@ -112,6 +112,16 @@ $systemInfo = $systemInfo ?? [
                     <button class="btn btn-outline-primary" onclick="window.open('https://www.qsl.net/ca2iig/', '_blank')">
                         <i class="bi bi-globe"></i> Web Site Desarrollador
                     </button>
+                    <button class="btn btn-outline-info" id="btn-audio-settings"
+                        title="Configuración de audio">
+                        <i class="bi bi-sliders"></i> Audio
+                    </button>
+                    <button class="btn btn-outline-primary" onclick="window.open('https://github.com/gismodes37/Chilemon/blob/main/docs/soporte.md', '_blank')">
+                        <i class="bi bi-globe"></i> Soporte
+                    </button>
+                    <button class="btn btn-outline-primary" onclick="window.open('https://www.qsl.net/ca2iig/', '_blank')">
+                        <i class="bi bi-globe"></i> Web Site Desarrollador
+                    </button>
                     <button class="btn btn-outline-danger" id="btn-restart-asterisk"
                         onclick="confirmarReinicio('Asterisk', 'restart-asterisk')"
                         title="Reiniciar el servicio Asterisk">
@@ -698,6 +708,49 @@ $systemInfo = $systemInfo ?? [
         </div>
     </div>
 </main>
+
+<div class="modal fade modal-chilemon-info" id="audioSettingsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-sliders text-info"></i>
+                    Audio Settings
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-4">
+                    <label class="form-label d-flex justify-content-between">
+                        <span><i class="bi bi-speaker text-success"></i> RX — Salida</span>
+                        <span class="text-muted" id="rx-gain-value">100%</span>
+                    </label>
+                    <input type="range" class="form-range audio-slider" id="rx-gain-slider"
+                        min="0" max="200" value="100" step="5">
+                    <small class="text-muted">Volumen de lo que escuchás</small>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label d-flex justify-content-between">
+                        <span><i class="bi bi-mic text-warning"></i> TX — Entrada</span>
+                        <span class="text-muted" id="tx-gain-value">100%</span>
+                    </label>
+                    <input type="range" class="form-range audio-slider" id="tx-gain-slider"
+                        min="0" max="200" value="100" step="5">
+                    <small class="text-muted">Sensibilidad del micrófono</small>
+                </div>
+                <hr>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-sm btn-outline-secondary flex-fill" id="audio-reset-defaults">
+                        <i class="bi bi-arrow-counterclockwise"></i> Restaurar
+                    </button>
+                    <button class="btn btn-sm btn-outline-info flex-fill" id="audio-test-tone">
+                        <i class="bi bi-play-circle"></i> Probar RX
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
 <div class="modal fade modal-chilemon-danger" id="modalReinicio" tabindex="-1" aria-labelledby="modalReicioLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">

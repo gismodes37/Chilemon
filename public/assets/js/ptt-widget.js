@@ -42,6 +42,12 @@ class PTTWidget {
         /** @type {AudioContext|null} */
         this.audioCtx = null;
 
+        // Gain nodes for RX/TX volume control
+        /** @type {GainNode|null} */
+        this._rxGainNode = null;
+        /** @type {GainNode|null} */
+        this._txGainNode = null;
+
         // Previous audio source (stopped before starting new one to prevent overlap)
         /** @type {AudioBufferSourceNode|null} */
         this._audioSource = null;
@@ -384,6 +390,10 @@ class PTTWidget {
         try {
             if (!this.audioCtx) {
                 this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                // Create RX gain node (persists across plays)
+                this._rxGainNode = this.audioCtx.createGain();
+                this._rxGainNode.gain.value = this._getStoredGain('rx');
+                this._rxGainNode.connect(this.audioCtx.destination);
             }
             if (this.audioCtx.state === 'suspended') {
                 this.audioCtx.resume().catch(() => {});
@@ -400,7 +410,7 @@ class PTTWidget {
 
             this._audioSource = this.audioCtx.createBufferSource();
             this._audioSource.buffer = buf;
-            this._audioSource.connect(this.audioCtx.destination);
+            this._audioSource.connect(this._rxGainNode);
             this._audioSource.start(0);
         } catch (_) { /* audio not available */ }
     }
@@ -434,6 +444,11 @@ class PTTWidget {
             .then((stream) => {
                 this._micStream = stream;
                 this._micSource = this._txCtx.createMediaStreamSource(stream);
+
+                // TX gain node for mic sensitivity control
+                this._txGainNode = this._txCtx.createGain();
+                this._txGainNode.gain.value = this._getStoredGain('tx');
+
                 this._micProcessor = this._txCtx.createScriptProcessor(1024, 1, 1);
 
                 this._micProcessor.onaudioprocess = (e) => {
@@ -443,7 +458,9 @@ class PTTWidget {
                     this._sendAudioChunk(input);
                 };
 
-                this._micSource.connect(this._micProcessor);
+                // micSource → gainNode → scriptProcessor
+                this._micSource.connect(this._txGainNode);
+                this._txGainNode.connect(this._micProcessor);
 
                 // ScriptProcessorNode MUST be connected to the destination
                 // for onaudioprocess to fire — otherwise the audio graph
@@ -576,6 +593,47 @@ class PTTWidget {
         if (this._visualizer) this._visualizer.setTransmitting(false);
         this._setStatus('connected', 'Bridge Connected');
         this._updateUI();
+    }
+
+    // ---------------------------------------------------------------
+    //  Audio Gain Control (RX / TX)
+    // ---------------------------------------------------------------
+
+    /**
+     * Set RX (output) gain. Value 0.0–2.0 (1.0 = normal, 2.0 = 200%).
+     * @param {number} value
+     */
+    setRxGain(value) {
+        const v = Math.max(0, Math.min(2, Number(value) || 1));
+        if (this._rxGainNode) {
+            this._rxGainNode.gain.setTargetAtTime(v, this.audioCtx.currentTime, 0.01);
+        }
+        try { localStorage.setItem('chilemon_rx_gain', String(v)); } catch (_) {}
+    }
+
+    /**
+     * Set TX (input/mic) gain. Value 0.0–2.0.
+     * @param {number} value
+     */
+    setTxGain(value) {
+        const v = Math.max(0, Math.min(2, Number(value) || 1));
+        if (this._txGainNode) {
+            this._txGainNode.gain.setTargetAtTime(v, this._txCtx.currentTime, 0.01);
+        }
+        try { localStorage.setItem('chilemon_tx_gain', String(v)); } catch (_) {}
+    }
+
+    /**
+     * Get stored gain from localStorage.
+     * @param {'rx'|'tx'} type
+     * @returns {number} gain value (default 1.0)
+     */
+    _getStoredGain(type) {
+        try {
+            const key = type === 'rx' ? 'chilemon_rx_gain' : 'chilemon_tx_gain';
+            const v = parseFloat(localStorage.getItem(key));
+            return isNaN(v) ? 1 : Math.max(0, Math.min(2, v));
+        } catch (_) { return 1; }
     }
 
     // ---------------------------------------------------------------
