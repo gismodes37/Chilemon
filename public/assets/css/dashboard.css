@@ -349,6 +349,14 @@
     background: transparent !important;
 }
 
+#fav_tbody td,
+#fav_tbody th {
+    padding: 0.2rem 0.4rem;
+    font-size: 0.85rem;
+    line-height: 1.1;
+    vertical-align: middle;
+}
+
 .modal-body thead th {
     font-size: 0.75rem;
     text-transform: uppercase;
