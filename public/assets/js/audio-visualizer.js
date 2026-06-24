@@ -25,7 +25,7 @@ class AudioVisualizer {
      * @param {number} [opts.barCount=48]       Number of vertical bars
      * @param {number} [opts.fftSize=1024]      FFT size (power of 2)
      * @param {number} [opts.decayRate=0.88]    Per-frame decay multiplier
-     * @param {number} [opts.smoothFactor=0.75] Smoothing (0=instant, 1=no change)
+     * @param {number} [opts.smoothFactor=0.65] Smoothing (0=instant, 1=no change)
      */
     constructor(canvasId, opts = {}) {
         this.canvas = document.getElementById(canvasId);
@@ -38,7 +38,7 @@ class AudioVisualizer {
         this.barCount = opts.barCount || 48;
         this.fftSize = opts.fftSize || 1024;
         this.decayRate = opts.decayRate || 0.88;
-        this.smoothFactor = opts.smoothFactor || 0.75;
+        this.smoothFactor = opts.smoothFactor || 0.65;
 
         /** @type {Float32Array} Current bar heights (0..1) */
         this.bars = new Float32Array(this.barCount);
@@ -131,7 +131,8 @@ class AudioVisualizer {
                 this._im[binIdx] * this._im[binIdx]
             );
             // Normalize: divide by fftSize, clamp to ~1.0
-            let normalized = (mag / this.fftSize) * 6;
+            // Higher multiplier = more sensitive bars
+            let normalized = (mag / this.fftSize) * 10;
             if (normalized > 1) normalized = 1;
 
             // Smooth towards target
@@ -221,17 +222,18 @@ class AudioVisualizer {
             const x = i * barTotal;
 
             // Color: green (low amp) → yellow (mid) → red (high amp)
+            // Thresholds shifted lower so colors appear sooner
             const t = this.bars[i];
             let r, g, b;
-            if (t < 0.4) {
+            if (t < 0.25) {
                 // Green → Yellow
-                const p = t / 0.4;
+                const p = t / 0.25;
                 r = Math.floor(p * 255);
                 g = 255;
                 b = 40;
             } else {
                 // Yellow → Red
-                const p = (t - 0.4) / 0.6;
+                const p = (t - 0.25) / 0.75;
                 r = 255;
                 g = Math.floor((1 - p) * 255);
                 b = Math.floor((1 - p) * 40);
