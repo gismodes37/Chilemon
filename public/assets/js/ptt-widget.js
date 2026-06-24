@@ -439,6 +439,7 @@ class PTTWidget {
                 this._micProcessor.onaudioprocess = (e) => {
                     if (!this.pttActive) return;
                     const input = e.inputBuffer.getChannelData(0);
+                    console.log('PTT: onaudioprocess firing, samples=', input.length, 'pttActive=', this.pttActive);
                     this._sendAudioChunk(input);
                 };
 
@@ -500,12 +501,17 @@ class PTTWidget {
             this._visualizer.feedPCM(samples);
         }
 
-        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+            console.warn('PTT: ws not open, readyState=', this.ws ? this.ws.readyState : 'null');
+            return;
+        }
         try {
             const hex = this._samplesToHex(samples);
-            this.ws.send(JSON.stringify({ type: 'audio_tx', data: hex }));
-        } catch (_) {
-            // Silently drop on send error (connection may be closing)
+            const msg = JSON.stringify({ type: 'audio_tx', data: hex });
+            console.log('PTT: sending audio_tx', hex.length, 'hex chars');
+            this.ws.send(msg);
+        } catch (err) {
+            console.error('PTT: send error', err);
         }
     }
 
@@ -551,6 +557,7 @@ class PTTWidget {
         if (!this.connected || this.pttActive) return;
         if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
 
+        console.log('PTT: key pressed, sending ptt key');
         this.ws.send(JSON.stringify({ type: 'ptt', action: 'key' }));
         this.pttActive = true;
         if (this._visualizer) this._visualizer.setTransmitting(true);
