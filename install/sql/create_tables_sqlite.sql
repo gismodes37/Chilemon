@@ -1,21 +1,85 @@
+-- ==============================================================================
+-- ChileMon - SQLite Schema (v0.5.0)
+-- ==============================================================================
+-- Este archivo es el schema canónico para SQLite.
+-- Mantener sincronizado con install/sql/schema.sql
+
+-- Usuarios del sistema
+CREATE TABLE IF NOT EXISTS users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  username TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'user',
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Nodos monitoreados (solo referencia, datos live vienen de AMI)
 CREATE TABLE IF NOT EXISTS nodes (
-  node_id     TEXT PRIMARY KEY,
-  status      TEXT NOT NULL DEFAULT 'unknown',
-  signal      TEXT,
-  system      TEXT,
-  uptime      TEXT,
-  last_seen   TEXT NOT NULL,
-  raw_stats   TEXT
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  node_id TEXT NOT NULL UNIQUE,
+  users INTEGER DEFAULT 0,
+  last_seen TEXT DEFAULT NULL
 );
 
-CREATE TABLE IF NOT EXISTS node_links (
-  id          INTEGER PRIMARY KEY AUTOINCREMENT,
-  node_id     TEXT NOT NULL,
-  linked_node TEXT NOT NULL,
-  direction   TEXT,
-  created_at  TEXT NOT NULL,
-  UNIQUE(node_id, linked_node)
+-- Log de llamadas/conexiones
+CREATE TABLE IF NOT EXISTS calls (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  node_id TEXT NOT NULL,
+  action TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Nodos favoritos del usuario (con alias y descripción)
+CREATE TABLE IF NOT EXISTS favorites (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  node_id TEXT NOT NULL,
+  alias TEXT DEFAULT '',
+  description TEXT DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(user_id, node_id)
+);
 
+CREATE INDEX IF NOT EXISTS idx_favorites_user_id ON favorites(user_id);
+CREATE INDEX IF NOT EXISTS idx_favorites_node_id ON favorites(node_id);
 
+-- Rate limiting: intentos de login
+CREATE TABLE IF NOT EXISTS login_attempts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL,
+    ip_address TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_login_attempts_user_time
+ON login_attempts (username, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_login_attempts_ip_time
+ON login_attempts (ip_address, created_at);
+
+-- Eventos del nodo (actividad reciente)
+CREATE TABLE IF NOT EXISTS node_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    node_number TEXT NOT NULL,
+    event_type  TEXT NOT NULL,
+    details     TEXT,
+    created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_node_events_created
+ON node_events(created_at);
+
+CREATE INDEX IF NOT EXISTS idx_node_events_node
+ON node_events(node_number);
+
+-- Rate limiting: APIs
+CREATE TABLE IF NOT EXISTS api_attempts (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    action     TEXT NOT NULL,
+    ip_address TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_api_attempts_lookup
+ON api_attempts(action, ip_address, created_at);
