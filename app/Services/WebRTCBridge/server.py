@@ -423,6 +423,7 @@ class WebRTCBridgeApp:
             return
 
         msg_type = payload.get("type", "")
+        logger.debug("WS recv type=%s active_call=%s", msg_type, self._active_call is not None)
 
         if msg_type == "ptt":
             action = payload.get("action", "")
@@ -454,7 +455,9 @@ class WebRTCBridgeApp:
                 if pcm_f32_hex:
                     pcm_f32 = bytes.fromhex(pcm_f32_hex)
                     ulaw = tx_process(pcm_f32)
-                    self._active_call.send_voice(ulaw)
+                    sent = self._active_call.send_voice(ulaw)
+                    if sent:
+                        logger.debug("audio_tx sent %d bytes ulaw", len(ulaw))
             except (ValueError, KeyError) as exc:
                 logger.warning("audio_tx parse error: %s", exc)
 
