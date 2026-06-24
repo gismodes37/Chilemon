@@ -112,15 +112,15 @@ $systemInfo = $systemInfo ?? [
                     <button class="btn btn-outline-primary" onclick="window.open('https://www.qsl.net/ca2iig/', '_blank')">
                         <i class="bi bi-globe"></i> Web Site Desarrollador
                     </button>
-                    <button class="btn btn-outline-info" id="btn-audio-settings"
-                        title="Configuración de audio">
-                        <i class="bi bi-sliders"></i> Audio
-                    </button>
                     <button class="btn btn-outline-primary" onclick="window.open('https://github.com/gismodes37/Chilemon/blob/main/docs/soporte.md', '_blank')">
                         <i class="bi bi-globe"></i> Soporte
                     </button>
                     <button class="btn btn-outline-primary" onclick="window.open('https://www.qsl.net/ca2iig/', '_blank')">
                         <i class="bi bi-globe"></i> Web Site Desarrollador
+                    </button>
+                    <button class="btn btn-outline-info" id="btn-audio-settings"
+                        title="Configuración de audio">
+                        <i class="bi bi-sliders"></i> Audio
                     </button>
                     <button class="btn btn-outline-danger" id="btn-restart-asterisk"
                         onclick="confirmarReinicio('Asterisk', 'restart-asterisk')"

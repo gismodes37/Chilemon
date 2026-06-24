@@ -38,7 +38,7 @@ class AudioVisualizer {
         this.barCount = opts.barCount || 48;
         this.fftSize = opts.fftSize || 1024;
         this.decayRate = opts.decayRate || 0.88;
-        this.smoothFactor = opts.smoothFactor || 0.65;
+        this.smoothFactor = opts.smoothFactor || 0.55;
 
         /** @type {Float32Array} Current bar heights (0..1) */
         this.bars = new Float32Array(this.barCount);
@@ -132,7 +132,7 @@ class AudioVisualizer {
             );
             // Normalize: divide by fftSize, clamp to ~1.0
             // Higher multiplier = more sensitive bars
-            let normalized = (mag / this.fftSize) * 14;
+            let normalized = (mag / this.fftSize) * 20;
             if (normalized > 1) normalized = 1;
 
             // Smooth towards target
@@ -225,15 +225,15 @@ class AudioVisualizer {
             // Thresholds shifted lower so colors appear sooner
             const t = this.bars[i];
             let r, g, b;
-            if (t < 0.25) {
+            if (t < 0.15) {
                 // Green → Yellow
-                const p = t / 0.25;
+                const p = t / 0.15;
                 r = Math.floor(p * 255);
                 g = 255;
                 b = 40;
             } else {
                 // Yellow → Red
-                const p = (t - 0.25) / 0.75;
+                const p = (t - 0.15) / 0.85;
                 r = 255;
                 g = Math.floor((1 - p) * 255);
                 b = Math.floor((1 - p) * 40);
