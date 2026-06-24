@@ -686,11 +686,13 @@ class PTTWidget {
 
     _onKeyDown(e) {
         // Spacebar — but not when typing in an input/textarea
-        if (e.code === 'Space' && !e.repeat) {
+        if (e.code === 'Space') {
             const tag = document.activeElement ? document.activeElement.tagName : '';
             if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-            e.preventDefault();
-            this.keyPtt();
+            e.preventDefault(); // siempre bloquear scroll, incluso en repeat
+            if (!e.repeat) {
+                this.keyPtt();
+            }
         }
     }
 
