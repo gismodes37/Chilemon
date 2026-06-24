@@ -722,7 +722,7 @@ $systemInfo = $systemInfo ?? [
             <div class="modal-body">
                 <div class="mb-4">
                     <label class="form-label d-flex justify-content-between">
-                        <span><i class="bi bi-speaker text-success"></i> RX — Salida</span>
+                        <span><i class="bi bi-speaker text-success"></i> RX — Entrada</span>
                         <span class="text-muted" id="rx-gain-value">100%</span>
                     </label>
                     <input type="range" class="form-range audio-slider" id="rx-gain-slider"
@@ -731,7 +731,7 @@ $systemInfo = $systemInfo ?? [
                 </div>
                 <div class="mb-3">
                     <label class="form-label d-flex justify-content-between">
-                        <span><i class="bi bi-mic text-warning"></i> TX — Entrada</span>
+                        <span><i class="bi bi-mic text-warning"></i> TX — Salida</span>
                         <span class="text-muted" id="tx-gain-value">100%</span>
                     </label>
                     <input type="range" class="form-range audio-slider" id="tx-gain-slider"
