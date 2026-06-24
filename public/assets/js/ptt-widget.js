@@ -443,6 +443,11 @@ class PTTWidget {
                 };
 
                 this._micSource.connect(this._micProcessor);
+
+                // ScriptProcessorNode MUST be connected to the destination
+                // for onaudioprocess to fire — otherwise the audio graph
+                // has no sink and the browser won't drive the callback.
+                this._micProcessor.connect(this._txCtx.destination);
             })
             .catch((err) => {
                 console.warn('PTT: Mic access denied —', err.message);

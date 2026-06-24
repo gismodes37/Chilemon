@@ -447,6 +447,7 @@ class WebRTCBridgeApp:
         elif msg_type == "audio_tx":
             # Transmit audio: hex-encoded float32 PCM 16 kHz from browser
             if not self._active_call:
+                logger.debug("audio_tx dropped: no active IAX2 call")
                 return
             try:
                 pcm_f32_hex = payload.get("data", "")
