@@ -161,7 +161,12 @@ $systemInfo = $systemInfo ?? [
 
             <div class="col-md-4">
                 <div class="d-grid gap-2">
-                    <button class="btn btn-outline-primary">
+                    <button class="btn btn-outline-primary" id="btn-transmit"
+                        onmousedown="window.pttWidget && window.pttWidget.keyPtt()"
+                        onmouseup="window.pttWidget && window.pttWidget.unkeyPtt()"
+                        onmouseleave="window.pttWidget && window.pttWidget.unkeyPtt()"
+                        ontouchstart="window.pttWidget && window.pttWidget.keyPtt()"
+                        ontouchend="window.pttWidget && window.pttWidget.unkeyPtt()">
                         <i class="bi bi-mic"></i> Transmitir
                     </button>
                     <button class="btn btn-outline-secondary">
