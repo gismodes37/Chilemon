@@ -116,7 +116,7 @@ ChileMon está construido utilizando tecnologías simples y robustas.
 
 ### Puente WebRTC
 
-- Python 3.10+ (aiortc + aiohttp)
+- Python 3.11+ (aiortc + aiohttp + websockets)
 - WebSocket para audio en tiempo real
 - Protocolo IAX2 para integración con Asterisk
 
@@ -245,7 +245,7 @@ ChileMon puede instalarse directamente en un nodo **ASL3**. Se recomienda utiliz
 
 ### 📦 Opción 1: Instalación Automática (Recomendada)
 
-La forma más rápida. Solo copia y pega estos **dos comandos** en tu terminal:
+El instalador detecta automáticamente si es una instalación **NUEVA** (setup interactivo completo) o una **ACTUALIZACIÓN** (solo agrega dependencias faltantes, preserva la configuración existente).
 
 #### 1. Descargar ChileMon
 ```bash
@@ -253,37 +253,59 @@ sudo git clone https://github.com/gismodes37/Chilemon.git /opt/chilemon
 ```
 *Esto crea la carpeta `/opt/chilemon` con todos los archivos del proyecto.*
 
-#### 2. Ejecutar el instalador
+#### 2. Ejecutar el instalador principal
 ```bash
 cd /opt/chilemon && sudo bash install/install_chilemon.sh
 ```
-*El instalador te pedirá tu número de nodo ASL y la clave AMI.*
 
-> ⚠️ **Antes de empezar**: Ten a mano tu **número de nodo** ASL y la **clave AMI** (de `/etc/asterisk/manager.conf`). El instalador te las va a pedir.
+El instalador ejecuta **12 pasos**:
+1. Validar estructura del repositorio
+2. Instalar dependencias base (Apache, PHP, SQLite, Python 3)
+3. Configurar datos del nodo (NUEVO) o leer configuración existente (ACTUALIZACIÓN)
+4. Preparar carpetas y permisos
+5. Generar configuración local (NUEVO) o preservar existente (ACTUALIZACIÓN)
+6. Configurar módulos ASL3 de Asterisk
+7. Configurar Asterisk para WebRTC (IAX2 + phonelogin en rpt.conf)
+8. Instalar wrapper seguro + sudoers
+9. Configurar alias de Apache
+10. Habilitar proxy WebSocket de Apache
+11. Validar módulos PHP + inicializar base de datos
+12. Crear usuario administrador (NUEVO) o ejecutar verificación (ACTUALIZACIÓN)
+
+> ⚠️ **Instalación NUEVA**: Ten a mano tu **número de nodo** ASL y la **clave AMI** (de `/etc/asterisk/manager.conf`). El instalador te las va a pedir.
+
+> 💡 **ACTUALIZACIÓN (sistema existente)**: El instalador detecta `config/local.php` y omite todos los prompts — solo agrega dependencias faltantes, configura WebRTC/WebSocket, y ejecuta una verificación completa.
+
+#### 3. Instalar Puente WebRTC (opcional)
+Para activar Push-to-Talk (PTT) desde el navegador, ejecuta el instalador del bridge:
+```bash
+sudo bash install/install_webrtc.sh
+```
+Requiere **Python 3.11+** e instala: aiohttp, aiortc, websockets, más un servicio systemd.
+
 ---
 
 ## 🧪 Opción 2: Rama Main (Último desarrollo)
 
-Lo mismo que la Opción 1 — clonar y ejecutar el instalador. La rama main siempre tiene las últimas características:
+Clonar y ejecutar el instalador — igual que la Opción 1:
 
 ```bash
 sudo git clone https://github.com/gismodes37/Chilemon.git /opt/chilemon
 cd /opt/chilemon && sudo bash install/install_chilemon.sh
 ```
 
-El instalador configurará automáticamente Apache, PHP, SQLite y el wrapper de seguridad para que ChileMon esté listo en `http://tu_ip/chilemon`.
+El instalador configura automáticamente Apache, PHP, SQLite, el wrapper de seguridad, soporte WebRTC/WebSocket, y ejecuta una verificación. ChileMon queda listo en `http://tu_ip/chilemon`.
 
 ---
 
 ## 🐳 Opción 3: Entorno de Desarrollo Local (Docker)
 
-Para seguir avanzando en el desarrollo y poder probar ChileMon en cualquier computadora (Windows, Mac o Linux) sin necesitar un nodo real de AllStarLink, hemos creado un entorno basado en Docker que simula la actividad del nodo.
+Para probar ChileMon en cualquier computadora (Windows, Mac o Linux) sin necesitar un nodo real de AllStarLink, usa el entorno Docker que simula la actividad del nodo.
 
 ### 3.1 Requisitos
 - Tener Docker y Docker Compose instalados.
 
 ### 3.2 Levantar el entorno
-En la raíz del proyecto, ejecuta:
 ```bash
 docker-compose up -d --build
 ```
@@ -295,7 +317,7 @@ docker-compose exec chilemon php bin/create-user.php
 ```
 
 ### 3.4 Acceder al Dashboard
-Entra a `http://localhost:8080`. El entorno usa un *mock script* que simula las respuestas de `rpt` de Asterisk, permitiéndote probar la interfaz gráfica, la gestión de favoritos y la autenticación sin afectar a un nodo real.
+Entra a `http://localhost:8080`. El entorno usa un mock script que simula las respuestas de `rpt` de Asterisk, permitiéndote probar la interfaz gráfica, favoritos y autenticación sin afectar un nodo real.
 
 ---
 

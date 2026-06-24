@@ -5,6 +5,8 @@
 # Installs and enables the chilemon-webrtc systemd service alongside the
 # main ChileMon installation. Requires Python 3.11+ (Debian 12 / ASL3).
 #
+# Supports both NEW installations and UPDATES on existing systems.
+#
 # Usage:
 #   sudo bash install/install_webrtc.sh
 # ==============================================================================
@@ -16,6 +18,8 @@ SERVICE_SRC="$REPO_DIR/install/chilemon-webrtc.service"
 SERVICE_DST="/etc/systemd/system/chilemon-webrtc.service"
 DEFAULT_ENV_FILE="/etc/default/chilemon-webrtc"
 INSTALL_TS="$(date +%Y%m%d_%H%M%S)"
+
+TOTAL_STEPS=5
 
 # Colors
 if [[ -t 1 ]]; then
@@ -31,7 +35,7 @@ fi
 step() {
     echo
     echo "============================================================"
-    echo "Paso $1: $2"
+    echo "Paso $1 de ${TOTAL_STEPS}: $2"
     echo "============================================================"
 }
 
@@ -67,11 +71,35 @@ main() {
     echo "${C_CYAN}========================================${C_RESET}"
     echo
 
-    step "1 de 4" "Instalando dependencias Python"
+    step "1 de ${TOTAL_STEPS}" "Validando versión de Python"
 
-    # Packages needed for the bridge daemon
+    # Verify Python 3.11+ (required for audioop module)
+    if ! command -v python3 &>/dev/null; then
+        echo "[ERROR] python3 no encontrado. Instale python3 primero."
+        exit 1
+    fi
+
+    PYTHON_VERSION=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+    info "Python detectado: ${PYTHON_VERSION}"
+
+    # Use bc for version comparison
+    if ! command -v bc &>/dev/null; then
+        apt-get install -y bc >/dev/null 2>&1
+    fi
+
+    if [[ $(echo "$PYTHON_VERSION < 3.11" | bc -l) -eq 1 ]]; then
+        echo "[ERROR] Python 3.11+ es requerido para audioop (encontrado: ${PYTHON_VERSION})"
+        echo "[ERROR] Actualice Python o use Debian 12+ / ASL3"
+        exit 1
+    fi
+
+    ok "Python ${PYTHON_VERSION} cumple requisito mínimo (3.11+)"
+
+    step "2 de ${TOTAL_STEPS}" "Instalando dependencias Python"
+
+    # Base packages
     apt-get update -qq
-    apt-get install -y python3-aiohttp python3-aiohttp-cors
+    apt-get install -y python3-aiohttp python3-aiohttp-cors python3-websockets python3-venv
 
     # aiortc may need pip if apt version is too old
     if dpkg -s python3-aiortc &>/dev/null 2>&1; then
@@ -79,25 +107,37 @@ main() {
     else
         info "python3-aiortc no disponible en apt — intentando pip"
         if command -v pip3 &>/dev/null; then
-            pip3 install aiortc>=1.4.0
+            pip3 install "aiortc>=1.4.0"
             ok "python3-aiortc instalado vía pip3"
         elif command -v pip &>/dev/null; then
-            pip install aiortc>=1.4.0
+            pip install "aiortc>=1.4.0"
             ok "python3-aiortc instalado vía pip"
         else
             warn "pip no disponible — se omite aiortc (WebRTC deshabilitado)"
         fi
     fi
 
-    # Verify aiohttp is importable
+    # Verify critical packages are importable
+    local import_fail=0
+
     if python3 -c "import aiohttp" &>/dev/null; then
         ok "python3-aiohttp verificada"
     else
         echo "[ERROR] python3-aiohttp no se importa correctamente"
+        import_fail=1
+    fi
+
+    if python3 -c "import websockets" &>/dev/null; then
+        ok "python3-websockets verificada"
+    else
+        warn "python3-websockets no importable — WebSocket podría no funcionar"
+    fi
+
+    if [[ "$import_fail" -ne 0 ]]; then
         exit 1
     fi
 
-    step "2 de 4" "Instalando unidad systemd"
+    step "3 de ${TOTAL_STEPS}" "Instalando unidad systemd"
 
     if [[ ! -f "$SERVICE_SRC" ]]; then
         echo "[ERROR] No se encuentra $SERVICE_SRC"
@@ -109,7 +149,7 @@ main() {
     chmod 644 "$SERVICE_DST"
     ok "Unidad instalada en $SERVICE_DST"
 
-    step "3 de 4" "Configurando variables de entorno"
+    step "4 de ${TOTAL_STEPS}" "Configurando variables de entorno"
 
     if [[ ! -f "$DEFAULT_ENV_FILE" ]]; then
         cat > "$DEFAULT_ENV_FILE" <<EOF
@@ -149,7 +189,7 @@ EOF
         ok "Configuración ya existe en $DEFAULT_ENV_FILE"
     fi
 
-    step "4 de 4" "Habilitando e iniciando servicio"
+    step "5 de ${TOTAL_STEPS}" "Habilitando e iniciando servicio"
 
     systemctl daemon-reload
     systemctl enable chilemon-webrtc.service
@@ -160,6 +200,39 @@ EOF
     else
         warn "Servicio no está activo — revise con: systemctl status chilemon-webrtc"
     fi
+
+    # Verify installation
+    echo
+    info "Verificación de la instalación WebRTC:"
+
+    local pass=0
+
+    if command -v python3 &>/dev/null; then
+        ok "Python3: $(python3 --version 2>&1)"
+        pass=$((pass + 1))
+    fi
+
+    if python3 -c "import aiohttp" &>/dev/null 2>&1; then
+        ok "Paquete: aiohttp importable"
+        pass=$((pass + 1))
+    fi
+
+    if python3 -c "import websockets" &>/dev/null 2>&1; then
+        ok "Paquete: websockets importable"
+        pass=$((pass + 1))
+    fi
+
+    if [[ -f "$SERVICE_DST" ]]; then
+        ok "Servicio: chilemon-webrtc.service instalado"
+        pass=$((pass + 1))
+    fi
+
+    if systemctl is-enabled --quiet chilemon-webrtc.service 2>/dev/null; then
+        ok "Servicio: habilitado en boot"
+        pass=$((pass + 1))
+    fi
+
+    info "Verificación completada: ${pass} componentes OK"
 
     echo
     echo "${C_CYAN}========================================${C_RESET}"

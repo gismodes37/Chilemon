@@ -115,7 +115,7 @@ ChileMon is built using simple and robust technologies.
 
 ### WebRTC Bridge
 
-- Python 3.10+ (aiortc + aiohttp)
+- Python 3.11+ (aiortc + aiohttp + websockets)
 - WebSocket for real-time audio
 - IAX2 protocol for Asterisk integration
 
@@ -241,11 +241,12 @@ ChileMon **does not replace Supermon**, but instead offers a modern alternative 
 
 
 # 🚀 Installation Options
+
 ChileMon can be installed directly on an **ASL3** node. It is recommended to use a Debian-based system (such as the official ASL3 image).
 
 ### 📦 Option 1: Automatic Installation (Recommended)
 
-This is the fastest way. Just copy and paste these **two commands** into your terminal:
+The installer auto-detects between **NEW** (full interactive setup) and **UPDATE** (adds missing dependencies only, preserves existing config). Just copy and paste these commands:
 
 #### 1. Download ChileMon
 ```bash
@@ -253,50 +254,59 @@ sudo git clone https://github.com/gismodes37/Chilemon.git /opt/chilemon
 ```
 *This creates the folder `/opt/chilemon` with all the project files.*
 
-#### 2. Run the installer
+#### 2. Run the main installer
 ```bash
 cd /opt/chilemon && sudo bash install/install_chilemon.sh
 ```
-*The installer will ask you for your ASL node number and AMI password.*
 
-> ⚠️ **Before starting**: Have your ASL **node number** and **AMI password** (from `/etc/asterisk/manager.conf`) ready. The installer will ask you for them.
+The installer runs **12 steps**:
+1. Validate repository structure
+2. Install base dependencies (Apache, PHP, SQLite, Python 3)
+3. Configure node data (NEW) or read existing config (UPDATE)
+4. Prepare directories and permissions
+5. Generate local config (NEW) or preserve existing (UPDATE)
+6. Configure ASL3 Asterisk modules
+7. Configure Asterisk for WebRTC (IAX2 + rpt.conf phonelogin)
+8. Install secure wrapper + sudoers
+9. Configure Apache alias
+10. Enable Apache WebSocket proxy
+11. Validate PHP modules + initialize database
+12. Create admin user (NEW) or run installation verification (UPDATE)
+
+> ⚠️ **NEW installation**: Have your ASL **node number** and **AMI password** (from `/etc/asterisk/manager.conf`) ready. The installer will ask you for them.
+
+> 💡 **UPDATE (existing system)**: The installer detects `config/local.php` and skips all prompts — it only adds missing dependencies, configures WebRTC/WebSocket, and runs a full verification.
+
+#### 3. Install WebRTC Audio Bridge (optional)
+For browser-based Push-to-Talk (PTT), run the WebRTC bridge installer:
+```bash
+sudo bash install/install_webrtc.sh
+```
+This requires **Python 3.11+** and installs: aiohttp, aiortc, websockets, plus a systemd service.
 
 ---
 
 ### 🧪 Option 2: Main Branch (Latest Development)
 
-Same as Option 1 — just clone and run:
+Clone the repo and run the installer — same as Option 1:
 
 ```bash
 sudo git clone https://github.com/gismodes37/Chilemon.git /opt/chilemon
+cd /opt/chilemon && sudo bash install/install_chilemon.sh
 ```
 
-### 2.2 Enter the directory
+The installer automatically configures Apache, PHP, SQLite, the security wrapper, WebRTC/WebSocket support, and runs a verification. ChileMon will be ready at `http://your_ip/chilemon`.
 
-```bash
-cd /opt/chilemon
-```
-
-### 2.3 Run the automatic installer
-#### (Make sure to have your node ID and AMI password ready)
-
-```bash
-sudo bash install/install_chilemon.sh
-```
-
-The installer will automatically configure Apache, PHP, SQLite, and the security wrapper so ChileMon is ready at `http://your_ip/chilemon`.
-
- ---
+---
 
 ### 🐳 Option 3: Local Development Environment (Docker)
 
-To continue advancing development and be able to test ChileMon on any computer (Windows, Mac, or Linux) without needing a real AllStarLink node, we have created a Docker-based environment that simulates node activity.
+To test ChileMon on any computer (Windows, Mac, or Linux) without needing a real AllStarLink node, use the Docker environment that simulates node activity.
 
 #### 3.1 Requirements
 - Docker and Docker Compose installed.
 
 #### 3.2 Start the environment
-In the root of the project, run:
 ```bash
 docker-compose up -d --build
 ```
@@ -308,9 +318,9 @@ docker-compose exec chilemon php bin/create-user.php
 ```
 
 #### 3.4 Access the Dashboard
-Go to `http://localhost:8080`. The environment uses a mock script that simulates Asterisk `rpt` responses, allowing you to test the graphical interface, favorites management, and authentication without affecting a real node.
+Go to `http://localhost:8080`. The environment uses a mock script that simulates Asterisk `rpt` responses, allowing you to test the GUI, favorites management, and authentication without affecting a real node.
 
- ---
+---
 
  ## 📂 Project Structure
 

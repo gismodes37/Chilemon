@@ -3,6 +3,7 @@
 # ChileMon - Instalador automático principal
 # ------------------------------------------------------------------------------
 # Este script instala ChileMon en un nodo Debian/ASL3 con Apache + PHP + SQLite.
+# Soporta instalación NUEVA y ACTUALIZACIÓN de un sistema existente.
 # Está pensado para ejecutarse después de clonar el repositorio en /opt/chilemon.
 #
 # Uso:
@@ -26,8 +27,15 @@ BACKUP_DIR="$REPO_DIR/backups"
 PUBLIC_DIR="$REPO_DIR/public"
 INSTALLER_PHP="$REPO_DIR/bin/install.php"
 MANAGER_CONF="/etc/asterisk/manager.conf"
+ASTERISK_IAX_CONF="/etc/asterisk/iax.conf"
+ASTERISK_RPT_CONF="/etc/asterisk/rpt.conf"
+INSTALL_IAX_SNIPPET="$REPO_DIR/install/asterisk/iax.conf"
+INSTALL_RPT_DOCS="$REPO_DIR/install/asterisk/rpt.conf"
 DEFAULT_NODE_PROTO="https"
 ASL3_MODULES_ADDED=0
+INSTALL_MODE="new"
+
+TOTAL_STEPS=12
 
 
 # ------------------------------------------------------------------------------
@@ -80,7 +88,7 @@ step() {
     local msg="$2"
     echo
     echo "============================================================"
-    echo "Paso ${num}: ${msg}"
+    echo "Paso ${num} de ${TOTAL_STEPS}: ${msg}"
     echo "============================================================"
 }
 
@@ -129,23 +137,33 @@ validate_php_modules() {
 
     local missing=0
 
-    if ! php -m | grep -q '^PDO$'; then
+    if ! php -m | grep -qi '^PDO$'; then
         echo "[ERROR] PHP no tiene cargado el módulo PDO."
         missing=1
     fi
 
-    if ! php -m | grep -q '^pdo_sqlite$'; then
+    if ! php -m | grep -qi '^pdo_sqlite$'; then
         echo "[ERROR] PHP no tiene cargado el módulo pdo_sqlite."
         missing=1
     fi
 
-    if ! php -m | grep -q '^sqlite3$'; then
+    if ! php -m | grep -qi '^sqlite3$'; then
         echo "[ERROR] PHP no tiene cargado el módulo sqlite3."
         missing=1
     fi
 
-    if ! php -m | grep -q '^curl$'; then
+    if ! php -m | grep -qi '^curl$'; then
         echo "[ERROR] PHP no tiene cargado el módulo curl."
+        missing=1
+    fi
+
+    if ! php -m | grep -qi '^json$'; then
+        echo "[ERROR] PHP no tiene cargado el módulo json (requerido para WebSocket)."
+        missing=1
+    fi
+
+    if ! php -m | grep -qi '^mbstring$'; then
+        echo "[ERROR] PHP no tiene cargado el módulo mbstring."
         missing=1
     fi
 
@@ -154,12 +172,12 @@ validate_php_modules() {
         echo "[ERROR] La instalación no puede continuar porque faltan módulos PHP."
         echo "[ERROR] Revise la configuración de PHP en este nodo."
         echo "[ERROR] Sugerencia inicial:"
-        echo "        sudo apt install --reinstall -y php8.4-common php8.4-cli libapache2-mod-php8.4 php8.4-sqlite3 php-sqlite3 php-curl"
-        echo "        php -m | grep -E 'PDO|pdo_sqlite|sqlite3|curl'"
+        echo "        sudo apt install --reinstall -y php8.4-common php8.4-cli libapache2-mod-php8.4 php8.4-sqlite3 php-sqlite3 php-curl php-mbstring php-json"
+        echo "        php -m | grep -E 'PDO|pdo_sqlite|sqlite3|curl|json|mbstring'"
         exit 1
     fi
 
-    ok "PHP tiene cargados PDO, pdo_sqlite, sqlite3 y curl"
+    ok "PHP tiene cargados PDO, pdo_sqlite, sqlite3, curl, json y mbstring"
 }
 
 detect_server_host() {
@@ -393,6 +411,43 @@ EOF2
     ok "Apache configurado con alias /chilemon"
 }
 
+enable_apache_websocket() {
+    info "Habilitando proxy WebSocket para Apache"
+
+    # Enable required Apache modules
+    if ! apache2ctl -M 2>/dev/null | grep -q 'proxy_wstunnel_module'; then
+        a2enmod proxy_wstunnel >/dev/null 2>&1
+        ok "Apache module mod_proxy_wstunnel habilitado"
+    else
+        ok "Apache module mod_proxy_wstunnel ya habilitado"
+    fi
+
+    if ! apache2ctl -M 2>/dev/null | grep -q 'proxy_module'; then
+        a2enmod proxy >/dev/null 2>&1
+        ok "Apache module mod_proxy habilitado"
+    else
+        ok "Apache module mod_proxy ya habilitado"
+    fi
+
+    # Add WebSocket proxy config
+    local ws_conf="/etc/apache2/conf-available/chilemon-websocket.conf"
+    backup_if_exists "$ws_conf"
+
+    cat > "$ws_conf" <<'EOF2'
+# -----------------------------------------------------------------------------
+# ChileMon — WebSocket Proxy para WebRTC Audio Bridge
+# Archivo generado por el instalador automático.
+# Redirige /ws al bridge Python en el puerto 9091.
+# -----------------------------------------------------------------------------
+
+ProxyPass /ws ws://127.0.0.1:9091/ws
+ProxyPassReverse /ws ws://127.0.0.1:9091/ws
+EOF2
+
+    a2enconf chilemon-websocket >/dev/null 2>&1 || true
+    ok "WebSocket proxy configurado en $ws_conf"
+}
+
 run_php_installer() {
     if [[ ! -f "$INSTALLER_PHP" ]]; then
         warn "No existe bin/install.php. Se omite inicialización PHP."
@@ -454,6 +509,147 @@ configure_asl3_modules() {
 }
 
 
+configure_webrtc_asterisk() {
+    info "Configurando Asterisk para WebRTC Audio Bridge"
+
+    # Step 1: Append IAX2 snippet to iax.conf
+    if [[ -f "$INSTALL_IAX_SNIPPET" ]]; then
+        if [[ -f "$ASTERISK_IAX_CONF" ]]; then
+            # Check if [webrtc-bridge] section already exists in target
+            if grep -q '^\[webrtc-bridge\]' "$ASTERISK_IAX_CONF"; then
+                ok "Sección [webrtc-bridge] ya existe en $ASTERISK_IAX_CONF — se omite"
+            else
+                backup_if_exists "$ASTERISK_IAX_CONF"
+                echo "" >> "$ASTERISK_IAX_CONF"
+                cat "$INSTALL_IAX_SNIPPET" >> "$ASTERISK_IAX_CONF"
+                ok "Snippet IAX2 ([webrtc-bridge]) agregado a $ASTERISK_IAX_CONF"
+                warn "IMPORTANTE: Cambie CHANGEME_PHONE_SECRET en $ASTERISK_IAX_CONF"
+            fi
+        else
+            warn "$ASTERISK_IAX_CONF no existe — se omite snippet IAX2"
+        fi
+    else
+        warn "Snippet IAX2 no encontrado en $INSTALL_IAX_SNIPPET"
+    fi
+
+    # Step 2: Add phonelogin directives to rpt.conf node block
+    if [[ -f "$ASTERISK_RPT_CONF" ]]; then
+        # Detect the first [NODE_NUMBER] section (ASL node)
+        local node_section
+        node_section=$(awk '/^\[[0-9]+\]/ { gsub(/[\[\]]/, ""); print; exit }' "$ASTERISK_RPT_CONF")
+
+        if [[ -n "$node_section" ]]; then
+            if grep -q 'phonelogin=yes' "$ASTERISK_RPT_CONF"; then
+                ok "phonelogin=yes ya configurado en $ASTERISK_RPT_CONF"
+            else
+                backup_if_exists "$ASTERISK_RPT_CONF"
+                # Insert phonelogin and phonecontext after the node section line
+                sed -i "/^\[${node_section}\]$/a phonelogin=yes\\nphonecontext=radio-ptt" "$ASTERISK_RPT_CONF"
+                ok "phonelogin=yes y phonecontext=radio-ptt agregados al bloque [${node_section}]"
+            fi
+        else
+            warn "No se encontró bloque [NODE] en $ASTERISK_RPT_CONF — se omite"
+        fi
+    else
+        warn "$ASTERISK_RPT_CONF no existe — se omite configuración de phonelogin"
+    fi
+}
+
+
+run_verification() {
+    info "Verificación final de la instalación"
+
+    local pass=0
+    local fail=0
+
+    # Check PHP extensions
+    for mod in PDO pdo_sqlite sqlite3 curl json mbstring; do
+        if php -m | grep -qi "^${mod}$"; then
+            ok "PHP módulo: $mod"
+            pass=$((pass + 1))
+        else
+            warn "PHP módulo faltante: $mod"
+            fail=$((fail + 1))
+        fi
+    done
+
+    # Check Python packages
+    if command -v python3 &>/dev/null; then
+        ok "Python3 instalado: $(python3 --version 2>&1)"
+        pass=$((pass + 1))
+    else
+        warn "Python3 no encontrado"
+        fail=$((fail + 1))
+    fi
+
+    if python3 -c "import aiohttp" &>/dev/null 2>&1; then
+        ok "Python paquete: aiohttp"
+        pass=$((pass + 1))
+    else
+        warn "Python paquete faltante: aiohttp"
+        fail=$((fail + 1))
+    fi
+
+    # Check Asterisk config files
+    if [[ -f "$ASTERISK_IAX_CONF" ]]; then
+        ok "Asterisk config: iax.conf existe"
+        pass=$((pass + 1))
+    else
+        warn "Asterisk config faltante: iax.conf"
+        fail=$((fail + 1))
+    fi
+
+    if [[ -f "$ASTERISK_RPT_CONF" ]]; then
+        ok "Asterisk config: rpt.conf existe"
+        pass=$((pass + 1))
+    else
+        warn "Asterisk config faltante: rpt.conf"
+        fail=$((fail + 1))
+    fi
+
+    # Check Apache modules
+    if apache2ctl -M 2>/dev/null | grep -q 'proxy_wstunnel_module'; then
+        ok "Apache módulo: proxy_wstunnel"
+        pass=$((pass + 1))
+    else
+        warn "Apache módulo faltante: proxy_wstunnel"
+        fail=$((fail + 1))
+    fi
+
+    if apache2ctl -M 2>/dev/null | grep -q 'rewrite_module'; then
+        ok "Apache módulo: rewrite"
+        pass=$((pass + 1))
+    else
+        warn "Apache módulo faltante: rewrite"
+        fail=$((fail + 1))
+    fi
+
+    # Check systemd service (if webrtc installer has been run)
+    if systemctl list-unit-files | grep -q 'chilemon-webrtc.service'; then
+        ok "Servicio systemd: chilemon-webrtc registrado"
+        pass=$((pass + 1))
+    else
+        info "Servicio chilemon-webrtc no registrado (instale con install_webrtc.sh)"
+    fi
+
+    # Check ChileMon database
+    if [[ -f "${DATA_DIR}/chilemon.sqlite" ]]; then
+        ok "Base de datos SQLite: chilemon.sqlite existe"
+        pass=$((pass + 1))
+    else
+        warn "Base de datos faltante: chilemon.sqlite"
+        fail=$((fail + 1))
+    fi
+
+    echo
+    info "Verificación completada: ${pass} OK, ${fail} pendientes"
+
+    if [[ "$fail" -gt 0 ]]; then
+        warn "Algunos componentes requieren atención. Revise los mensajes anteriores."
+    fi
+}
+
+
 print_final_banner() {
     local local_node="$1"
     local server_host="$2"
@@ -509,6 +705,7 @@ validate_installation() {
     echo
     echo "Resumen técnico"
     echo "---------------"
+    echo "Modo     : ${INSTALL_MODE}"
     echo "Proyecto : $REPO_DIR"
     echo "Wrapper  : $WRAPPER_PATH"
     echo "Config   : $LOCAL_CONFIG"
@@ -524,16 +721,34 @@ main() {
     echo "ChileMon - Instalador automático"
     echo "--------------------------------"
     echo "Proyecto detectado en: $REPO_DIR"
-    echo "Este script no elimina el proyecto existente."
-    echo
-    read -r -p "¿Desea continuar con la instalación? [s/N]: " confirm
-    [[ "$confirm" =~ ^[sS]$ ]] || { echo "Instalación cancelada."; exit 0; }
 
-    step "1 de 10" "Validando estructura del repositorio"
+    # ----------------------------------------------------------
+    # Detection: NEW install vs UPDATE
+    # ----------------------------------------------------------
+    if [[ -f "$LOCAL_CONFIG" ]]; then
+        INSTALL_MODE="update"
+        echo
+        echo "[UPDATE] Se detectó configuración existente en $LOCAL_CONFIG"
+        echo "[UPDATE] Este modo SOLO instala dependencias faltantes."
+        echo "[UPDATE] NO se sobrescribirán configuraciones existentes."
+        echo
+        read -r -p "¿Desea continuar con la actualización? [s/N]: " confirm
+        [[ "$confirm" =~ ^[sS]$ ]] || { echo "Instalación cancelada."; exit 0; }
+    else
+        INSTALL_MODE="new"
+        echo
+        echo "[NUEVA] No se detectó configuración previa. Se realizará una instalación completa."
+        echo "Este script no elimina el proyecto existente."
+        echo
+        read -r -p "¿Desea continuar con la instalación? [s/N]: " confirm
+        [[ "$confirm" =~ ^[sS]$ ]] || { echo "Instalación cancelada."; exit 0; }
+    fi
+
+    step "1 de ${TOTAL_STEPS}" "Validando estructura del repositorio"
     check_repo_structure
     ok "Estructura del repositorio validada"
 
-    step "2 de 10" "Instalando dependencias base"
+    step "2 de ${TOTAL_STEPS}" "Instalando dependencias base"
     apt-get update
     ensure_package git
     ensure_package apache2
@@ -542,98 +757,148 @@ main() {
     ensure_package php-curl
     ensure_package sqlite3
     ensure_package sudo
+    ensure_package python3
+    ensure_package python3-pip
+    ensure_package python3-venv
     ok "Dependencias instaladas o ya presentes"
 
-    step "3 de 10" "Detectando datos del nodo y solicitando confirmación"
-
+    # ----------------------------------------------------------
+    # Variables for configuration (populated differently per mode)
+    # ----------------------------------------------------------
     local local_node=""
-    while [[ -z "$local_node" ]]; do
-        read -r -p "Ingrese su N° de nodo ASL local: " local_node
-        [[ "$local_node" =~ ^[0-9]+$ ]] || { echo "Debe ingresar solo números."; local_node=""; }
-    done
-
-    local detected_server_host=""
-    detected_server_host="$(detect_server_host)"
-
     local server_host=""
-    read -r -p "Nombre DNS o IP del servidor [${detected_server_host}]: " server_host
-    server_host="${server_host:-$detected_server_host}"
-
     local web_proto=""
-    web_proto="$(detect_web_proto)"
-
     local header_tagline=""
-    read -r -p "Ingrese texto descriptivo del nodo [Nodo local ChileMon]: " header_tagline
-    header_tagline="${header_tagline:-Nodo local ChileMon}"
-
     local ami_host=""
-    ami_host="$(detect_ami_host)"
-
     local ami_port=""
-    ami_port="$(detect_ami_port)"
-
     local ami_user=""
-    ami_user="$(detect_ami_user)"
-
+    local ami_pass=""
     local ami_timeout="$DEFAULT_AMI_TIMEOUT"
 
-    echo
-    info "Se detectó la siguiente configuración AMI:"
-    info "  Host    : ${ami_host}"
-    info "  Puerto  : ${ami_port}"
-    info "  Usuario : ${ami_user}"
-    info "  Timeout : ${ami_timeout} segundos"
-    echo
+    if [[ "$INSTALL_MODE" == "new" ]]; then
+        # ----------------------------------------------------------
+        # NEW INSTALLATION — interactive prompts
+        # ----------------------------------------------------------
+        step "3 de ${TOTAL_STEPS}" "Detectando datos del nodo y solicitando confirmación"
 
-    local ami_pass=""
-    echo "Ingrese la clave AMI configurada en /etc/asterisk/manager.conf."
-    echo "El usuario AMI corresponde al nombre del bloque detectado, "
-    echo "por ejemplo: [admin] => usuario admin."
-    while [[ -z "$ami_pass" ]]; do
-        read -r -s -p "Ingrese clave AMI (obligatorio): " ami_pass
-        echo ""
-        if [[ -z "$ami_pass" ]]; then
-            echo "[ERROR] La clave AMI es obligatoria. Revisa /etc/asterisk/manager.conf"
+        while [[ -z "$local_node" ]]; do
+            read -r -p "Ingrese su N° de nodo ASL local: " local_node
+            [[ "$local_node" =~ ^[0-9]+$ ]] || { echo "Debe ingresar solo números."; local_node=""; }
+        done
+
+        detected_server_host="$(detect_server_host)"
+
+        read -r -p "Nombre DNS o IP del servidor [${detected_server_host}]: " server_host
+        server_host="${server_host:-$detected_server_host}"
+
+        web_proto="$(detect_web_proto)"
+
+        read -r -p "Ingrese texto descriptivo del nodo [Nodo local ChileMon]: " header_tagline
+        header_tagline="${header_tagline:-Nodo local ChileMon}"
+
+        ami_host="$(detect_ami_host)"
+        ami_port="$(detect_ami_port)"
+        ami_user="$(detect_ami_user)"
+
+        echo
+        info "Se detectó la siguiente configuración AMI:"
+        info "  Host    : ${ami_host}"
+        info "  Puerto  : ${ami_port}"
+        info "  Usuario : ${ami_user}"
+        info "  Timeout : ${ami_timeout} segundos"
+        echo
+
+        echo "Ingrese la clave AMI configurada en /etc/asterisk/manager.conf."
+        echo "El usuario AMI corresponde al nombre del bloque detectado, "
+        echo "por ejemplo: [admin] => usuario admin."
+        while [[ -z "$ami_pass" ]]; do
+            read -r -s -p "Ingrese clave AMI (obligatorio): " ami_pass
+            echo ""
+            if [[ -z "$ami_pass" ]]; then
+                echo "[ERROR] La clave AMI es obligatoria. Revisa /etc/asterisk/manager.conf"
+            fi
+        done
+
+        ok "Nodo local capturado: $local_node"
+        ok "Servidor detectado/configurado: $server_host"
+        ok "Usuario AMI detectado: $ami_user"
+
+    else
+        # ----------------------------------------------------------
+        # UPDATE MODE — read existing config, skip prompts
+        # ----------------------------------------------------------
+        step "3 de ${TOTAL_STEPS}" "Leyendo configuración existente"
+
+        # Extract values from existing local.php (which returns an array)
+        local_node="$(php -r "\$cfg = require '$LOCAL_CONFIG'; echo \$cfg['local_node'] ?? '';")"
+        server_host="$(php -r "\$cfg = require '$LOCAL_CONFIG'; echo \$cfg['server_host'] ?? '';")"
+        header_tagline="$(php -r "\$cfg = require '$LOCAL_CONFIG'; echo \$cfg['header_tagline'] ?? '';")"
+        ami_host="$(php -r "\$cfg = require '$LOCAL_CONFIG'; echo \$cfg['ami_host'] ?? '';")"
+        ami_port="$(php -r "\$cfg = require '$LOCAL_CONFIG'; echo \$cfg['ami_port'] ?? '';")"
+        ami_user="$(php -r "\$cfg = require '$LOCAL_CONFIG'; echo \$cfg['ami_user'] ?? '';")"
+
+        web_proto="$(detect_web_proto)"
+
+        if [[ -z "$local_node" ]]; then
+            warn "No se pudo extraer local_node de $LOCAL_CONFIG"
+            warn "Continuando con modo actualización sin valores de configuración"
+        else
+            ok "Configuración existente detectada:"
+            ok "  Nodo       : $local_node"
+            ok "  Servidor   : $server_host"
+            ok "  Usuario AMI: $ami_user"
         fi
-    done
+    fi
 
-    ok "Nodo local capturado: $local_node"
-    ok "Servidor detectado/configurado: $server_host"
-    ok "Usuario AMI detectado: $ami_user"
-
-    step "4 de 10" "Preparando carpetas y permisos"
+    step "4 de ${TOTAL_STEPS}" "Preparando carpetas y permisos"
     mkdir -p "$DATA_DIR" "$LOG_DIR" "$BACKUP_DIR" "$REPO_DIR/config"
     chown -R www-data:www-data "$DATA_DIR" "$LOG_DIR" "$BACKUP_DIR"
     chmod -R 775 "$DATA_DIR" "$LOG_DIR" "$BACKUP_DIR"
     ok "Carpetas preparadas y permisos aplicados"
 
-    step "5 de 10" "Generando configuración local"
-    write_local_config \
-        "$local_node" \
-        "$server_host" \
-        "$header_tagline" \
-        "$ami_host" \
-        "$ami_port" \
-        "$ami_user" \
-        "$ami_pass" \
-        "$ami_timeout"
+    step "5 de ${TOTAL_STEPS}" "Generando configuración local"
+    if [[ "$INSTALL_MODE" == "update" ]]; then
+        info "Modo actualización — configuración existente preservada"
+        ok "Archivo de configuración mantenido: $LOCAL_CONFIG"
+    else
+        write_local_config \
+            "$local_node" \
+            "$server_host" \
+            "$header_tagline" \
+            "$ami_host" \
+            "$ami_port" \
+            "$ami_user" \
+            "$ami_pass" \
+            "$ami_timeout"
+    fi
 
-    step "6 de 10" "Configurando módulos de Asterisk para ASL3"
+    step "6 de ${TOTAL_STEPS}" "Configurando módulos de Asterisk para ASL3"
     configure_asl3_modules
 
-    step "7 de 10" "Instalando wrapper y sudoers"
+    step "7 de ${TOTAL_STEPS}" "Configurando Asterisk para WebRTC"
+    configure_webrtc_asterisk
+
+    step "8 de ${TOTAL_STEPS}" "Instalando wrapper y sudoers"
     write_wrapper_if_missing
     write_sudoers
 
-    step "8 de 10" "Configurando Apache"
+    step "9 de ${TOTAL_STEPS}" "Configurando Apache"
     write_apache_config
 
-    step "9 de 10" "Validando PHP e inicializando ChileMon"
+    step "10 de ${TOTAL_STEPS}" "Habilitando proxy WebSocket para Apache"
+    enable_apache_websocket
+
+    step "11 de ${TOTAL_STEPS}" "Validando PHP e inicializando ChileMon"
     validate_php_modules
     run_php_installer
 
-    step "10 de 10" "Creando usuario administrador de ChileMon"
-    run_php_user_creation
+    if [[ "$INSTALL_MODE" == "new" ]]; then
+        step "12 de ${TOTAL_STEPS}" "Creando usuario administrador de ChileMon"
+        run_php_user_creation
+    else
+        step "12 de ${TOTAL_STEPS}" "Verificación de la instalación"
+        run_verification
+    fi
 
     validate_installation "$local_node" "$server_host" "$ami_user" "definido durante instalación" "$web_proto"
 }
