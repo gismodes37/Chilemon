@@ -37,20 +37,26 @@ class NodeApiController
             if ($userId > 0) {
                 try {
                     $db = \App\Core\Database::getConnection();
-                    $st = $db->prepare("SELECT node_id, alias FROM favorites WHERE user_id = :uid");
+                    $st = $db->prepare("SELECT node_id, alias, description FROM favorites WHERE user_id = :uid");
                     $st->execute([':uid' => $userId]);
-                    $favorites = $st->fetchAll(\PDO::FETCH_KEY_PAIR); // [ '494780' => 'Mi Nodo', ... ]
+                    $favorites = $st->fetchAll(\PDO::FETCH_ASSOC);
                 } catch (\Throwable $e) {
                     error_log("Error cargando favoritos en NodeApiController: " . $e->getMessage());
                     $favorites = [];
                 }
             }
 
+            $favMap = [];
+            foreach ($favorites as $fav) {
+                $favMap[$fav['node_id']] = $fav;
+            }
+
             foreach ($allNodes as $nodeId) {
                 $isDirect   = isset($directLookup[$nodeId]);
                 $isVisible  = isset($visibleLookup[$nodeId]);
-                $isFav      = isset($favorites[$nodeId]);
-                $alias      = (string)($favorites[$nodeId] ?? '');
+                $isFav      = isset($favMap[$nodeId]);
+                $alias      = (string)($favMap[$nodeId]['alias'] ?? '');
+                $favDesc    = (string)($favMap[$nodeId]['description'] ?? '');
                 
                 // Detectar modo: nodos EchoLink en ASL empiezan con 3 y tienen 7 dígitos
                 $isEchoLink = str_starts_with((string)$nodeId, '3') && strlen((string)$nodeId) === 7;
@@ -62,6 +68,7 @@ class NodeApiController
                     'node'            => (string)$nodeId,
                     'is_favorite'     => $isFav,
                     'alias'           => $alias,
+                    'description'     => $favDesc,
                     'info'            => (string)$nodeInfo,
                     'received'        => '--',
                     'link'            => $isDirect ? 'DIRECTO' : ($isVisible ? 'VISIBLE' : '--'),

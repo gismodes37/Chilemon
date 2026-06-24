@@ -348,6 +348,8 @@ function renderNodes(nodes) {
 
     <td>${escapeHtml(n.info || "")}</td>
 
+    <td class="text-muted small">${escapeHtml(n.description || "")}</td>
+
     <td>${escapeHtml(n.received || "--")}</td>
 
     <td>${activityHtml}</td>
