@@ -43,12 +43,17 @@ class DashboardController
             if ($userId > 0) {
                 try {
                     $db = \App\Core\Database::getConnection();
-                    $st = $db->prepare("SELECT node_id, alias FROM favorites WHERE user_id = :uid");
+                    $st = $db->prepare("SELECT node_id, alias, description FROM favorites WHERE user_id = :uid");
                     $st->execute([':uid' => $userId]);
-                    $favorites = $st->fetchAll(\PDO::FETCH_KEY_PAIR);
+                    $favorites = $st->fetchAll(\PDO::FETCH_ASSOC);
                 } catch (\Throwable $e) {
                     error_log("Error cargando favoritos en DashboardController: " . $e->getMessage());
                 }
+            }
+
+            $favMap = [];
+            foreach ($favorites as $fav) {
+                $favMap[$fav['node_id']] = $fav;
             }
 
             foreach ($directTableNodes as $nodeId) {
@@ -67,8 +72,9 @@ class DashboardController
                     $remoteScope = 'global';
                 }
 
-                $isFav = isset($favorites[$nodeId]);
-                $alias = (string)($favorites[$nodeId] ?? '');
+                $isFav = isset($favMap[$nodeId]);
+                $alias = (string)($favMap[$nodeId]['alias'] ?? '');
+                $favDesc = (string)($favMap[$nodeId]['description'] ?? '');
 
                 // Detectar modo: nodos EchoLink en ASL empiezan con 3 y tienen 7 dígitos
                 $isEchoLink = str_starts_with((string)$nodeId, '3') && strlen((string)$nodeId) === 7;
@@ -80,6 +86,7 @@ class DashboardController
                     'node_id'          => (string)$nodeId,
                     'is_favorite'      => $isFav,
                     'alias'            => $alias,
+                    'description'      => $favDesc,
                     'info'             => (string)$nodeName,
                     'name'             => (string)$nodeName,
                     'received'         => '--',

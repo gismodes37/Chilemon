@@ -143,7 +143,7 @@ $systemInfo = $systemInfo ?? [
                 title="Audio spectrum — TX/RX activity"></canvas>
         </div>
     </div>
-    
+
 
     <div class="control-panel">
         <div class="row align-items-center">
@@ -193,7 +193,7 @@ $systemInfo = $systemInfo ?? [
             </h3>
             <div class="input-group" style="max-width: 250px;">
                 <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
-                <input type="text" id="node-search-filter" class="form-control border-start-0 ps-0" placeholder="Filtrar nodos...">
+                <input type="text" id="node-search-filter" class="form-control border-start-0 ps-0" placeholder=" Filtrar nodos...">
             </div>
         </div>
 
@@ -204,6 +204,7 @@ $systemInfo = $systemInfo ?? [
                         <tr>
                             <th width="100">Nodo ID</th>
                             <th>Información del nodo</th>
+                            <th>Descripción</th>
                             <th width="120">Recibido</th>
                             <th width="110">Actividad</th>
                             <th width="100">Enlace</th>
@@ -216,7 +217,7 @@ $systemInfo = $systemInfo ?? [
                     <tbody id="nodes-table-body">
                         <?php if (empty($nodos)): ?>
                             <tr>
-                                <td colspan="9" class="text-center py-4 text-muted">
+                                <td colspan="10" class="text-center py-4 text-muted">
                                     <i class="bi bi-exclamation-triangle"></i> No hay nodos disponibles
                                 </td>
                             </tr>
@@ -286,6 +287,8 @@ $systemInfo = $systemInfo ?? [
                                     </td>
 
                                     <td><?= htmlspecialchars($nodeInfo, ENT_QUOTES, 'UTF-8') ?></td>
+
+                                    <td class="text-muted small"><?= htmlspecialchars((string)($nodo['description'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
 
                                     <td><?= htmlspecialchars($receivedText, ENT_QUOTES, 'UTF-8') ?></td>
 
@@ -623,11 +626,11 @@ $systemInfo = $systemInfo ?? [
                 <div class="modal-body">
                     <form id="favForm" class="row g-3">
                         <div class="col-md-3">
-                            <label class="form-label">Nodo</label>
+                            <label class="form-label">Nodo ID</label>
                             <input class="form-control" name="node_id" id="fav_node_id" placeholder="Ej: 2002" maxlength="10" required>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label">Alias</label>
+                            <label class="form-label">Información del nodo</label>
                             <input class="form-control" name="alias" id="fav_alias" placeholder="Ej: Serena Link" maxlength="60">
                         </div>
                         <div class="col-md-5">
@@ -658,8 +661,8 @@ $systemInfo = $systemInfo ?? [
                         <table class="table table-sm align-middle">
                             <thead>
                                 <tr>
-                                    <th>Nodo</th>
-                                    <th>Alias</th>
+                                    <th>Nodo ID</th>
+                                    <th>Información del nodo</th>
                                     <th>Descripción</th>
                                     <th class="text-end">Acciones</th>
                                 </tr>

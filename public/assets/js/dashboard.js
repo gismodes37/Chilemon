@@ -319,7 +319,7 @@ function renderNodes(nodes) {
   if (!Array.isArray(nodes) || nodes.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="9" class="text-center py-3 text-muted">
+        <td colspan="10" class="text-center py-3 text-muted">
           Sin nodos conectados
         </td>
       </tr>`;
@@ -908,9 +908,14 @@ function favoritesClearForm() {
   const b = document.getElementById("fav_alias");
   const c = document.getElementById("fav_desc");
 
-  if (a) a.value = "";
+  if (a) { a.value = ""; a.disabled = false; }
   if (b) b.value = "";
   if (c) c.value = "";
+
+  const submitBtn = document.querySelector('#favForm button[type="submit"]');
+  if (submitBtn) {
+    submitBtn.innerHTML = '<i class="bi bi-save"></i> Guardar';
+  }
 }
 
 /**
@@ -975,6 +980,9 @@ function renderFavorites(items) {
             <button class="btn btn-success" data-fav-connect="${node}">
               <i class="bi bi-telephone"></i> Conectar
             </button>
+            <button class="btn btn-outline-primary" data-fav-edit="${node}" data-fav-alias="${escapeHtml(it.alias || "")}" data-fav-desc="${escapeHtml(it.description || "")}">
+              <i class="bi bi-pencil"></i>
+            </button>
             <button class="btn btn-outline-danger" data-fav-delete="${node}">
               <i class="bi bi-trash"></i>
             </button>
@@ -1025,6 +1033,28 @@ function renderFavorites(items) {
         if (err.message !== "Unauthorized") {
           alert(`Error eliminando favorito: ${err.message}`);
         }
+      }
+    });
+  });
+
+  // Enlazar botones "Editar" — carga datos en el formulario para editar
+  tbody.querySelectorAll("[data-fav-edit]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const node = btn.getAttribute("data-fav-edit") || "";
+      const alias = btn.getAttribute("data-fav-alias") || "";
+      const desc = btn.getAttribute("data-fav-desc") || "";
+
+      document.getElementById("fav_node_id").value = node;
+      document.getElementById("fav_alias").value = alias;
+      document.getElementById("fav_desc").value = desc;
+
+      // Deshabilitar node_id ya que no se puede cambiar al editar
+      document.getElementById("fav_node_id").disabled = true;
+
+      // Cambiar texto del botón submit
+      const submitBtn = document.querySelector('#favForm button[type="submit"]');
+      if (submitBtn) {
+        submitBtn.innerHTML = '<i class="bi bi-save"></i> Actualizar';
       }
     });
   });
@@ -1251,10 +1281,10 @@ document.addEventListener("DOMContentLoaded", async () => {
           noResultsRow = document.createElement("tr");
           noResultsRow.id = "no-results-search-row";
           noResultsRow.className = "no-results-row text-center py-4 text-muted";
-          noResultsRow.innerHTML = `<td colspan="9"><i class="bi bi-search"></i> No se encontraron nodos que coincidan con "${escapeHtml(searchTerm)}"</td>`;
+          noResultsRow.innerHTML = `<td colspan="10"><i class="bi bi-search"></i> No se encontraron nodos que coincidan con "${escapeHtml(searchTerm)}"</td>`;
           nodesTableBody.appendChild(noResultsRow);
         } else {
-          noResultsRow.innerHTML = `<td colspan="9"><i class="bi bi-search"></i> No se encontraron nodos que coincidan con "${escapeHtml(searchTerm)}"</td>`;
+          noResultsRow.innerHTML = `<td colspan="10"><i class="bi bi-search"></i> No se encontraron nodos que coincidan con "${escapeHtml(searchTerm)}"</td>`;
           noResultsRow.style.display = "";
         }
       } else if (noResultsRow) {
