@@ -78,16 +78,7 @@ $systemInfo = $systemInfo ?? [
         </div>
     <?php endif; ?>
 
-    <!-- =========================================
-         Audio Spectrum Visualizer
-         ========================================= -->
-    <div class="card audio-visualizer-card mb-3">
-        <div class="card-body p-0">
-            <canvas id="audio-canvas"
-                class="audio-visualizer-canvas"
-                title="Audio spectrum — TX/RX activity"></canvas>
-        </div>
-    </div>
+   
 
     <div class="acceso-rapido">
         <div class="row align-items-center">
@@ -140,6 +131,19 @@ $systemInfo = $systemInfo ?? [
             </div>
         </div>
     </div>
+
+
+     <!-- =========================================
+         Audio Spectrum Visualizer
+         ========================================= -->
+    <div class="card audio-visualizer-card mb-3">
+        <div class="card-body p-0">
+            <canvas id="audio-canvas"
+                class="audio-visualizer-canvas"
+                title="Audio spectrum — TX/RX activity"></canvas>
+        </div>
+    </div>
+    
 
     <div class="control-panel">
         <div class="row align-items-center">
