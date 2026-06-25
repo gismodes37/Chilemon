@@ -258,30 +258,26 @@ sudo git clone https://github.com/gismodes37/Chilemon.git /opt/chilemon
 cd /opt/chilemon && sudo bash install/install_chilemon.sh
 ```
 
-El instalador ejecuta **12 pasos**:
+El instalador ejecuta **pasos 13**:
 1. Validar estructura del repositorio
 2. Instalar dependencias base (Apache, PHP, SQLite, Python 3)
 3. Configurar datos del nodo (NUEVO) o leer configuración existente (ACTUALIZACIÓN)
 4. Preparar carpetas y permisos
 5. Generar configuración local (NUEVO) o preservar existente (ACTUALIZACIÓN)
 6. Configurar módulos ASL3 de Asterisk
-7. Configurar Asterisk para WebRTC (IAX2 + phonelogin en rpt.conf)
+7. Configurar Asterisk para WebRTC (IAX2 + rpt.conf phonelogin)
 8. Instalar wrapper seguro + sudoers
 9. Configurar alias de Apache
 10. Habilitar proxy WebSocket de Apache
 11. Validar módulos PHP + inicializar base de datos
-12. Crear usuario administrador (NUEVO) o ejecutar verificación (ACTUALIZACIÓN)
+12. **Instalar puente WebRTC** (PTT desde el navegador — aiohttp, aiortc, websockets, systemd service)
+13. Crear usuario administrador (NUEVO) o ejecutar verificación (ACTUALIZACIÓN)
 
 > ⚠️ **Instalación NUEVA**: Ten a mano tu **número de nodo** ASL y la **clave AMI** (de `/etc/asterisk/manager.conf`). El instalador te las va a pedir.
 
 > 💡 **ACTUALIZACIÓN (sistema existente)**: El instalador detecta `config/local.php` y omite todos los prompts — solo agrega dependencias faltantes, configura WebRTC/WebSocket, y ejecuta una verificación completa.
 
-#### 3. Instalar Puente WebRTC (opcional)
-Para activar Push-to-Talk (PTT) desde el navegador, ejecuta el instalador del bridge:
-```bash
-sudo bash install/install_webrtc.sh
-```
-Requiere **Python 3.11+** e instala: aiohttp, aiortc, websockets, más un servicio systemd.
+> 🎯 **WebRTC Audio Bridge**: El puente para hablar por radio desde el navegador ya **se instala automáticamente** en el paso 12. No necesitas ejecutar un script aparte. Solo configura las credenciales en `/etc/default/chilemon-webrtc` después de la instalación.
 
 ---
 
@@ -298,26 +294,46 @@ El instalador configura automáticamente Apache, PHP, SQLite, el wrapper de segu
 
 ---
 
-## 🐳 Opción 3: Entorno de Desarrollo Local (Docker)
+## 🖥️ Opción 3: Máquina Virtual con Debian 13 + ASL3 + ChileMon
 
-Para probar ChileMon en cualquier computadora (Windows, Mac o Linux) sin necesitar un nodo real de AllStarLink, usa el entorno Docker que simula la actividad del nodo.
+Para quienes quieren un sistema limpio y dedicado sin tocar su instalación actual. Ideal para probar ChileMon en un entorno aislado o como servidor permanente.
 
-### 3.1 Requisitos
-- Tener Docker y Docker Compose instalados.
+### 3.1 Crear la Máquina Virtual
+- **VirtualBox**, **Proxmox VE**, o **VMware** — el que prefieras
+- **SO invitado**: Debian 13 (Trixie) — descargar desde [debian.org](https://www.debian.org)
+- **Mínimo**: 1 CPU, 1 GB RAM, 10 GB disco
+- **Red**: Bridged o NAT con reenvío de puertos (80/443 para el dashboard, 4569 para IAX2, 5038 para AMI)
 
-### 3.2 Levantar el entorno
+### 3.2 Instalar Debian 13
+Sigue la instalación estándar de Debian 13. Recomendación: solo entorno base (sin desktop) para máxima compatibilidad con ASL3.
+
+### 3.3 Instalar ASL3
 ```bash
-docker-compose up -d --build
+sudo apt-get update && sudo apt-get upgrade -y
+sudo apt-get install -y wget
+wget https://apt.allstarlink.org/repos/install
+sudo bash install
 ```
 
-### 3.3 Inicializar Base de Datos y Usuario
+### 3.4 Instalar ChileMon
 ```bash
-docker-compose exec chilemon php bin/install.php
-docker-compose exec chilemon php bin/create-user.php
+cd /opt
+sudo git clone -b v0.4.0 https://github.com/gismodes37/Chilemon.git chilemon
+cd chilemon
+sudo bash install/install_chilemon.sh
+```
+> El instalador detecta si es sistema nuevo o actualización. En modo NUEVO te pedirá el número de nodo ASL y la clave AMI.
+
+### 3.5 Configurar WebRTC Bridge
+El bridge se instala automáticamente (Paso 12). Solo edita las credenciales reales:
+```bash
+sudo nano /etc/default/chilemon-webrtc
+# Cambiar IAX_PHONE_PASS y WEBRTC_SECRET
+sudo systemctl restart chilemon-webrtc
 ```
 
-### 3.4 Acceder al Dashboard
-Entra a `http://localhost:8080`. El entorno usa un mock script que simula las respuestas de `rpt` de Asterisk, permitiéndote probar la interfaz gráfica, favoritos y autenticación sin afectar un nodo real.
+### 3.6 Acceder al Dashboard
+Abrí `http://<ip-de-tu-vm>/chilemon` — PTT desde el navegador incluido 🇨🇱
 
 ---
 
@@ -382,7 +398,7 @@ Entra a `http://localhost:8080`. El entorno usa un mock script que simula las re
 
 <img alt="Static Badge" src="https://img.shields.io/badge/Version-0.5.x-blue">
 
-**Siguiente** — Despliegue y pruebas en producción, TURN/STUN para PTT remoto, HTTPS/WSS, sesiones multiusuario, imagen Docker production
+**Siguiente** — Despliegue y pruebas en producción, TURN/STUN para PTT remoto, HTTPS/WSS, sesiones multiusuario, imagen production
 
 <img alt="Static Badge" src="https://img.shields.io/badge/Version-1.0-green">
 

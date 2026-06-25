@@ -81,7 +81,7 @@ Cambios clave:
 
 ### Dependencias
 
-Instaladas por `install_webrtc.sh`:
+Instaladas por el instalador principal (`install/install_chilemon.sh`, Paso 12) o standalone vía:
 
 | Paquete | Propósito |
 |---------|-----------|
@@ -114,7 +114,8 @@ Instaladas por `install_webrtc.sh`:
 | Archivo | Propósito |
 |---------|-----------|
 | `install/chilemon-webrtc.service` | Unidad systemd — auto-inicio, Restart=always |
-| `install/install_webrtc.sh` | Instalador — dependencias apt + habilitar servicio |
+| `install/install_chilemon.sh` (Paso 12) | Instalador principal — incluye bridge automáticamente |
+| `install/install_webrtc.sh` | Instalador standalone — dependencias apt + habilitar servicio |
 | `config/app.php` | Constantes del bridge (`WEBRTC_PORT`, `IAX_PHONE_USER`, etc.) |
 | `config/local.php` | Configuración local (secretos, valores por instancia) |
 
@@ -139,7 +140,11 @@ Instaladas por `install_webrtc.sh`:
 
 ```bash
 # Copiar el script de instalación y ejecutarlo
-sudo bash install/install_webrtc.sh
+  sudo bash install/install_chilemon.sh
+
+O standalone:
+
+  sudo bash install/install_webrtc.sh
 ```
 
 Esto instala los paquetes Python, crea el directorio del bridge y habilita el

@@ -35,7 +35,7 @@ DEFAULT_NODE_PROTO="https"
 ASL3_MODULES_ADDED=0
 INSTALL_MODE="new"
 
-TOTAL_STEPS=12
+TOTAL_STEPS=13
 
 
 # ------------------------------------------------------------------------------
@@ -88,7 +88,7 @@ step() {
     local msg="$2"
     echo
     echo "============================================================"
-    echo "Paso ${num}: ${msg}"
+    echo "Paso ${num} de ${TOTAL_STEPS}: ${msg}"
     echo "============================================================"
 }
 
@@ -624,12 +624,31 @@ run_verification() {
         fail=$((fail + 1))
     fi
 
-    # Check systemd service (if webrtc installer has been run)
-    if systemctl list-unit-files | grep -q 'chilemon-webrtc.service'; then
+    # Check systemd service (chilemon-webrtc)
+    if systemctl list-unit-files 2>/dev/null | grep -q 'chilemon-webrtc.service'; then
         ok "Servicio systemd: chilemon-webrtc registrado"
         pass=$((pass + 1))
     else
-        info "Servicio chilemon-webrtc no registrado (instale con install_webrtc.sh)"
+        warn "Servicio chilemon-webrtc no registrado"
+        fail=$((fail + 1))
+    fi
+
+    # Check WebRTC bridge env file
+    if [[ -f "/etc/default/chilemon-webrtc" ]]; then
+        ok "WebRTC config: /etc/default/chilemon-webrtc existe"
+        pass=$((pass + 1))
+    else
+        warn "WebRTC config faltante: /etc/default/chilemon-webrtc"
+        fail=$((fail + 1))
+    fi
+
+    # Check Python websockets package
+    if python3 -c "import websockets" &>/dev/null 2>&1; then
+        ok "Python paquete: websockets"
+        pass=$((pass + 1))
+    else
+        warn "Python paquete faltante: websockets"
+        fail=$((fail + 1))
     fi
 
     # Check ChileMon database
@@ -680,6 +699,10 @@ print_final_banner() {
     echo
     echo -e " ${C_GREEN}Usuario web    :${C_RESET} ${web_user}"
     echo -e " ${C_GREEN}Módulos ASL3   :${C_RESET} ${ASL3_MODULES_ADDED:-0} load => agregados"
+    echo -e " ${C_GREEN}WebRTC bridge  :${C_RESET} Si (PTT desde el navegador)"
+    echo
+    echo -e "${C_WHITE}Probar puente WebRTC:${C_RESET}"
+    echo "  curl http://localhost:\${WEBRTC_PORT:-9091}/health"
     echo
     echo -e "${C_CYAN}----------------------------------------------------------------${C_RESET}"
     echo -e "${C_WHITE}Pruebas rápidas:${C_RESET}"
@@ -711,6 +734,147 @@ validate_installation() {
     echo "Config   : $LOCAL_CONFIG"
 
     print_final_banner "$local_node" "$server_host" "$ami_user" "$web_user" "$web_proto"
+}
+
+
+# ------------------------------------------------------------------------------
+# WebRTC Audio Bridge installation
+# ------------------------------------------------------------------------------
+install_webrtc_bridge() {
+    info "Instalando puente WebRTC para PTT desde el navegador"
+    info "Esto permite hablar por radio SIN equipos externos 🇨🇱"
+
+    SERVICE_SRC="$REPO_DIR/install/chilemon-webrtc.service"
+    SERVICE_DST="/etc/systemd/system/chilemon-webrtc.service"
+    DEFAULT_ENV_FILE="/etc/default/chilemon-webrtc"
+
+    # Step A: Verify Python 3.11+
+    if ! command -v python3 &>/dev/null; then
+        warn "python3 no encontrado — se omite WebRTC bridge"
+        return
+    fi
+
+    PYTHON_VERSION=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+    info "Python detectado: ${PYTHON_VERSION}"
+
+    if ! command -v bc &>/dev/null; then
+        apt-get install -y bc >/dev/null 2>&1
+    fi
+
+    if [[ $(echo "$PYTHON_VERSION < 3.11" | bc -l) -eq 1 ]]; then
+        warn "Python ${PYTHON_VERSION} — se requiere 3.11+ para audioop, se omite WebRTC bridge"
+        return
+    fi
+
+    ok "Python ${PYTHON_VERSION} cumple requisito mínimo (3.11+)"
+
+    # Step B: Install Python packages
+    apt-get install -y python3-aiohttp python3-aiohttp-cors python3-websockets python3-venv
+
+    # aiortc may need pip
+    if dpkg -s python3-aiortc &>/dev/null 2>&1; then
+        ok "python3-aiortc instalado vía apt"
+    else
+        info "python3-aiortc no disponible en apt — intentando pip"
+        if command -v pip3 &>/dev/null; then
+            pip3 install "aiortc>=1.4.0"
+            ok "python3-aiortc instalado vía pip3"
+        elif command -v pip &>/dev/null; then
+            pip install "aiortc>=1.4.0"
+            ok "python3-aiortc instalado vía pip"
+        else
+            warn "pip no disponible — WebRTC deshabilitado (se requiere aiortc)"
+        fi
+    fi
+
+    # Verify critical imports
+    local import_fail=0
+    if python3 -c "import aiohttp" &>/dev/null; then
+        ok "python3-aiohttp verificada"
+    else
+        warn "python3-aiohttp no se importa — WebRTC puede fallar"
+        import_fail=1
+    fi
+    if python3 -c "import websockets" &>/dev/null; then
+        ok "python3-websockets verificada"
+    else
+        warn "python3-websockets no importable — WebSocket podría no funcionar"
+    fi
+
+    if [[ "$import_fail" -ne 0 ]]; then
+        warn "Dependencias críticas faltantes — WebRTC bridge puede no funcionar"
+    fi
+
+    # Step C: Install systemd unit
+    if [[ ! -f "$SERVICE_SRC" ]]; then
+        warn "No se encuentra $SERVICE_SRC — se omite unidad systemd"
+    else
+        if [[ -f "$SERVICE_DST" ]]; then
+            info "Unidad systemd ya existe — preservando"
+        else
+            cp "$SERVICE_SRC" "$SERVICE_DST"
+            chmod 644 "$SERVICE_DST"
+            ok "Unidad systemd instalada: $SERVICE_DST"
+        fi
+    fi
+
+    # Step D: Create env file if not exists
+    if [[ ! -f "$DEFAULT_ENV_FILE" ]]; then
+        ASL_NODE_VAL="${local_node:-494780}"
+        cat > "$DEFAULT_ENV_FILE" <<EOF
+# ChileMon WebRTC Bridge — Configuration
+# This file is sourced by the chilemon-webrtc systemd service.
+# Edit and restart the service after changes:
+#   sudo systemctl restart chilemon-webrtc
+
+# Port for the bridge HTTP/WS server
+WEBRTC_PORT=9091
+
+# Asterisk IAX2 credentials (must match iax.conf phone extension)
+IAX_PHONE_USER=webrtc-bridge
+IAX_PHONE_PASS=CHANGE_ME
+
+# HMAC secret for WebSocket auth (must match config/local.php webrtc_secret)
+WEBRTC_SECRET=CHANGE_ME
+
+# Local ASL node number
+ASL_NODE=${ASL_NODE_VAL}
+
+# Asterisk IAX2 connection
+IAX_HOST=127.0.0.1
+IAX_PORT=4569
+
+# Log level: DEBUG, INFO, WARNING, ERROR
+LOG_LEVEL=INFO
+EOF
+        chmod 600 "$DEFAULT_ENV_FILE"
+        ok "Configuración WebRTC creada en $DEFAULT_ENV_FILE"
+        echo
+        echo "  ${C_YELLOW}IMPORTANTE: Configure credenciales reales:${C_RESET}"
+        echo "  sudo nano $DEFAULT_ENV_FILE"
+        echo "  - IAX_PHONE_PASS: misma clave que en /etc/asterisk/iax.conf"
+        echo "  - WEBRTC_SECRET: misma clave que en config/local.php webrtc_secret"
+        echo
+    else
+        ok "Configuración WebRTC ya existe en $DEFAULT_ENV_FILE"
+    fi
+
+    # Step E: Enable and start service
+    systemctl daemon-reload
+    systemctl enable chilemon-webrtc.service 2>/dev/null || true
+
+    if systemctl is-active --quiet chilemon-webrtc.service 2>/dev/null; then
+        ok "Servicio chilemon-webrtc activo"
+    else
+        systemctl restart chilemon-webrtc.service 2>/dev/null || true
+        if systemctl is-active --quiet chilemon-webrtc.service 2>/dev/null; then
+            ok "Servicio chilemon-webrtc iniciado"
+        else
+            warn "Servicio chilemon-webrtc no activo — revise con: systemctl status chilemon-webrtc"
+        fi
+    fi
+
+    ok "Puente WebRTC instalado — PTT desde el navegador disponible"
 }
 
 
@@ -850,13 +1014,13 @@ main() {
         fi
     fi
 
-    step "4 de ${TOTAL_STEPS}" "Preparando carpetas y permisos"
+    step "4" "Preparando carpetas y permisos"
     mkdir -p "$DATA_DIR" "$LOG_DIR" "$BACKUP_DIR" "$REPO_DIR/config"
     chown -R www-data:www-data "$DATA_DIR" "$LOG_DIR" "$BACKUP_DIR"
     chmod -R 775 "$DATA_DIR" "$LOG_DIR" "$BACKUP_DIR"
     ok "Carpetas preparadas y permisos aplicados"
 
-    step "5 de ${TOTAL_STEPS}" "Generando configuración local"
+    step "5" "Generando configuración local"
     if [[ "$INSTALL_MODE" == "update" ]]; then
         info "Modo actualización — configuración existente preservada"
         ok "Archivo de configuración mantenido: $LOCAL_CONFIG"
@@ -872,31 +1036,34 @@ main() {
             "$ami_timeout"
     fi
 
-    step "6 de ${TOTAL_STEPS}" "Configurando módulos de Asterisk para ASL3"
+    step "6" "Configurando módulos de Asterisk para ASL3"
     configure_asl3_modules
 
-    step "7 de ${TOTAL_STEPS}" "Configurando Asterisk para WebRTC"
+    step "7" "Configurando Asterisk para WebRTC"
     configure_webrtc_asterisk
 
-    step "8 de ${TOTAL_STEPS}" "Instalando wrapper y sudoers"
+    step "8" "Instalando wrapper y sudoers"
     write_wrapper_if_missing
     write_sudoers
 
-    step "9 de ${TOTAL_STEPS}" "Configurando Apache"
+    step "9" "Configurando Apache"
     write_apache_config
 
-    step "10 de ${TOTAL_STEPS}" "Habilitando proxy WebSocket para Apache"
+    step "10" "Habilitando proxy WebSocket para Apache"
     enable_apache_websocket
 
-    step "11 de ${TOTAL_STEPS}" "Validando PHP e inicializando ChileMon"
+    step "11" "Validando PHP e inicializando ChileMon"
     validate_php_modules
     run_php_installer
 
+    step "12" "Instalando puente WebRTC"
+    install_webrtc_bridge
+
     if [[ "$INSTALL_MODE" == "new" ]]; then
-        step "12 de ${TOTAL_STEPS}" "Creando usuario administrador de ChileMon"
+        step "13" "Creando usuario administrador de ChileMon"
         run_php_user_creation
     else
-        step "12 de ${TOTAL_STEPS}" "Verificación de la instalación"
+        step "13" "Verificación de la instalación"
         run_verification
     fi
 

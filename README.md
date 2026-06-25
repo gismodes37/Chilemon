@@ -259,7 +259,7 @@ sudo git clone https://github.com/gismodes37/Chilemon.git /opt/chilemon
 cd /opt/chilemon && sudo bash install/install_chilemon.sh
 ```
 
-The installer runs **12 steps**:
+The installer runs **13 steps**:
 1. Validate repository structure
 2. Install base dependencies (Apache, PHP, SQLite, Python 3)
 3. Configure node data (NEW) or read existing config (UPDATE)
@@ -271,18 +271,14 @@ The installer runs **12 steps**:
 9. Configure Apache alias
 10. Enable Apache WebSocket proxy
 11. Validate PHP modules + initialize database
-12. Create admin user (NEW) or run installation verification (UPDATE)
+12. **Install WebRTC Audio Bridge** (browser PTT — aiohttp, aiortc, websockets, systemd service)
+13. Create admin user (NEW) or run installation verification (UPDATE)
 
 > ⚠️ **NEW installation**: Have your ASL **node number** and **AMI password** (from `/etc/asterisk/manager.conf`) ready. The installer will ask you for them.
 
 > 💡 **UPDATE (existing system)**: The installer detects `config/local.php` and skips all prompts — it only adds missing dependencies, configures WebRTC/WebSocket, and runs a full verification.
 
-#### 3. Install WebRTC Audio Bridge (optional)
-For browser-based Push-to-Talk (PTT), run the WebRTC bridge installer:
-```bash
-sudo bash install/install_webrtc.sh
-```
-This requires **Python 3.11+** and installs: aiohttp, aiortc, websockets, plus a systemd service.
+> 🎯 **WebRTC Audio Bridge**: The bridge for browser-based radio PTT is now **installed automatically** in step 12. No separate script needed. Just configure the credentials in `/etc/default/chilemon-webrtc` after installation.
 
 ---
 
@@ -299,26 +295,46 @@ The installer automatically configures Apache, PHP, SQLite, the security wrapper
 
 ---
 
-### 🐳 Option 3: Local Development Environment (Docker)
+### 🖥️ Option 3: Virtual Machine with Debian 13 + ASL3 + ChileMon
 
-To test ChileMon on any computer (Windows, Mac, or Linux) without needing a real AllStarLink node, use the Docker environment that simulates node activity.
+For a clean, dedicated system without touching your existing installation. Ideal for testing ChileMon in an isolated environment or as a permanent server.
 
-#### 3.1 Requirements
-- Docker and Docker Compose installed.
+#### 3.1 Create the Virtual Machine
+- **VirtualBox**, **Proxmox VE**, or **VMware** — whichever you prefer
+- **Guest OS**: Debian 13 (Trixie) — download from [debian.org](https://www.debian.org)
+- **Minimum**: 1 CPU, 1 GB RAM, 10 GB disk
+- **Network**: Bridged or NAT with port forwarding (80/443 for dashboard, 4569 for IAX2, 5038 for AMI)
 
-#### 3.2 Start the environment
+#### 3.2 Install Debian 13
+Follow the standard Debian 13 installation. Recommended: base environment only (no desktop) for maximum ASL3 compatibility.
+
+#### 3.3 Install ASL3
 ```bash
-docker-compose up -d --build
+sudo apt-get update && sudo apt-get upgrade -y
+sudo apt-get install -y wget
+wget https://apt.allstarlink.org/repos/install
+sudo bash install
 ```
 
-#### 3.3 Initialize Database and User
+#### 3.4 Install ChileMon
 ```bash
-docker-compose exec chilemon php bin/install.php
-docker-compose exec chilemon php bin/create-user.php
+cd /opt
+sudo git clone -b v0.4.0 https://github.com/gismodes37/Chilemon.git chilemon
+cd chilemon
+sudo bash install/install_chilemon.sh
+```
+> The installer detects NEW vs UPDATE mode automatically. In NEW mode it will ask for the ASL node number and AMI password.
+
+#### 3.5 Configure WebRTC Bridge
+The bridge is installed automatically (Step 12). Just configure the real credentials:
+```bash
+sudo nano /etc/default/chilemon-webrtc
+# Set IAX_PHONE_PASS and WEBRTC_SECRET
+sudo systemctl restart chilemon-webrtc
 ```
 
-#### 3.4 Access the Dashboard
-Go to `http://localhost:8080`. The environment uses a mock script that simulates Asterisk `rpt` responses, allowing you to test the GUI, favorites management, and authentication without affecting a real node.
+#### 3.6 Access the Dashboard
+Open `http://<your-vm-ip>/chilemon` — browser PTT included 🇨🇱
 
 ---
 
@@ -383,7 +399,7 @@ Go to `http://localhost:8080`. The environment uses a mock script that simulates
 
 <img alt="Static Badge" src="https://img.shields.io/badge/Version-0.5.x-blue">
 
-**Next** — Deploy & production testing, TURN/STUN for remote PTT access, HTTPS/WSS, multi-user sessions, Docker production image
+**Next** — Deploy & production testing, TURN/STUN for remote PTT access, HTTPS/WSS, multi-user sessions, production image
 
 <img alt="Static Badge" src="https://img.shields.io/badge/Version-1.0-green">
 
