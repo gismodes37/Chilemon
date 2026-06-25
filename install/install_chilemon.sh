@@ -440,8 +440,8 @@ enable_apache_websocket() {
 # Redirige /ws al bridge Python en el puerto 9091.
 # -----------------------------------------------------------------------------
 
-ProxyPass /ws ws://127.0.0.1:9091/ws
-ProxyPassReverse /ws ws://127.0.0.1:9091/ws
+ProxyPass /chilemon/ws ws://127.0.0.1:9091/ws
+ProxyPassReverse /chilemon/ws ws://127.0.0.1:9091/ws
 EOF2
 
     a2enconf chilemon-websocket >/dev/null 2>&1 || true
