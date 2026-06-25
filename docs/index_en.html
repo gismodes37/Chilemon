@@ -116,8 +116,8 @@
           <div class="card-body p-4">
             <h2 class="h5 section-title mb-3">Quick start</h2>
 
-            <div class="code mb-3">
-              <div><span class="text-secondary">$</span> sudo git clone -b v0.1.0 https://github.com/gismodes37/Chilemon.git /opt/chilemon</div>
+              <div class="code mb-3">
+              <div><span class="text-secondary">$</span> sudo git clone -b v0.4.0 https://github.com/gismodes37/Chilemon.git /opt/chilemon</div>
               <div><span class="text-secondary">$</span> cd /opt/chilemon && sudo bash install/install_chilemon.sh</div>
             </div>
 
@@ -360,6 +360,7 @@
     <div class="container">
       <div class="text-center mb-5">
         <h2 class="h1 section-title">Screenshots</h2>
+        <p class="text-secondary mb-4">Current views of the login, dashboard and operation from release v0.4.0.</p>
       <div class="row g-4">
         <div class="col-md-6 col-lg-4">
           <div class="card shadow-sm h-100 border-0">
@@ -473,28 +474,27 @@
               <h3 class="h5 mb-3"><i class="bi bi-terminal"></i> Recommended workflow</h3>
               <div class="code">
                 <div><span class="text-secondary"># Clone stable version and install</span></div>
-                <div><span class="text-secondary">$</span> sudo git clone -b v0.1.0 https://github.com/gismodes37/Chilemon.git /opt/chilemon</div>
+                <div><span class="text-secondary">$</span> sudo git clone -b v0.4.0 https://github.com/gismodes37/Chilemon.git /opt/chilemon</div>
                 <div><span class="text-secondary">$</span> cd /opt/chilemon && sudo bash install/install_chilemon.sh</div>
               </div>
 
               <div class="mt-3 small text-secondary">
-                The installer leaves a final summary with the access URL, local node, detected AMI user, and relevant installation data.
+                The installer leaves a final summary with the access URL, local node, detected AMI user, WebRTC bridge status, and relevant installation data.
               </div>
             </div>
           </div>
 
           <div class="card shadow-sm mt-3">
             <div class="card-body p-4">
-              <h3 class="h5 mb-3"><i class="bi bi-box-seam"></i> Option: Local Development (Docker)</h3>
-              <p class="text-secondary small mb-3">For testing without a real node, use Docker Compose.</p>
+              <h3 class="h5 mb-3"><i class="bi bi-box-seam"></i> Option: Debian 13 VM + ASL3</h3>
+              <p class="text-secondary small mb-3">For a clean dedicated system. Create a VM with VirtualBox or Proxmox, install Debian 13 + ASL3, then ChileMon.</p>
               <div class="code">
-                <div><span class="text-secondary"># Clone and start container</span></div>
-                <div><span class="text-secondary">$</span> docker-compose up -d --build</div>
-                <div><span class="text-secondary"># Initialize DB and User</span></div>
-                <div><span class="text-secondary">$</span> docker-compose exec chilemon php bin/install.php</div>
+                <div><span class="text-secondary"># Clone and install</span></div>
+                <div><span class="text-secondary">$</span> sudo git clone -b v0.4.0 https://github.com/gismodes37/Chilemon.git /opt/chilemon</div>
+                <div><span class="text-secondary">$</span> cd /opt/chilemon && sudo bash install/install_chilemon.sh</div>
               </div>
               <div class="mt-3 small text-secondary">
-                Access at <code>http://localhost:8080</code>.
+                The installer auto-detects NEW vs UPDATE mode. The WebRTC bridge (browser PTT) is installed as part of the process.
               </div>
             </div>
           </div>
@@ -518,14 +518,15 @@
               <h3 class="h5 mb-3"><i class="bi bi-diagram-3"></i> Current Components</h3>
               <ul class="text-secondary mb-0">
                 <li><strong>UI</strong>: <span class="kbd">public/views/*</span></li>
-                <li><strong>Auth</strong>: login/logout + session + CSRF</li>
+                <li><strong>Auth</strong>: login/logout + session + CSRF + roles</li>
                 <li><strong>API</strong>: <span class="kbd">public/api/*</span></li>
                 <li><strong>DB</strong>: SQLite in <span class="kbd">data/chilemon.sqlite</span></li>
                 <li><strong>Schema</strong>: <span class="kbd">install/sql/schema.sql</span></li>
                 <li><strong>Config</strong>: <span class="kbd">config/app.php</span> + <span class="kbd">config/local.php</span></li>
-                <li><strong>Installer</strong>: <span class="kbd">install/install_chilemon.sh</span></li>
-                <li><strong>Initialization</strong>: <span class="kbd">bin/install.php</span></li>
+                <li><strong>Installer</strong>: <span class="kbd">install/install_chilemon.sh</span> (13 steps)</li>
+                <li><strong>WebRTC Bridge</strong>: <span class="kbd">app/Services/WebRTCBridge/</span> (Python, IAX2 server)</li>
                 <li><strong>Asterisk Wrapper</strong>: <span class="kbd">/usr/local/bin/chilemon-rpt</span></li>
+                <li><strong>Tests</strong>: <span class="kbd">tests/</span> (PHPUnit scaffold)</li>
               </ul>
             </div>
           </div>
@@ -542,8 +543,10 @@
                 <div>│  ├─ Core/</div>
                 <div>│  ├─ Helpers/</div>
                 <div>│  └─ Services/</div>
+                <div>│     └─ WebRTCBridge/</div>
                 <div>├─ bin/</div>
                 <div>├─ config/</div>
+                <div>├─ docs/</div>
                 <div>├─ install/</div>
                 <div>│  └─ sql/</div>
                 <div>├─ public/</div>
@@ -552,7 +555,7 @@
                 <div>│  ├─ views/</div>
                 <div>│  ├─ assets/</div>
                 <div>│  └─ api/</div>
-                <div>└─ docs/</div>
+                <div>├─ tests/</div>
               </div>
             </div>
           </div>
@@ -575,6 +578,7 @@
           <div class="card h-100 shadow-sm">
             <div class="card-body p-4">
               <h3 class="h5"><span class="badge text-bg-success">v0.1.0</span> Functional Release</h3>
+              <div class="small text-secondary mb-2"><i class="bi bi-calendar3"></i> March 2026</div>
               <ul class="text-secondary mb-0">
                 <li>Operational dashboard</li>
                 <li>Login + session</li>
@@ -592,6 +596,7 @@
           <div class="card h-100 shadow-sm">
             <div class="card-body p-4">
               <h3 class="h5"><span class="badge text-bg-success">v0.3.1</span> Favorites + RX/TX</h3>
+              <div class="small text-secondary mb-2"><i class="bi bi-calendar3"></i> April 2026</div>
               <ul class="text-secondary mb-0">
                 <li>Favorites Integration</li>
                 <li>Custom aliases</li>
@@ -607,6 +612,7 @@
           <div class="card h-100 shadow-sm border-primary">
             <div class="card-body p-4">
               <h3 class="h5"><span class="badge text-bg-primary">v0.4.0</span> Current Release</h3>
+              <div class="small text-secondary mb-2"><i class="bi bi-calendar3"></i> June 2026</div>
               <ul class="text-secondary mb-0">
                 <li><strong>PTT Audio Bridge WebRTC</strong></li>
                 <li>IAX2 reversal (server mode)</li>
@@ -623,11 +629,13 @@
           <div class="card h-100 shadow-sm">
             <div class="card-body p-4">
               <h3 class="h5"><span class="badge text-bg-secondary">v0.5.x</span> Next</h3>
+              <div class="small text-secondary mb-2"><i class="bi bi-calendar3"></i> July-August 2026</div>
               <ul class="text-secondary mb-0">
-                <li>Deploy & prod testing</li>
+                <li>Deploy & production testing</li>
                 <li>TURN/STUN for remote PTT</li>
-                <li>HTTPS/WSS</li>
-                <li>Multi-user sessions</li>
+                <li>HTTPS/WSS with Let's Encrypt</li>
+                <li>Multi-user sessions in bridge</li>
+                <li>GitHub Actions CI</li>
               </ul>
             </div>
           </div>
@@ -865,7 +873,7 @@
       <div>
         <div class="fw-semibold">ChileMon</div>
         <div class="text-secondary small">
-          Dashboard moderno para AllStarLink ASL3 — primer release funcional.
+          Modern dashboard for AllStarLink ASL3 — browser PTT, hardened security.
         </div>
       </div>
       <div class="text-secondary small">
