@@ -88,7 +88,7 @@ step() {
     local msg="$2"
     echo
     echo "============================================================"
-    echo "Paso ${num} de ${TOTAL_STEPS}: ${msg}"
+    echo "Paso ${num}: ${msg}"
     echo "============================================================"
 }
 
@@ -744,11 +744,11 @@ main() {
         [[ "$confirm" =~ ^[sS]$ ]] || { echo "Instalación cancelada."; exit 0; }
     fi
 
-    step "1 de ${TOTAL_STEPS}" "Validando estructura del repositorio"
+        step "1" "Validando estructura del repositorio"
     check_repo_structure
     ok "Estructura del repositorio validada"
 
-    step "2 de ${TOTAL_STEPS}" "Instalando dependencias base"
+    step "2" "Instalando dependencias base"
     apt-get update
     ensure_package git
     ensure_package apache2
@@ -779,7 +779,7 @@ main() {
         # ----------------------------------------------------------
         # NEW INSTALLATION — interactive prompts
         # ----------------------------------------------------------
-        step "3 de ${TOTAL_STEPS}" "Detectando datos del nodo y solicitando confirmación"
+        step "3" "Detectando datos del nodo y solicitando confirmación"
 
         while [[ -z "$local_node" ]]; do
             read -r -p "Ingrese su N° de nodo ASL local: " local_node
@@ -827,7 +827,7 @@ main() {
         # ----------------------------------------------------------
         # UPDATE MODE — read existing config, skip prompts
         # ----------------------------------------------------------
-        step "3 de ${TOTAL_STEPS}" "Leyendo configuración existente"
+        step "3" "Leyendo configuración existente"
 
         # Extract values from existing local.php (which returns an array)
         local_node="$(php -r "\$cfg = require '$LOCAL_CONFIG'; echo \$cfg['local_node'] ?? '';")"
