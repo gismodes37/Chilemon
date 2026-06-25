@@ -15,14 +15,17 @@ This module provides the conversion chain in both directions:
                              → s16_to_float32()
                              → aiortc encodes to OPUS → WebRTC track
 
-Uses Python stdlib ``audioop`` (available on Debian 12 / Python 3.11).
+Uses ``audioop-lts`` (backport of stdlib ``audioop`` removed in Python 3.13).
 aiortc handles OPUS encode/decode natively — this module only handles
 the PCM↔ulaw and resampling layers.
 """
 
 from __future__ import annotations
 
-import audioop
+try:
+    import audioop
+except ImportError:
+    import audioop_lts as audioop  # type: ignore[no-redef]
 import struct
 import logging
 from typing import Tuple

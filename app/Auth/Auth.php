@@ -267,7 +267,10 @@ final class Auth
     }
 
     /**
-     * Valida token CSRF (timing-safe).
+     * Valida token CSRF (timing-safe) y lo rota tras validación exitosa.
+     *
+     * La rotación post-validación previene ataques de reutilización de token:
+     * si un token es interceptado, solo sirve para UNA solicitud.
      */
     public static function validateCsrf(string $token): bool
     {
@@ -277,7 +280,15 @@ final class Auth
         if ($sessionToken === '' || $token === '') {
             return false;
         }
-        return hash_equals($sessionToken, $token);
+
+        $valid = hash_equals($sessionToken, $token);
+
+        // Rotar token después de cada validación exitosa
+        if ($valid) {
+            $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+        }
+
+        return $valid;
     }
 
     // ---------------------------------------------------------------

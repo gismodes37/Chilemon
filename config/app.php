@@ -226,7 +226,7 @@ if (!defined('AMI_USER')) {
     define(
         'AMI_USER',
         getenv('CHILEMON_AMI_USER')
-            ?: ($localConfig['ami_user'] ?? 'admin')
+            ?: ($localConfig['ami_user'] ?? '')
     );
 }
 

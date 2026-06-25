@@ -1,1 +1,0 @@
-# ChileMon — app package root

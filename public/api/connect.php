@@ -31,6 +31,9 @@ if (!Auth::isLoggedIn()) {
     exit;
 }
 
+// Requerir rol admin: conectar/desconectar nodos afecta la red de radio
+Auth::requireAdmin();
+
 // Validar CSRF
 $token = (string)($_POST['csrf_token'] ?? '');
 if ($token !== '' && !Auth::validateCsrf($token)) {
