@@ -1,6 +1,6 @@
 # 🛠️ Soporte Técnico — ChileMon ASL3
 
-> Plataforma de monitoreo para nodos AllStarLink 3 | PHP 8.2+ · Bootstrap 5 · SQLite · Apache2 · WebRTC Bridge  
+> Plataforma de monitoreo para nodos AllStarLink 3 | PHP 8.2+ · Python 3.11+ · SQLite · Apache2 · WebRTC Bridge  
 > Desarrollado por **CA2IIG – Guillermo Ismodes López** · La Serena, Chile
 
 ---
@@ -22,13 +22,17 @@
 
 Verifica que tu entorno cumple los requisitos mínimos:
 
-| Requisito        | Versión mínima          |
-|------------------|-------------------------|
-| Sistema operativo| Debian 12 (Bookworm)    |
-| PHP              | 8.2+                    |
-| Apache           | 2.4+                    |
-| SQLite           | 3.x                     |
-| Git              | cualquier versión actual |
+| Requisito               | Versión mínima          |
+|-------------------------|-------------------------|
+| Sistema operativo       | Debian 12 (Bookworm)    |
+| PHP                     | 8.2+                    |
+| Módulos PHP             | PDO, pdo_sqlite, sqlite3, curl, json, mbstring |
+| Apache                  | 2.4+                    |
+| Módulos Apache          | rewrite, proxy, proxy_wstunnel |
+| Python                  | 3.11+ (solo para WebRTC Bridge) |
+| Paquetes Python         | aiohttp, aiortc, websockets |
+| SQLite                  | 3.x                     |
+| Git                     | cualquier versión actual |
 
 Comandos de verificación rápida:
 
@@ -39,11 +43,18 @@ php -v
 # Extensiones SQLite activas
 php -m | grep -i sqlite
 
+# Todos los módulos PHP requeridos
+php -m | grep -iE 'pdo|sqlite|curl|json|mbstring'
+
 # Estado de Apache
 sudo systemctl status apache2
 
-# Módulo rewrite habilitado
-apache2ctl -M | grep rewrite
+# Módulos Apache requeridos
+apache2ctl -M | grep -iE 'rewrite|proxy|wstunnel'
+
+# Python (si usas WebRTC)
+python3 --version
+python3 -c "import aiohttp; import websockets; print('Python OK')"
 
 # Permisos sobre el directorio de datos
 ls -la /opt/chilemon/data/
@@ -99,7 +110,30 @@ sqlite3 /opt/chilemon/data/chilemon.sqlite ".tables"
 sqlite3 /opt/chilemon/data/chilemon.sqlite "SELECT id, username, created_at FROM users;"
 ```
 
-### 2.5 Configuración Rápida de EchoLink (Opcional)
+### 2.5 Verificar WebRTC Bridge (PTT)
+
+```bash
+# Estado del servicio bridge
+sudo systemctl status chilemon-webrtc
+
+# Health del bridge (conexión AMI + IAX2)
+curl -s http://127.0.0.1:9091/health
+
+# Respuesta esperada:
+# {"status":"ok","ami_connected":true,"iax_server_running":true,"in_call":false,...}
+
+# Logs en vivo del bridge
+sudo journalctl -u chilemon-webrtc -n 30 --no-pager
+
+# Ver peer IAX2 registrado en Asterisk
+sudo asterisk -rx "iax2 show peers" | grep webrtc-bridge
+
+# Verificar proxy WebSocket de Apache
+sudo cat /etc/apache2/conf-available/chilemon-websocket.conf
+# Debe mostrar: ProxyPass /chilemon/ws ws://127.0.0.1:9091/ws
+```
+
+### 2.6 Configuración Rápida de EchoLink (Opcional)
 
 Si tu nodo no tiene EchoLink configurado, puedes usar este bloque en la terminal de tu nodo para crearlo rápidamente. **Importante:** Debes cambiar los campos `call`, `pwd` y `astnode` antes de ejecutarlo.
 
@@ -151,6 +185,57 @@ if ($exitCode === 0) {
 // exit code distinto de 0 = error real
 return false;
 ```
+
+---
+
+### ❌ PTT en rojo, no conecta ("Bridge Disconnected")
+
+**Causa:** El WebSocket del dashboard no logra conectar con el bridge. Generalmente el proxy de Apache no está capturando la ruta correcta.
+
+**Diagnóstico:**
+
+```bash
+# 1. Verificar que el bridge esté corriendo
+sudo systemctl status chilemon-webrtc
+
+# 2. Verificar el health del bridge
+curl -s http://127.0.0.1:9091/health
+
+# 3. Verificar configuración del proxy WebSocket
+sudo cat /etc/apache2/conf-available/chilemon-websocket.conf
+```
+
+**Solución:** El proxy Apache debe usar `/chilemon/ws` (no `/ws` solo), porque el dashboard usa el path completo del alias:
+
+```apacheconf
+# ✅ Correcto
+ProxyPass /chilemon/ws ws://127.0.0.1:9091/ws
+ProxyPassReverse /chilemon/ws ws://127.0.0.1:9091/ws
+```
+
+```bash
+# Recargar Apache después de corregir
+sudo systemctl reload apache2
+# Recargar la página del dashboard (F5)
+```
+
+---
+
+### ❌ Se perdió el audio del bridge después de reiniciar Asterisk
+
+**Causa:** Al reiniciar Asterisk, la llamada IAX2 activa entre el bridge y Asterisk se corta. El bridge sigue registrado como peer pero no hay canal de audio activo.
+
+**Solución:**
+
+```bash
+# 1. Reiniciar el bridge para que re-establezca la originate
+sudo systemctl restart chilemon-webrtc
+
+# 2. Recargar la página del dashboard (F5)
+# 3. Apretar PTT/Transmitir para reconectar
+```
+
+> ⚠️ **Importante:** Si necesitas reiniciar Asterisk, también reinicia `chilemon-webrtc` después y recarga el dashboard.
 
 ---
 
@@ -265,8 +350,14 @@ No. SQLite persiste en disco (`/opt/chilemon/data/chilemon.sqlite`). Los datos s
 ```bash
 cd /opt/chilemon
 sudo git pull origin main
-# Revisar si hay migraciones disponibles antes de cada actualización
+# Ejecutar el instalador en modo UPDATE (detecta automáticamente)
+# Agrega dependencias faltantes, configura WebRTC/WebSocket, y verifica
+sudo bash install/install_chilemon.sh
 ```
+> El instalador detecta automáticamente si es una instalación nueva o una actualización. En modo UPDATE solo agrega lo faltante, no sobrescribe tu configuración existente.
+
+**¿El PTT no conecta después de una actualización?**  
+Si el botón PTT se queda en rojo, probablemente el proxy WebSocket de Apache se generó con la ruta incorrecta. Revisa que `/etc/apache2/conf-available/chilemon-websocket.conf` use `/chilemon/ws` (no `/ws`). Si está mal, corrige y recarga Apache: `sudo systemctl reload apache2`; luego F5 en el dashboard.
 
 **¿El archivo `chilemon.sqlite` debe estar en el repositorio?**  
 No. Está excluido por `.gitignore`. Contiene datos de producción (usuarios, favoritos, actividad).

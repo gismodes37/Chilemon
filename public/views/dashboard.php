@@ -91,10 +91,10 @@ $systemInfo = $systemInfo ?? [
                     <button class="btn btn-outline-custom" onclick="window.open('https://stats.allstarlink.org/maps/allstarUSAMap.html', '_blank')">
                         <i class="bi bi-globe"></i> AllStar Maps !
                     </button>
-                    <button class="btn btn-outline-custom" onclick="window.open('https://wiki.allstarlink.org/wiki/Category:How_to', '_blank')">
+                    <button class="btn btn-outline-custom" onclick="window.open('https://allstarlink.github.io/', '_blank')">
                         <i class="bi bi-globe"></i> AllStar How To
                     </button>
-                    <button class="btn btn-outline-custom" onclick="window.open('https://wiki.allstarlink.org/wiki/Main_Page', '_blank')">
+                    <button class="btn btn-outline-custom" onclick="window.open('https://wiki.allstarlink.org/archive/', '_blank')">
                         <i class="bi bi-globe"></i> AllStar Wiki
                     </button>
                     <button class="btn btn-outline-warning" onclick="window.open('https://gismodes37.github.io/Chilemon/', '_blank')">
