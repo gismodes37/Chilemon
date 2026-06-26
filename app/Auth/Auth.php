@@ -206,7 +206,7 @@ final class Auth
             return false;
         }
 
-        $stmt = $db->prepare('SELECT id, username, password_hash FROM users WHERE username = :u LIMIT 1');
+        $stmt = $db->prepare('SELECT id, username, password_hash, role FROM users WHERE username = :u LIMIT 1');
         $stmt->execute([':u' => $u]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
