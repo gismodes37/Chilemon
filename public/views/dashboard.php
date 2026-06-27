@@ -800,6 +800,17 @@ $systemInfo = $systemInfo ?? [
             <div class="modal-body">
                 <form id="regForm">
                     <input type="hidden" name="csrf_token" id="regCsrfToken" value="">
+                    <div id="regAuthFields" class="mb-3">
+                        <div class="mb-2">
+                            <label class="form-label">Usuario hub</label>
+                            <input type="text" class="form-control" name="hub_user" maxlength="100" placeholder="Ej: admin">
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Contraseña hub</label>
+                            <input type="password" class="form-control" name="hub_pass" placeholder="••••••••">
+                        </div>
+                        <hr>
+                    </div>
                     <div class="mb-3">
                         <label class="form-label">Indicativo (callsign)</label>
                         <input type="text" class="form-control" name="callsign" required maxlength="16" placeholder="Ej: CA2IIG">
@@ -860,6 +871,11 @@ $systemInfo = $systemInfo ?? [
         if (meta) {
             document.getElementById('regCsrfToken').value = meta.getAttribute('content');
         }
+        // Toggle auth fields based on localStorage
+        var authFields = document.getElementById('regAuthFields');
+        if (authFields) {
+            authFields.classList.toggle('d-none', localStorage.getItem('chilemon_reg_authenticated') === '1');
+        }
     });
 
     submitBtn.addEventListener('click', function () {
@@ -888,6 +904,7 @@ $systemInfo = $systemInfo ?? [
                     var banner = document.getElementById('reg-banner');
                     if (banner) banner.style.display = 'none';
                     sessionStorage.setItem('chilemon_reg_banner_dismissed', '1');
+                    localStorage.setItem('chilemon_reg_authenticated', '1');
                 }, 2000);
             } else {
                 feedback.className = 'alert alert-danger mt-3';
