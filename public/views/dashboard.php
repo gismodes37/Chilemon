@@ -86,7 +86,22 @@ $systemInfo = $systemInfo ?? [
     $_regLocal = file_exists($_regConfigFile) ? (require $_regConfigFile) : [];
     $_hasRegToken = !empty($_regLocal['registration_token']);
     $_hubUrlConfigured = defined('HUB_URL') && HUB_URL !== '';
-    $showRegBanner = $_hasRegToken && $_hubUrlConfigured;
+
+    // Check with hub if this node is already registered
+    $_isRegistered = false;
+    if ($_hasRegToken && $_hubUrlConfigured && defined('ASL_NODE') && ASL_NODE !== '') {
+        $_checkUrl = rtrim(HUB_URL, '/') . '/api/map/check.php?node_id=' . urlencode((string)ASL_NODE);
+        $_ctx = stream_context_create(['http' => ['timeout' => 3, 'method' => 'GET']]);
+        $_resp = @file_get_contents($_checkUrl, false, $_ctx);
+        if ($_resp !== false) {
+            $_data = json_decode($_resp, true);
+            if (is_array($_data) && !empty($_data['ok']) && !empty($_data['registered'])) {
+                $_isRegistered = true;
+            }
+        }
+    }
+
+    $showRegBanner = $_hasRegToken && $_hubUrlConfigured && !$_isRegistered;
     ?>
     <?php if ($showRegBanner): ?>
     <div class="alert alert-info alert-dismissible fade show" id="reg-banner" role="alert">
@@ -100,6 +115,10 @@ $systemInfo = $systemInfo ?? [
             onclick="sessionStorage.setItem('chilemon_reg_banner_dismissed', '1')"></button>
     </div>
     <script>
+    // Hide banner if already registered (persistent across sessions)
+    if (localStorage.getItem('chilemon_registered') === '1') {
+        document.getElementById('reg-banner').style.display = 'none';
+    }
     if (sessionStorage.getItem('chilemon_reg_banner_dismissed') === '1') {
         document.getElementById('reg-banner').style.display = 'none';
     }
@@ -883,6 +902,7 @@ $systemInfo = $systemInfo ?? [
             if (result.data.ok) {
                 feedback.className = 'alert alert-success mt-3';
                 feedback.textContent = '✅ Registro enviado correctamente. Un administrador lo revisará pronto.';
+                localStorage.setItem('chilemon_registered', '1');
 
                 setTimeout(function () {
                     bootstrap.Modal.getInstance(modalEl).hide();
