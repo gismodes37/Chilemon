@@ -78,7 +78,33 @@ $systemInfo = $systemInfo ?? [
         </div>
     <?php endif; ?>
 
-   
+    <?php
+    /**
+     * Registration banner state
+     */
+    $_regConfigFile = ROOT_PATH . '/config/local.php';
+    $_regLocal = file_exists($_regConfigFile) ? (require $_regConfigFile) : [];
+    $_hasRegToken = !empty($_regLocal['registration_token']);
+    $_hubUrlConfigured = defined('HUB_URL') && HUB_URL !== '';
+    $showRegBanner = !$_hasRegToken && $_hubUrlConfigured;
+    ?>
+    <?php if ($showRegBanner): ?>
+    <div class="alert alert-info alert-dismissible fade show" id="reg-banner" role="alert">
+        <i class="bi bi-geo-alt-fill"></i>
+        <strong>¡Registrá tu instalación!</strong>
+        Registrá tu nodo en el mapa comunitario de ChileMon para que otros operadores puedan verte.
+        <button type="button" class="btn btn-primary btn-sm ms-3" data-bs-toggle="modal" data-bs-target="#regModal">
+            <i class="bi bi-pencil-square"></i> Registrarse
+        </button>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"
+            onclick="sessionStorage.setItem('chilemon_reg_banner_dismissed', '1')"></button>
+    </div>
+    <script>
+    if (sessionStorage.getItem('chilemon_reg_banner_dismissed') === '1') {
+        document.getElementById('reg-banner').style.display = 'none';
+    }
+    </script>
+    <?php endif; ?>
 
     <div class="acceso-rapido">
         <div class="row align-items-center">
@@ -118,6 +144,12 @@ $systemInfo = $systemInfo ?? [
                     <button class="btn btn-outline-primary" onclick="window.open('https://www.qsl.net/ca2iig/', '_blank')">
                         <i class="bi bi-globe"></i> Web Site Desarrollador
                     </button>
+                    <?php if (defined('HUB_URL') && HUB_URL !== ''): ?>
+                    <?php $mapUrl = HUB_MODE ? rtrim(BASE_URL, '/') . '/map.php' : HUB_URL; ?>
+                    <button class="btn btn-outline-success" onclick="window.open('<?= $mapUrl ?>', '<?= HUB_MODE ? '_self' : '_blank' ?>')">
+                        <i class="bi bi-map"></i> ChileMon Map
+                    </button>
+                    <?php endif; ?>
                     <button class="btn btn-outline-info" id="btn-audio-settings"
                         title="Configuración de audio">
                         <i class="bi bi-sliders"></i> Audio
@@ -751,6 +783,128 @@ $systemInfo = $systemInfo ?? [
         </div>
     </div>
 </div>
+
+<!-- =========================================
+     Registration Modal (Installation Map)
+     ========================================= -->
+<div class="modal fade" id="regModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-geo-alt-fill text-primary"></i>
+                    Registrá tu instalación
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <form id="regForm">
+                    <input type="hidden" name="csrf_token" id="regCsrfToken" value="">
+                    <div class="mb-3">
+                        <label class="form-label">Indicativo (callsign)</label>
+                        <input type="text" class="form-control" name="callsign" required maxlength="16" placeholder="Ej: CA2IIG">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Ciudad</label>
+                        <input type="text" class="form-control" name="city" required maxlength="100" placeholder="Ej: La Serena">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Región</label>
+                        <input type="text" class="form-control" name="region" maxlength="100" placeholder="Ej: Coquimbo">
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Latitud</label>
+                            <input type="number" class="form-control" name="lat" step="any" required placeholder="-33.45">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Longitud</label>
+                            <input type="number" class="form-control" name="lng" step="any" required placeholder="-70.65">
+                        </div>
+                    </div>
+                    <p class="text-muted small mb-0">
+                        <i class="bi bi-info-circle"></i>
+                        Los datos se enviarán al hub central de ChileMon. Un administrador revisará y aprobará tu registro.
+                    </p>
+                    <div id="regFormFeedback" class="d-none"></div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="regSubmitBtn">
+                    <i class="bi bi-send"></i> Enviar registro
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    'use strict';
+
+    var modalEl = document.getElementById('regModal');
+    if (!modalEl) return;
+
+    var form     = document.getElementById('regForm');
+    var submitBtn = document.getElementById('regSubmitBtn');
+    var feedback  = document.getElementById('regFormFeedback');
+
+    var registerUrl = '<?= HUB_MODE
+        ? rtrim(BASE_URL, '/') . '/api/map/register.php'
+        : rtrim(HUB_URL, '/') . '/api/map/register.php' ?>';
+
+    // Populate CSRF token when modal opens
+    modalEl.addEventListener('show.bs.modal', function () {
+        var meta = document.querySelector('meta[name="csrf-token"]');
+        if (meta) {
+            document.getElementById('regCsrfToken').value = meta.getAttribute('content');
+        }
+    });
+
+    submitBtn.addEventListener('click', function () {
+        var formData = new FormData(form);
+
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Enviando...';
+        feedback.className = 'd-none';
+
+        fetch(registerUrl, {
+            method: 'POST',
+            body: formData,
+        })
+        .then(function (resp) {
+            return resp.json().then(function (data) {
+                return { status: resp.status, data: data };
+            });
+        })
+        .then(function (result) {
+            if (result.data.ok) {
+                feedback.className = 'alert alert-success mt-3';
+                feedback.textContent = '✅ Registro enviado correctamente. Un administrador lo revisará pronto.';
+
+                setTimeout(function () {
+                    bootstrap.Modal.getInstance(modalEl).hide();
+                    var banner = document.getElementById('reg-banner');
+                    if (banner) banner.style.display = 'none';
+                    sessionStorage.setItem('chilemon_reg_banner_dismissed', '1');
+                }, 2000);
+            } else {
+                feedback.className = 'alert alert-danger mt-3';
+                feedback.textContent = '❌ ' + (result.data.error || 'Error desconocido');
+            }
+        })
+        .catch(function (err) {
+            feedback.className = 'alert alert-danger mt-3';
+            feedback.textContent = '❌ Error de conexión: ' + err.message;
+        })
+        .finally(function () {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="bi bi-send"></i> Enviar registro';
+        });
+    });
+})();
+</script>
 
 <div class="modal fade modal-chilemon-danger" id="modalReinicio" tabindex="-1" aria-labelledby="modalReicioLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">

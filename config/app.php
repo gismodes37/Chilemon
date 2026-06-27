@@ -339,3 +339,31 @@ if (!defined('NODE_WHITELIST')) {
     }
     define('NODE_WHITELIST', is_array($rawWhitelist) ? $rawWhitelist : []);
 }
+
+/**
+ * -----------------------------------------------------
+ * Installation Map Configuration
+ * -----------------------------------------------------
+ * Hub mode enables registration APIs and public map page.
+ * Agent nodes (hub_mode=false) show a registration banner
+ * and POST to the hub URL.
+ */
+if (!defined('HUB_MODE')) {
+    $envHubMode = getenv('CHILEMON_HUB_MODE');
+    define(
+        'HUB_MODE',
+        $envHubMode !== false
+            ? filter_var($envHubMode, FILTER_VALIDATE_BOOL)
+            : ($localConfig['hub_mode'] ?? false)
+    );
+}
+
+if (!defined('HUB_URL')) {
+    define(
+        'HUB_URL',
+        (string) (
+            getenv('CHILEMON_HUB_URL')
+                ?: ($localConfig['hub_url'] ?? '')
+        )
+    );
+}

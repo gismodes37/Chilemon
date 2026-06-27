@@ -83,3 +83,19 @@ CREATE TABLE IF NOT EXISTS api_attempts (
 
 CREATE INDEX IF NOT EXISTS idx_api_attempts_lookup
 ON api_attempts(action, ip_address, created_at);
+
+-- Instalaciones registradas (mapa comunitario)
+CREATE TABLE IF NOT EXISTS registrations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    node_id TEXT NOT NULL,
+    callsign TEXT,
+    lat REAL,
+    lng REAL,
+    city TEXT,
+    region TEXT,
+    owner TEXT,
+    status TEXT NOT NULL DEFAULT 'pending',
+    registration_token TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);

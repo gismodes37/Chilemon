@@ -92,6 +92,24 @@ final class Database
                 self::$instance->exec("CREATE INDEX IF NOT EXISTS idx_api_attempts_lookup ON api_attempts(action, ip_address, created_at);");
             } catch (\Throwable $err) {}
 
+            // MIGRACIÓN v0.5.0: Tabla de registraciones para el mapa comunitario
+            self::$instance->exec("
+                CREATE TABLE IF NOT EXISTS registrations (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    node_id TEXT NOT NULL,
+                    callsign TEXT,
+                    lat REAL,
+                    lng REAL,
+                    city TEXT,
+                    region TEXT,
+                    owner TEXT,
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    registration_token TEXT NOT NULL UNIQUE,
+                    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+                )
+            ");
+
         } catch (PDOException $e) {
             throw new \RuntimeException('Error SQLite: ' . $e->getMessage(), 0, $e);
         }
