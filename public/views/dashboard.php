@@ -164,7 +164,7 @@ $systemInfo = $systemInfo ?? [
                         <i class="bi bi-globe"></i> Web Site Desarrollador
                     </button>
                     <?php if (defined('HUB_URL') && HUB_URL !== ''): ?>
-                    <?php $mapUrl = HUB_MODE ? rtrim(BASE_URL, '/') . '/map.php' : HUB_URL; ?>
+                    <?php $mapUrl = HUB_MODE ? rtrim(BASE_URL, '/') . '/map.php' : rtrim(HUB_URL, '/') . '/map.php'; ?>
                     <button class="btn btn-outline-success" onclick="window.open('<?= $mapUrl ?>', '<?= HUB_MODE ? '_self' : '_blank' ?>')">
                         <i class="bi bi-map"></i> ChileMon Map
                     </button>
