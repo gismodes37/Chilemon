@@ -281,6 +281,7 @@ write_local_config() {
     local ami_user="$6"
     local ami_pass="$7"
     local ami_timeout="$8"
+    local hub_url="$9"
 
     mkdir -p "$(dirname "$LOCAL_CONFIG")"
     backup_if_exists "$LOCAL_CONFIG"
@@ -288,6 +289,7 @@ write_local_config() {
     local safe_local_node safe_server_host safe_header_tagline
     local safe_ami_host safe_ami_user safe_ami_pass
     local safe_repo_dir safe_db_path safe_wrapper_path
+    local safe_hub_url
 
     safe_local_node="$(escape_php_string "$local_node")"
     safe_server_host="$(escape_php_string "$server_host")"
@@ -298,6 +300,7 @@ write_local_config() {
     safe_repo_dir="$(escape_php_string "$REPO_DIR")"
     safe_db_path="$(escape_php_string "${DATA_DIR}/chilemon.sqlite")"
     safe_wrapper_path="$(escape_php_string "$WRAPPER_PATH")"
+    safe_hub_url="$(escape_php_string "$hub_url")"
 
     cat > "$LOCAL_CONFIG" <<PHP
 <?php
@@ -333,6 +336,11 @@ return [
     'ami_user' => '${safe_ami_user}',
     'ami_pass' => '${safe_ami_pass}',
     'ami_timeout' => ${ami_timeout},
+
+    // URL del hub central ChileMon (opcional). Si se configura,
+    // el dashboard mostrará un banner para registrar este nodo
+    // en el mapa comunitario (https://github.com/gismodes37/Chilemon-Hub).
+    'hub_url' => '${safe_hub_url}',
 ];
 PHP
 
@@ -938,6 +946,7 @@ main() {
     local ami_user=""
     local ami_pass=""
     local ami_timeout="$DEFAULT_AMI_TIMEOUT"
+    local hub_url=""
 
     if [[ "$INSTALL_MODE" == "new" ]]; then
         # ----------------------------------------------------------
@@ -959,6 +968,13 @@ main() {
 
         read -r -p "Ingrese texto descriptivo del nodo [Nodo local ChileMon]: " header_tagline
         header_tagline="${header_tagline:-Nodo local ChileMon}"
+
+        echo
+        echo "--- Mapa comunitario ChileMon (opcional) ---"
+        echo "Si tienes un hub central, puedes registrar este nodo en el mapa comunitario."
+        echo "Ejemplo: http://192.168.0.111"
+        read -r -p "URL del hub ChileMon (dejar vacío para omitir): " hub_url
+        echo
 
         ami_host="$(detect_ami_host)"
         ami_port="$(detect_ami_port)"
@@ -1033,7 +1049,8 @@ main() {
             "$ami_port" \
             "$ami_user" \
             "$ami_pass" \
-            "$ami_timeout"
+            "$ami_timeout" \
+            "$hub_url"
     fi
 
     step "6" "Configurando módulos de Asterisk para ASL3"

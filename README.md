@@ -76,6 +76,10 @@ ChileMon currently includes:
 - **CSRF protection** on all forms
 - **WebRTC Audio Bridge** — Browser-based Push-to-Talk (PTT) from the dashboard
 - **Bridge IAX2 Direction Reversal** — Robust IAX2 server mode for ASL3 compatibility
+- **🗺️ Installation Map** — Opt-in community map showing all ChileMon nodes (Leaflet + OpenStreetMap)
+- **Interactive Map Picker** — Click-to-set coordinates in registration modal with draggable marker
+- **Address Geocoding** — Type an address and the map auto-positions via Nominatim (OpenStreetMap)
+- **Cross-Origin Registration** — Agent nodes register on the hub without pre-existing session
 
 ---
 
@@ -278,6 +282,8 @@ The installer runs **13 steps**:
 
 > 💡 **UPDATE (existing system)**: The installer detects `config/local.php` and skips all prompts — it only adds missing dependencies, configures WebRTC/WebSocket, and runs a full verification.
 
+> 🗺️ **Installation Map (optional)**: During NEW installation, you'll be asked for a **hub URL**. If you have a ChileMon Hub instance, enter its URL (e.g. `http://192.168.0.111`) and your node will be able to register on the community map. This is optional — skip it if you don't have a hub.
+
 > 🎯 **WebRTC Audio Bridge**: The bridge for browser-based radio PTT is now **installed automatically** in step 12. No separate script needed. Just configure the credentials in `/etc/default/chilemon-webrtc` after installation.
 
 ---
@@ -374,6 +380,10 @@ Open `http://<your-vm-ip>/chilemon` — browser PTT included 🇨🇱
      │   │   ├── disconnect.php
      │   │   ├── delete_node.php
      │   │   ├── system_action.php
+     │   │   ├── map/          ← Instalación mapa comunitario
+     │   │   │   ├── check.php
+     │   │   │   ├── register.php
+     │   │   │   └── data.php
      │   │   ├── favorites/    ← CRUD favoritos
      │   │   └── ami/          ← AMI status endpoints
      │   └── views/
@@ -395,7 +405,7 @@ Open `http://<your-vm-ip>/chilemon` — browser PTT included 🇨🇱
 
 <img alt="Static Badge" src="https://img.shields.io/badge/Version-0.4.0-brightgreen">
 
-**Current Release** — Security overhaul, PTT Audio Bridge, Bridge IAX2 reversal, rate limiting, CSRF protection, user roles, admin panel, health check
+**Current Release** — Security overhaul, PTT Audio Bridge, Bridge IAX2 reversal, rate limiting, CSRF protection, user roles, admin panel, health check, installation map (hub + agent registration), interactive map picker with address geocoding
 
 <img alt="Static Badge" src="https://img.shields.io/badge/Version-0.5.x-blue">
 
