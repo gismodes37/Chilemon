@@ -803,7 +803,7 @@ $systemInfo = $systemInfo ?? [
      Registration Modal (Installation Map)
      ========================================= -->
 <div class="modal fade" id="regModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">
@@ -817,39 +817,55 @@ $systemInfo = $systemInfo ?? [
                     <input type="hidden" name="csrf_token" id="regCsrfToken" value="">
                     <input type="hidden" name="registration_token" value="<?= htmlspecialchars($_regLocal['registration_token'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
                     <input type="hidden" name="node_id" value="<?= defined('ASL_NODE') ? htmlspecialchars((string)ASL_NODE, ENT_QUOTES, 'UTF-8') : '' ?>">
-                    <div class="mb-3">
-                        <label class="form-label">Indicativo (callsign)</label>
-                        <input type="text" class="form-control" name="callsign" required maxlength="16" placeholder="Ej: CA2IIG">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Ciudad</label>
-                        <input type="text" class="form-control" name="city" required maxlength="100" placeholder="Ej: La Serena">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Región</label>
-                        <input type="text" class="form-control" name="region" maxlength="100" placeholder="Ej: Coquimbo">
+
+                    <div class="row">
+                        <!-- Left column: form fields -->
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Indicativo (callsign)</label>
+                                <input type="text" class="form-control" name="callsign" required maxlength="16" placeholder="Ej: CA2IIG">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Ciudad</label>
+                                <input type="text" class="form-control" name="city" required maxlength="100" placeholder="Ej: La Serena">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Región</label>
+                                <input type="text" class="form-control" name="region" maxlength="100" placeholder="Ej: Coquimbo">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Dirección exacta</label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="regAddress" placeholder="Ej: Av. Principal 123" autocomplete="off">
+                                    <span class="input-group-text" id="regAddrSpinner" style="display:none;">
+                                        <span class="spinner-border spinner-border-sm"></span>
+                                    </span>
+                                </div>
+                                <div id="regGeocodeStatus" class="form-text"></div>
+                            </div>
+                            <div class="row mb-3">
+                                <div class="col-6">
+                                    <label class="form-label">Latitud</label>
+                                    <input type="text" class="form-control" name="lat" id="regLat" required placeholder="-33.45" inputmode="decimal" autocomplete="off">
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label">Longitud</label>
+                                    <input type="text" class="form-control" name="lng" id="regLng" required placeholder="-70.65" inputmode="decimal" autocomplete="off">
+                                </div>
+                            </div>
+                            <p class="text-muted small mb-0">
+                                <i class="bi bi-info-circle"></i>
+                                Los datos se enviarán al hub central de ChileMon. Un administrador revisará y aprobará tu registro.
+                            </p>
+                        </div>
+
+                        <!-- Right column: map -->
+                        <div class="col-md-6">
+                            <label class="form-label">Ubicación <span class="text-muted small">(arrastrá el marcador para ajustar)</span></label>
+                            <div id="regMap" style="height:350px;border-radius:0.375rem;border:1px solid #dee2e6;z-index:1;"></div>
+                        </div>
                     </div>
 
-                    <!-- Map picker -->
-                    <div class="mb-3">
-                        <label class="form-label">Ubicación <span class="text-muted small">(hacé clic en el mapa)</span></label>
-                        <div id="regMap" style="height:260px;border-radius:0.375rem;border:1px solid #dee2e6;z-index:1;"></div>
-                    </div>
-
-                    <div class="row mb-3">
-                        <div class="col-md-6">
-                            <label class="form-label">Latitud</label>
-                            <input type="text" class="form-control" name="lat" id="regLat" required placeholder="-33.45" inputmode="decimal" autocomplete="off">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Longitud</label>
-                            <input type="text" class="form-control" name="lng" id="regLng" required placeholder="-70.65" inputmode="decimal" autocomplete="off">
-                        </div>
-                    </div>
-                    <p class="text-muted small mb-0">
-                        <i class="bi bi-info-circle"></i>
-                        Los datos se enviarán al hub central de ChileMon. Un administrador revisará y aprobará tu registro.
-                    </p>
                     <div id="regFormFeedback" class="d-none"></div>
                 </form>
             </div>
@@ -942,6 +958,53 @@ $systemInfo = $systemInfo ?? [
         }
         regMap.setView(ll, regMap.getZoom());
     }
+
+    /* ---- Address geocoding (Nominatim OSM) ---- */
+    var regAddress    = document.getElementById('regAddress');
+    var regAddrStatus = document.getElementById('regGeocodeStatus');
+    var regAddrSpin   = document.getElementById('regAddrSpinner');
+    var geocodeTimer  = null;
+
+    function geocodeAddress() {
+        var q = regAddress.value.trim();
+        if (q.length < 4) {
+            regAddrStatus.textContent = '';
+            return;
+        }
+
+        regAddrSpin.style.display = 'inline-flex';
+        regAddrStatus.innerHTML = '<span class="text-muted">Buscando dirección…</span>';
+
+        fetch('https://nominatim.openstreetmap.org/search?format=json&q='
+            + encodeURIComponent(q) + '&limit=1&countrycodes=cl')
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            regAddrSpin.style.display = 'none';
+            if (data && data.length > 0) {
+                var lat = parseFloat(data[0].lat);
+                var lng = parseFloat(data[0].lon);
+                document.getElementById('regLat').value = lat.toFixed(6);
+                document.getElementById('regLng').value = lng.toFixed(6);
+                updateMarkerFromInputs();
+                if (regMap) regMap.setView([lat, lng], 16);
+                regAddrStatus.innerHTML = '<span class="text-success">✓ '
+                    + (data[0].display_name.split(',')[0] || 'Ubicación encontrada')
+                    + '</span>';
+            } else {
+                regAddrStatus.innerHTML = '<span class="text-warning">⚠ No se encontró la dirección. Ajustá el marcador manualmente.</span>';
+            }
+        })
+        .catch(function () {
+            regAddrSpin.style.display = 'none';
+            regAddrStatus.innerHTML = '<span class="text-danger">✗ Error al buscar dirección</span>';
+        });
+    }
+
+    regAddress.addEventListener('input', function () {
+        clearTimeout(geocodeTimer);
+        geocodeTimer = setTimeout(geocodeAddress, 500);
+    });
+    /* ---- End address geocoding ---- */
 
     // Populate CSRF token when modal opens
     modalEl.addEventListener('show.bs.modal', function () {
