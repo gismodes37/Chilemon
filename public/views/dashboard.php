@@ -1042,10 +1042,10 @@ $systemInfo = $systemInfo ?? [
         .then(function (result) {
             if (result.data.ok) {
                 feedback.className = 'alert alert-success mt-3';
-                feedback.textContent = '✅ Registro enviado correctamente. Un administrador lo revisará pronto.';
+                feedback.textContent = '✅ Registro enviado correctamente. Recargando…';
                 setTimeout(function () {
-                    bootstrap.Modal.getInstance(modalEl).hide();
-                }, 2000);
+                    window.location.reload();
+                }, 1500);
             } else {
                 feedback.className = 'alert alert-danger mt-3';
                 feedback.textContent = '❌ ' + (result.data.error || 'Error desconocido');
