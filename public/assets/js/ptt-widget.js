@@ -455,21 +455,9 @@ class PTTWidget {
                     if (!this.pttActive) return;
                     const input = e.inputBuffer.getChannelData(0);
                     const actualRate = this._txCtx.sampleRate;
-                    let outSamples, outRate;
-                    if (actualRate === 16000) {
-                        outSamples = input;
-                        outRate = 16000;
-                    } else {
-                        try {
-                            outSamples = this._downsampleCIC(input, actualRate);
-                            outRate = 16000;
-                        } catch (err) {
-                            console.warn('[ChileMon] CIC downsample failed, raw data sent:', err);
-                            outSamples = input;
-                            outRate = actualRate;
-                        }
-                    }
-                    this._sendAudioChunk(outSamples, outRate);
+                    // Send raw audio with actual sample rate.
+                    // Server handles resample to 16kHz if rate != 16000.
+                    this._sendAudioChunk(input, actualRate);
                 };
 
                 // micSource → gainNode → scriptProcessor
@@ -506,34 +494,6 @@ class PTTWidget {
             this._txCtx.close().catch(() => {});
             this._txCtx = null;
         }
-    }
-
-    /**
-     * Cascaded Integrator-Comb downsample, stage-1.
-     * Running-sum + decimate-by-M to convert any sample rate to ~16kHz.
-     * For 48kHz->16kHz: M=3, 1024 inputs -> ~341 outputs.
-     * For arbitrary rates: M = round(actualRate / 16000).
-     * @param {Float32Array} samples - Input PCM at actualRate
-     * @param {number} actualRate - Real sample rate of AudioContext
-     * @returns {Float32Array} Downsampled PCM at ~16kHz
-     */
-    _downsampleCIC(samples, actualRate) {
-        const M = Math.round(actualRate / 16000);
-        if (M <= 1) {
-            return samples;
-        }
-        const outLen = Math.floor(samples.length / M);
-        const output = new Float32Array(outLen);
-        for (let i = 0; i < outLen; i++) {
-            const base = i * M;
-            let sum = 0;
-            for (let j = 0; j < M; j++) {
-                sum += samples[base + j];
-            }
-            output[i] = sum / M;
-        }
-        console.warn("[ChileMon] CIC downsample: %d->16000 Hz, M=%d", actualRate, M);
-        return output;
     }
 
     /**
