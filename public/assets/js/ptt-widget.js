@@ -84,6 +84,9 @@ class PTTWidget {
             // Call state (from server status messages)
             this._inCall = false;
             this._hasHadCall = false; // true after first successful call
+            // TX AudioContext state monitor
+            this._txStateTimer = null;
+
             this._diagChunkCount = 0;
             this._diagLogInterval = 30; // log every N chunks
         }
@@ -470,6 +473,28 @@ class PTTWidget {
         console.log('[PTT-DIAG] TX AudioContext created: requested=16000, actual='
             + this._txCtx.sampleRate + ', state=' + this._txCtx.state);
 
+        // Monitor AudioContext state — auto-resume if Chrome suspends it
+        this._txCtx.addEventListener('statechange', () => {
+            if (this._txCtx.state === 'suspended') {
+                console.log('[PTT-DIAG] TX AudioContext suspended — resuming...');
+                this._txCtx.resume().catch(() => {
+                    console.warn('[PTT-DIAG] TX AudioContext resume blocked');
+                });
+            }
+        });
+
+        // Periodic state check as fallback (every 2s while PTT active)
+        if (this._txStateTimer) {
+            clearInterval(this._txStateTimer);
+        }
+        this._txStateTimer = setInterval(() => {
+            if (!this.pttActive) return;
+            if (this._txCtx && this._txCtx.state === 'suspended') {
+                console.log('[PTT-DIAG] TX AudioContext suspended (interval) — resuming...');
+                this._txCtx.resume().catch(() => {});
+            }
+        }, 2000);
+
         navigator.mediaDevices.getUserMedia({ audio: true })
             .then((stream) => {
                 this._micStream = stream;
@@ -521,6 +546,12 @@ class PTTWidget {
 
     /** Stop mic capture and release the MediaStream + TX AudioContext. */
     stopCapture() {
+        // Clear AudioContext state monitor
+        if (this._txStateTimer) {
+            clearInterval(this._txStateTimer);
+            this._txStateTimer = null;
+        }
+
         if (this._micProcessor) {
             try { this._micProcessor.disconnect(); } catch (_) { /* ignore */ }
             this._micProcessor = null;
