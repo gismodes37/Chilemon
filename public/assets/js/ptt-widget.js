@@ -454,8 +454,22 @@ class PTTWidget {
                 this._micProcessor.onaudioprocess = (e) => {
                     if (!this.pttActive) return;
                     const input = e.inputBuffer.getChannelData(0);
-                    console.log('PTT: onaudioprocess firing, samples=', input.length, 'pttActive=', this.pttActive);
-                    this._sendAudioChunk(input);
+                    const actualRate = this._txCtx.sampleRate;
+                    let outSamples, outRate;
+                    if (actualRate === 16000) {
+                        outSamples = input;
+                        outRate = 16000;
+                    } else {
+                        try {
+                            outSamples = this._downsampleCIC(input, actualRate);
+                            outRate = 16000;
+                        } catch (err) {
+                            console.warn('[ChileMon] CIC downsample failed, raw data sent:', err);
+                            outSamples = input;
+                            outRate = actualRate;
+                        }
+                    }
+                    this._sendAudioChunk(outSamples, outRate);
                 };
 
                 // micSource → gainNode → scriptProcessor
@@ -495,8 +509,36 @@ class PTTWidget {
     }
 
     /**
+     * Cascaded Integrator-Comb downsample, stage-1.
+     * Running-sum + decimate-by-M to convert any sample rate to ~16kHz.
+     * For 48kHz->16kHz: M=3, 1024 inputs -> ~341 outputs.
+     * For arbitrary rates: M = round(actualRate / 16000).
+     * @param {Float32Array} samples - Input PCM at actualRate
+     * @param {number} actualRate - Real sample rate of AudioContext
+     * @returns {Float32Array} Downsampled PCM at ~16kHz
+     */
+    _downsampleCIC(samples, actualRate) {
+        const M = Math.round(actualRate / 16000);
+        if (M <= 1) {
+            return samples;
+        }
+        const outLen = Math.floor(samples.length / M);
+        const output = new Float32Array(outLen);
+        for (let i = 0; i < outLen; i++) {
+            const base = i * M;
+            let sum = 0;
+            for (let j = 0; j < M; j++) {
+                sum += samples[base + j];
+            }
+            output[i] = sum / M;
+        }
+        console.warn("[ChileMon] CIC downsample: %d->16000 Hz, M=%d", actualRate, M);
+        return output;
+    }
+
+    /**
      * Convert a Float32Array of audio samples to a hex string.
-     * Each float32 → 4 bytes (little-endian) → 8 hex chars.
+     * Each float32 -> 4 bytes (little-endian) -> 8 hex chars.
      * Matches what server.py:audio_tx expects.
      */
     _samplesToHex(samples) {
@@ -512,7 +554,7 @@ class PTTWidget {
     }
 
     /** Send an audio chunk over the WebSocket as audio_tx. */
-    _sendAudioChunk(samples) {
+    _sendAudioChunk(samples, rate = 16000) {
         // Feed to visualizer (TX audio)
         if (this._visualizer) {
             this._visualizer.feedPCM(samples);
@@ -524,7 +566,7 @@ class PTTWidget {
         }
         try {
             const hex = this._samplesToHex(samples);
-            const msg = JSON.stringify({ type: 'audio_tx', data: hex });
+            const msg = JSON.stringify({ type: 'audio_tx', data: hex, rate: rate });
             console.log('PTT: sending audio_tx', hex.length, 'hex chars');
             this.ws.send(msg);
         } catch (err) {

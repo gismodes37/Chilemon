@@ -89,6 +89,34 @@ def _env_int(key: str, default: int) -> int:
         return default
 
 
+def linear_resample_float32(data: bytes, in_rate: int, out_rate: int) -> bytes:
+    """Resample float32 PCM from in_rate to out_rate via linear interpolation.
+
+    Pure Python (struct only). Handles arbitrary input/output rates.
+    O(n) where n = output sample count.
+    """
+    if in_rate == out_rate:
+        return data
+
+    import struct
+
+    count = len(data) // 4
+    samples: tuple[float, ...] = struct.unpack(f"<{count}f", data)
+    out_count = round(count * out_rate / in_rate)
+    ratio = in_rate / out_rate
+    out: list[float] = []
+    for i in range(out_count):
+        pos = i * ratio
+        idx = int(pos)
+        frac = pos - idx
+        if idx + 1 < count:
+            sample = samples[idx] * (1.0 - frac) + samples[idx + 1] * frac
+        else:
+            sample = samples[idx]
+        out.append(sample)
+    return struct.pack(f"<{len(out)}f", *out)
+
+
 class BridgeConfig:
     """Daemon configuration, loaded from environment variables."""
 
@@ -452,12 +480,28 @@ class WebRTCBridgeApp:
                 return
             try:
                 pcm_f32_hex = payload.get("data", "")
-                if pcm_f32_hex:
-                    pcm_f32 = bytes.fromhex(pcm_f32_hex)
-                    ulaw = tx_process(pcm_f32)
-                    sent = self._active_call.send_voice(ulaw)
-                    if sent:
-                        logger.debug("audio_tx sent %d bytes ulaw", len(ulaw))
+                if not pcm_f32_hex:
+                    return
+
+                # Read rate with default 16000 (backward compat)
+                rate = payload.get("rate", 16000)
+
+                # Validate rate: must be int between 8000 and 96000
+                if not isinstance(rate, int) or rate < 8000 or rate > 96000:
+                    logger.warning("audio_tx invalid rate=%s, assuming 16000", rate)
+                    rate = 16000
+
+                pcm_f32 = bytes.fromhex(pcm_f32_hex)
+
+                # Fallback resample if rate != 16000
+                if rate != 16000:
+                    pcm_f32 = linear_resample_float32(pcm_f32, rate, 16000)
+                    logger.warning("Fallback resample activated: rate=%d", rate)
+
+                ulaw = tx_process(pcm_f32)
+                sent = self._active_call.send_voice(ulaw)
+                if sent:
+                    logger.debug("audio_tx sent %d bytes ulaw (rate=%d)", len(ulaw), rate)
             except (ValueError, KeyError) as exc:
                 logger.warning("audio_tx parse error: %s", exc)
 
