@@ -115,13 +115,9 @@ $systemInfo = $systemInfo ?? [
             onclick="sessionStorage.setItem('chilemon_reg_banner_dismissed', '1')"></button>
     </div>
     <script>
-    // Hide banner if already registered (persistent across sessions)
-    if (localStorage.getItem('chilemon_registered') === '1') {
-        document.getElementById('reg-banner').style.display = 'none';
-    }
-    if (sessionStorage.getItem('chilemon_reg_banner_dismissed') === '1') {
-        document.getElementById('reg-banner').style.display = 'none';
-    }
+    // Clear stale flags — server-side check is authoritative now
+    localStorage.removeItem('chilemon_registered');
+    sessionStorage.removeItem('chilemon_reg_banner_dismissed');
     </script>
     <?php endif; ?>
 
@@ -984,13 +980,8 @@ $systemInfo = $systemInfo ?? [
             if (result.data.ok) {
                 feedback.className = 'alert alert-success mt-3';
                 feedback.textContent = '✅ Registro enviado correctamente. Un administrador lo revisará pronto.';
-                localStorage.setItem('chilemon_registered', '1');
-
                 setTimeout(function () {
                     bootstrap.Modal.getInstance(modalEl).hide();
-                    var banner = document.getElementById('reg-banner');
-                    if (banner) banner.style.display = 'none';
-                    sessionStorage.setItem('chilemon_reg_banner_dismissed', '1');
                 }, 2000);
             } else {
                 feedback.className = 'alert alert-danger mt-3';
