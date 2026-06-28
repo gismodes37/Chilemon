@@ -820,6 +820,7 @@ $systemInfo = $systemInfo ?? [
                 <form id="regForm">
                     <input type="hidden" name="csrf_token" id="regCsrfToken" value="">
                     <input type="hidden" name="registration_token" value="<?= htmlspecialchars($_regLocal['registration_token'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
+                    <input type="hidden" name="node_id" value="<?= defined('ASL_NODE') ? htmlspecialchars((string)ASL_NODE, ENT_QUOTES, 'UTF-8') : '' ?>">
                     <div class="mb-3">
                         <label class="form-label">Indicativo (callsign)</label>
                         <input type="text" class="form-control" name="callsign" required maxlength="16" placeholder="Ej: CA2IIG">
