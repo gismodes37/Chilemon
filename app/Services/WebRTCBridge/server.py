@@ -178,6 +178,12 @@ class WebRTCBridgeApp:
         # Wire IAX2 server callback
         self.iax_server.on_new_call = self._on_iax_new_call
 
+        # Auto-reoriginate on call drop (max 3 attempts)
+        self._reoriginate_count: int = 0
+        self._max_reoriginate: int = 3
+        self._reoriginate_delay: float = 2.0  # seconds
+        self._reoriginate_task: Optional[asyncio.Task[None]] = None
+
     # -- Auth --
 
     def validate_ws_token(self, token: str) -> bool:
@@ -212,9 +218,11 @@ class WebRTCBridgeApp:
         Wires audio/hangup callbacks, accepts and answers the call.
         """
         self._active_call = call
+        self._reoriginate_count = 0  # reset retry counter
+        self._cancel_reoriginate()   # cancel any pending reoriginate
         logger.info(
-            "Inbound NEW from Asterisk — callno=%d called=%s",
-            call.callno, call.called_num,
+            "Inbound NEW from Asterisk — callno=%d called=%s (reoriginate_count=%d)",
+            call.callno, call.called_num, self._reoriginate_count,
         )
 
         # Wire call-level callbacks
@@ -277,6 +285,18 @@ class WebRTCBridgeApp:
         self._ptt_active = False
         await self._broadcast_status()
 
+        # Auto-reoriginate if WS peers still connected
+        if self._ws_peers and self._reoriginate_count < self._max_reoriginate:
+            logger.info(
+                "Auto-reoriginate in %.1fs (attempt %d/%d, peers=%d)",
+                self._reoriginate_delay,
+                self._reoriginate_count + 1,
+                self._max_reoriginate,
+                len(self._ws_peers),
+            )
+            self._reoriginate_count += 1
+            self._schedule_reoriginate()
+
     # -- PTT Handlers --
 
     async def _ptt_key(self) -> None:
@@ -310,9 +330,57 @@ class WebRTCBridgeApp:
 
         await self._broadcast_status()
 
+    def _cancel_reoriginate(self) -> None:
+        """Cancel a pending reoriginate task."""
+        if self._reoriginate_task and not self._reoriginate_task.done():
+            self._reoriginate_task.cancel()
+            self._reoriginate_task = None
+
+    def _schedule_reoriginate(self) -> None:
+        """Schedule a delayed reoriginate."""
+        self._cancel_reoriginate()
+        self._reoriginate_task = asyncio.create_task(
+            self._do_reoriginate()
+        )
+
+    async def _do_reoriginate(self) -> None:
+        """Wait, then re-originate an IAX2 call via AMI."""
+        try:
+            await asyncio.sleep(self._reoriginate_delay)
+
+            # Double-check: still have peers and no active call
+            if not self._ws_peers:
+                logger.debug("Reoriginate cancelled: no WS peers")
+                return
+            if self._active_call is not None:
+                logger.debug("Reoriginate skipped: call already active")
+                self._reoriginate_count = 0
+                return
+
+            logger.info(
+                "Reoriginating IAX2 call (attempt %d/%d)",
+                self._reoriginate_count, self._max_reoriginate,
+            )
+            await self.ami.originate(
+                channel=f"IAX2/webrtc-bridge/{self.config.asl_node}",
+                context="webrtc",
+                exten=self.config.asl_node,
+                priority=1,
+                callerid=f"\"WebRTC\" <{self.config.asl_node}>",
+            )
+        except asyncio.CancelledError:
+            pass
+        except Exception as exc:
+            logger.error("Reoriginate failed: %s", exc)
+
     async def _broadcast_status(self) -> None:
         """Send current bridge status to all connected WS peers."""
         in_call = self._active_call is not None
+        reconnecting = (
+            not in_call
+            and bool(self._ws_peers)
+            and self._reoriginate_count > 0
+        )
         status = {
             "type": "status",
             "ami_connected": self.ami.connected,
@@ -320,6 +388,7 @@ class WebRTCBridgeApp:
             "active_call": in_call,
             "in_call": in_call,
             "ptt_active": self._ptt_active,
+            "reconnecting": reconnecting,
         }
         msg = json.dumps(status)
         for ws in list(self._ws_peers):
@@ -431,12 +500,14 @@ class WebRTCBridgeApp:
                 close_code, len(self._ws_peers),
             )
 
-            # If no more peers, hang up the IAX2 call
-            if not self._ws_peers and self._active_call:
-                logger.info("Last WS peer gone — hanging up IAX2 call")
-                self._active_call.send_hangup()
-                self._active_call = None
-                self._ptt_active = False
+            # If no more peers, hang up the IAX2 call and cancel reoriginate
+            if not self._ws_peers:
+                self._cancel_reoriginate()
+                if self._active_call:
+                    logger.info("Last WS peer gone — hanging up IAX2 call")
+                    self._active_call.send_hangup()
+                    self._active_call = None
+                    self._ptt_active = False
 
         return ws
 
@@ -475,6 +546,10 @@ class WebRTCBridgeApp:
 
         elif msg_type == "audio_tx":
             # Transmit audio: hex-encoded float32 PCM 16 kHz from browser
+            rate = payload.get("rate", 16000)
+            logger.info("audio_tx received: rate=%s, dataLen=%s, active_call=%s",
+                        rate, len(payload.get("data", "")),
+                        self._active_call is not None)
             if not self._active_call:
                 logger.debug("audio_tx dropped: no active IAX2 call")
                 return
@@ -482,9 +557,6 @@ class WebRTCBridgeApp:
                 pcm_f32_hex = payload.get("data", "")
                 if not pcm_f32_hex:
                     return
-
-                # Read rate with default 16000 (backward compat)
-                rate = payload.get("rate", 16000)
 
                 # Validate rate: must be int between 8000 and 96000
                 if not isinstance(rate, int) or rate < 8000 or rate > 96000:

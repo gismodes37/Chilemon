@@ -24,63 +24,69 @@ class PTTWidget {
      * @param {number} [options.wsPort=9091]  Bridge WebSocket port
      * @param {number} [options.statusInterval=5000]  Status poll ms
      */
-    constructor(options = {}) {
-        this.wsPort = options.wsPort || 9091;
-        this.statusInterval = options.statusInterval || 5000;
+        constructor(options = {}) {
+            this.wsPort = options.wsPort || 9091;
+            this.statusInterval = options.statusInterval || 5000;
+    
+            /** @type {WebSocket|null} */
+            this.ws = null;
+            this.token = null;
+            this.connected = false;
+            this.pttActive = false;
+            this.reconnectAttempts = 0;
+            this.maxReconnectAttempts = 20;
+            this.reconnectBaseDelay = 1000; // 1s, doubles each attempt
+            this.reconnectTimer = null;
+            this.statusPollTimer = null;
+    
+            /** @type {AudioContext|null} */
+            this.audioCtx = null;
+    
+            // Gain nodes for RX/TX volume control
+            /** @type {GainNode|null} */
+            this._rxGainNode = null;
+            /** @type {GainNode|null} */
+            this._txGainNode = null;
+    
+            // Previous audio source (stopped before starting new one to prevent overlap)
+            /** @type {AudioBufferSourceNode|null} */
+            this._audioSource = null;
+    
+            // Volume-smoothing: RMS from last N audio messages
+            this.volumeSamples = [];
+            this.maxVolumeSamples = 10;
+    
+            // DOM references (set during init)
+            this.widget = null;
+            this.pttButton = null;
+            this.pttLabel = null;
+            this.statusDot = null;
+            this.statusText = null;
+            this.volumeFill = null;
+            this.volumeContainer = null;
+    
+            // Bound handlers for addEventListener / removeEventListener
+            this._onKeyDown = this._onKeyDown.bind(this);
+            this._onKeyUp = this._onKeyUp.bind(this);
+            this._onMouseUp = this._onMouseUp.bind(this);
+            this._onBeforeUnload = this._onBeforeUnload.bind(this);
+    
+            // TX (mic capture) state
+            /** @type {MediaStream|null} */
+            this._micStream = null;
+            /** @type {MediaStreamAudioSourceNode|null} */
+            this._micSource = null;
+            /** @type {ScriptProcessorNode|null} */
+            this._micProcessor = null;
+            /** @type {AudioContext|null} */
+            this._txCtx = null;
 
-        /** @type {WebSocket|null} */
-        this.ws = null;
-        this.token = null;
-        this.connected = false;
-        this.pttActive = false;
-        this.reconnectAttempts = 0;
-        this.maxReconnectAttempts = 20;
-        this.reconnectBaseDelay = 1000; // 1s, doubles each attempt
-        this.reconnectTimer = null;
-        this.statusPollTimer = null;
-
-        /** @type {AudioContext|null} */
-        this.audioCtx = null;
-
-        // Gain nodes for RX/TX volume control
-        /** @type {GainNode|null} */
-        this._rxGainNode = null;
-        /** @type {GainNode|null} */
-        this._txGainNode = null;
-
-        // Previous audio source (stopped before starting new one to prevent overlap)
-        /** @type {AudioBufferSourceNode|null} */
-        this._audioSource = null;
-
-        // Volume-smoothing: RMS from last N audio messages
-        this.volumeSamples = [];
-        this.maxVolumeSamples = 10;
-
-        // DOM references (set during init)
-        this.widget = null;
-        this.pttButton = null;
-        this.pttLabel = null;
-        this.statusDot = null;
-        this.statusText = null;
-        this.volumeFill = null;
-        this.volumeContainer = null;
-
-        // Bound handlers for addEventListener / removeEventListener
-        this._onKeyDown = this._onKeyDown.bind(this);
-        this._onKeyUp = this._onKeyUp.bind(this);
-        this._onMouseUp = this._onMouseUp.bind(this);
-        this._onBeforeUnload = this._onBeforeUnload.bind(this);
-
-        // TX (mic capture) state
-        /** @type {MediaStream|null} */
-        this._micStream = null;
-        /** @type {MediaStreamAudioSourceNode|null} */
-        this._micSource = null;
-        /** @type {ScriptProcessorNode|null} */
-        this._micProcessor = null;
-        /** @type {AudioContext|null} */
-        this._txCtx = null;
-    }
+            // Call state (from server status messages)
+            this._inCall = false;
+            this._hasHadCall = false; // true after first successful call
+            this._diagChunkCount = 0;
+            this._diagLogInterval = 30; // log every N chunks
+        }
 
     // ---------------------------------------------------------------
     //  Public API
@@ -181,6 +187,8 @@ class PTTWidget {
         this.ws.onclose = () => {
             this.connected = false;
             this.pttActive = false;
+            this._inCall = false;
+            this._hasHadCall = false;
             this._setStatus('disconnected', 'Disconnected');
             this._updateUI();
             this._scheduleReconnect();
@@ -320,14 +328,34 @@ class PTTWidget {
     }
 
     _handleStatusMessage(msg) {
-        if (msg.status === 'connected' || msg.status === 'ok') {
+        this._inCall = msg.in_call === true;
+
+        // Track whether we've ever had a successful call
+        if (this._inCall) {
+            this._hasHadCall = true;
+        }
+
+        // Handle reconnecting / call dropped state
+        if (msg.reconnecting === true) {
+            this._setStatus('connecting', 'Reconnecting...');
+            if (this.pttActive) {
+                this.stopCapture();
+                this.pttActive = false;
+            }
+        } else if (this._inCall) {
             if (!this.connected) {
                 this.connected = true;
-                this._setStatus('connected', 'Bridge Connected');
             }
-        } else if (msg.status === 'error') {
-            this._setStatus('error', msg.error || 'Bridge error');
+            this._setStatus('connected', 'Bridge Connected');
+        } else if (this.connected && this._hasHadCall) {
+            // Call dropped after being established — show error
+            this._setStatus('error', 'Call dropped');
+            if (this.pttActive) {
+                this.stopCapture();
+                this.pttActive = false;
+            }
         }
+
         if (typeof msg.ptt_active === 'boolean') {
             this.pttActive = msg.ptt_active;
         }
@@ -439,6 +467,8 @@ class PTTWidget {
         if (this._txCtx.state === 'suspended') {
             this._txCtx.resume().catch(() => {});
         }
+        console.log('[PTT-DIAG] TX AudioContext created: requested=16000, actual='
+            + this._txCtx.sampleRate + ', state=' + this._txCtx.state);
 
         navigator.mediaDevices.getUserMedia({ audio: true })
             .then((stream) => {
@@ -455,6 +485,18 @@ class PTTWidget {
                     if (!this.pttActive) return;
                     const input = e.inputBuffer.getChannelData(0);
                     const actualRate = this._txCtx.sampleRate;
+
+                    // Diagnostics: log chunk info every N chunks
+                    this._diagChunkCount++;
+                    if (this._diagChunkCount % this._diagLogInterval === 0) {
+                        const avg = input.reduce((s, v) => s + Math.abs(v), 0) / input.length;
+                        console.log('[PTT-DIAG] onaudioprocess #' + this._diagChunkCount
+                            + ' rate=' + actualRate
+                            + ' samples=' + input.length
+                            + ' avgLevel=' + avg.toFixed(6)
+                            + ' ptt=' + this.pttActive);
+                    }
+
                     // Send raw audio with actual sample rate.
                     // Server handles resample to 16kHz if rate != 16000.
                     this._sendAudioChunk(input, actualRate);
@@ -526,8 +568,15 @@ class PTTWidget {
         }
         try {
             const hex = this._samplesToHex(samples);
+
+            // Diagnostics: confirm WS state & message size
+            if (this._diagChunkCount % this._diagLogInterval === 0) {
+                console.log('[PTT-DIAG] WS sending: readyState=' + this.ws.readyState
+                    + ' hexLen=' + hex.length
+                    + ' rate=' + rate);
+            }
+
             const msg = JSON.stringify({ type: 'audio_tx', data: hex, rate: rate });
-            console.log('PTT: sending audio_tx', hex.length, 'hex chars');
             this.ws.send(msg);
         } catch (err) {
             console.error('PTT: send error', err);

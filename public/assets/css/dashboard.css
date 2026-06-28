@@ -737,6 +737,12 @@ html, body{
     box-shadow: 0 0 4px rgba(108, 117, 125, 0.3);
 }
 
+.ptt-status-connecting {
+    background-color: #fd7e14;
+    box-shadow: 0 0 8px rgba(253, 126, 20, 0.7);
+    animation: pttPulse 0.8s ease-in-out infinite;
+}
+
 .ptt-status-transmitting {
     background-color: #ffc107;
     box-shadow: 0 0 8px rgba(255, 193, 7, 0.7);
