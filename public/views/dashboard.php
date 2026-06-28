@@ -833,14 +833,21 @@ $systemInfo = $systemInfo ?? [
                         <label class="form-label">Región</label>
                         <input type="text" class="form-control" name="region" maxlength="100" placeholder="Ej: Coquimbo">
                     </div>
+
+                    <!-- Map picker -->
+                    <div class="mb-3">
+                        <label class="form-label">Ubicación <span class="text-muted small">(hacé clic en el mapa)</span></label>
+                        <div id="regMap" style="height:260px;border-radius:0.375rem;border:1px solid #dee2e6;z-index:1;"></div>
+                    </div>
+
                     <div class="row mb-3">
                         <div class="col-md-6">
                             <label class="form-label">Latitud</label>
-                            <input type="number" class="form-control" name="lat" step="any" required placeholder="-33.45">
+                            <input type="text" class="form-control" name="lat" id="regLat" required placeholder="-33.45" inputmode="decimal" autocomplete="off">
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Longitud</label>
-                            <input type="number" class="form-control" name="lng" step="any" required placeholder="-70.65">
+                            <input type="text" class="form-control" name="lng" id="regLng" required placeholder="-70.65" inputmode="decimal" autocomplete="off">
                         </div>
                     </div>
                     <p class="text-muted small mb-0">
@@ -875,6 +882,71 @@ $systemInfo = $systemInfo ?? [
         ? rtrim(BASE_URL, '/') . '/api/map/register.php'
         : rtrim(HUB_URL, '/') . '/api/map/register.php' ?>';
 
+    var regMap = null;
+    var regMarker = null;
+    var regMapInitialized = false;
+
+    function initRegMap() {
+        if (regMapInitialized) return;
+        var mapEl = document.getElementById('regMap');
+        if (!mapEl || mapEl.offsetHeight === 0) return;
+
+        regMap = L.map(mapEl, {
+            center: [-33.45, -70.65],
+            zoom: 5,
+            attributionControl: false,
+        });
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+        }).addTo(regMap);
+
+        // Fix map rendering after modal transition
+        setTimeout(function () { regMap.invalidateSize(); }, 300);
+
+        regMap.on('click', function (e) {
+            var lat = e.latlng.lat.toFixed(6);
+            var lng = e.latlng.lng.toFixed(6);
+            document.getElementById('regLat').value = lat;
+            document.getElementById('regLng').value = lng;
+
+            if (regMarker) {
+                regMarker.setLatLng(e.latlng);
+            } else {
+                regMarker = L.marker(e.latlng, { draggable: true }).addTo(regMap);
+                regMarker.on('dragend', function () {
+                    var pos = regMarker.getLatLng();
+                    document.getElementById('regLat').value = pos.lat.toFixed(6);
+                    document.getElementById('regLng').value = pos.lng.toFixed(6);
+                });
+            }
+        });
+
+        regMapInitialized = true;
+    }
+
+    function updateMarkerFromInputs() {
+        var lat = parseFloat(document.getElementById('regLat').value.replace(',', '.'));
+        var lng = parseFloat(document.getElementById('regLng').value.replace(',', '.'));
+        if (isNaN(lat) || isNaN(lng)) return;
+        if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return;
+        if (!regMap) return;
+
+        var ll = L.latLng(lat, lng);
+
+        if (regMarker) {
+            regMarker.setLatLng(ll);
+        } else {
+            regMarker = L.marker(ll, { draggable: true }).addTo(regMap);
+            regMarker.on('dragend', function () {
+                var pos = regMarker.getLatLng();
+                document.getElementById('regLat').value = pos.lat.toFixed(6);
+                document.getElementById('regLng').value = pos.lng.toFixed(6);
+            });
+        }
+        regMap.setView(ll, regMap.getZoom());
+    }
+
     // Populate CSRF token when modal opens
     modalEl.addEventListener('show.bs.modal', function () {
         var meta = document.querySelector('meta[name="csrf-token"]');
@@ -882,6 +954,15 @@ $systemInfo = $systemInfo ?? [
             document.getElementById('regCsrfToken').value = meta.getAttribute('content');
         }
     });
+
+    // Init map when modal is fully shown
+    modalEl.addEventListener('shown.bs.modal', function () {
+        initRegMap();
+    });
+
+    // Update marker when user types coordinates
+    document.getElementById('regLat').addEventListener('input', updateMarkerFromInputs);
+    document.getElementById('regLng').addEventListener('input', updateMarkerFromInputs);
 
     submitBtn.addEventListener('click', function () {
         var formData = new FormData(form);

@@ -19,6 +19,9 @@
     $cssVer  = file_exists($cssPath) ? (string)filemtime($cssPath) : (string)APP_VERSION;
   ?>
   
+  <!-- Leaflet (map picker en registro) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="anonymous">
+
   <!-- CSS del Dashboard -->
   <link rel="stylesheet" href="<?= rtrim(BASE_URL, '/') ?>/assets/css/dashboard.css?v=<?= $cssVer ?>">
 </head>
