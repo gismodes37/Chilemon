@@ -1391,28 +1391,32 @@ function checkForUpdate() {
   const icon  = document.getElementById("update-badge-icon");
   if (!badge) return; // badge only renders for admin
 
-  // Show "checking" state
-  badge.classList.remove("btn-update-available");
-  badge.className = "btn btn-sm btn-outline-secondary ms-2";
+  // Show "checking" state — preserve base btn classes, remove pulse
+  badge.classList.remove("btn-update-available", "btn-outline-info", "btn-outline-warning");
+  badge.classList.add("btn-outline-secondary");
   if (icon) icon.className = "bi bi-arrow-repeat";
 
   getJson("api/check-update.php")
     .then(function (json) {
       if (!json || !json.ok) {
+        badge.classList.remove("btn-outline-secondary");
+        badge.classList.add("btn-outline-info");
         if (icon) icon.className = "bi bi-check-circle";
         return;
       }
 
       if (json.update_available) {
         // Pulsing warning badge
-        badge.classList.add("btn-update-available");
+        badge.classList.remove("btn-outline-info", "btn-outline-secondary");
+        badge.classList.add("btn-outline-warning", "btn-update-available");
         if (icon) icon.className = "bi bi-git";
         badge.setAttribute("title", "¡Actualización disponible! Hacé clic para ver detalles.");
 
         showUpdateModal(json);
       } else {
-        // No update — muted check
-        badge.className = "btn btn-sm btn-outline-secondary ms-2";
+        // No update — info state
+        badge.classList.remove("btn-outline-secondary", "btn-outline-warning", "btn-update-available");
+        badge.classList.add("btn-outline-info");
         if (icon) icon.className = "bi bi-check-circle";
         badge.setAttribute("title", "Versión actualizada. Hacé clic para verificar.");
       }
@@ -1421,6 +1425,8 @@ function checkForUpdate() {
       if (e.message !== "Unauthorized") {
         console.debug("Update check error:", e.message);
       }
+      badge.classList.remove("btn-outline-secondary", "btn-outline-warning", "btn-update-available");
+      badge.classList.add("btn-outline-info");
       if (icon) icon.className = "bi bi-check-circle";
     });
 }

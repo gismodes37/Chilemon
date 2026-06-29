@@ -54,17 +54,6 @@ $headerStyle = $headerImgUrl
           <strong><?= APP_NAME ?></strong>
           <small class="opacity-75">v<?= APP_VERSION ?></small>
           <span class="header-badge ms-2">Supermon Style</span>
-
-          <?php if (\App\Auth\Auth::isAdmin()): ?>
-            <button type="button"
-                    id="update-status-badge"
-                    class="btn btn-sm btn-outline-secondary ms-2"
-                    onclick="window.checkForUpdate()"
-                    title="Verificar actualizaciones">
-              <i class="bi bi-check-circle" id="update-badge-icon"></i>
-              <span id="update-badge-text">v<?= htmlspecialchars((string)APP_VERSION, ENT_QUOTES, 'UTF-8') ?></span>
-            </button>
-          <?php endif; ?>
         </h1>
 
         <p class="mb-1 opacity-40">
@@ -120,6 +109,17 @@ $headerStyle = $headerImgUrl
                 <i class="bi bi-database"></i>
                 SQLite | <span id="current-time"><?= date('H:i') ?></span>
               </span>
+
+              <?php if (\App\Auth\Auth::isAdmin()): ?>
+              <button type="button"
+                      id="update-status-badge"
+                      class="btn btn-sm btn-outline-info"
+                      onclick="window.checkForUpdate()"
+                      title="Verificar actualizaciones en GitHub">
+                <i class="bi bi-check-circle" id="update-badge-icon"></i>
+                <span id="update-badge-text">Actualizar</span>
+              </button>
+              <?php endif; ?>
 
               <button class="btn btn-sm btn-outline-warning"
                       data-bs-toggle="modal"
