@@ -49,6 +49,26 @@ case "$CMD" in
         # Apaga el hardware físicamente
         poweroff
         ;;
+    git-fetch)
+        # Obtiene referencias remotas desde GitHub (no mergea)
+        cd /opt/chilemon && git fetch origin 2>&1
+        ;;
+    git-compare)
+        # Compara HEAD local con origin/main
+        cd /opt/chilemon && echo "LOCAL:$(git rev-parse HEAD)" && echo "REMOTE:$(git rev-parse origin/main)" && echo "SUMMARY:$(git log --oneline HEAD..origin/main 2>/dev/null || echo 'up-to-date')"
+        ;;
+    git-pull)
+        # Stash cambios locales si existen, hace pull, reporta resultado
+        cd /opt/chilemon && git stash push -m "chilemon-auto-stash-$(date +%s)" 2>/dev/null; git pull origin main 2>&1; echo "STASHED:$?"
+        ;;
+    sys-restart-webrtc)
+        # Reinicia el servicio WebRTC Audio Bridge
+        systemctl restart chilemon-webrtc
+        ;;
+    sys-reload-apache)
+        # Recarga Apache de forma graceful (no interrumpe conexiones)
+        systemctl reload apache2
+        ;;
     *)
         echo "Comando invalido: $CMD" >> /tmp/chilemon.log
         exit 1
