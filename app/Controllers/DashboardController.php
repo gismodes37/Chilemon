@@ -16,6 +16,7 @@ class DashboardController
         $estadisticas = [
             'total_nodos'    => 0,
             'nodos_online'   => 0,
+            'nodos_offline'  => 0,
             'nodos_idle'     => 0,
             'total_usuarios' => 0,
         ];
@@ -105,6 +106,7 @@ class DashboardController
 
             $estadisticas['total_nodos']    = count($nodos);
             $estadisticas['nodos_online']   = count($directNodes);
+            $estadisticas['nodos_offline']  = $estadisticas['total_nodos'] - $estadisticas['nodos_online'];
             $estadisticas['nodos_idle']     = 0;
             $estadisticas['total_usuarios'] = 0;
 

@@ -645,8 +645,8 @@ $systemInfo = $systemInfo ?? [
                         En línea: <strong><?= (int)($estadisticas['nodos_online'] ?? 0) ?></strong>
                     </p>
                     <p class="mb-0">
-                        <i class="bi bi-people text-info"></i>
-                        Usuarios: <strong><?= (int)($estadisticas['total_usuarios'] ?? 0) ?></strong>
+                        <i class="bi bi-x-circle text-danger"></i>
+                        Fuera de línea: <strong><?= (int)($estadisticas['nodos_offline'] ?? 0) ?></strong>
                     </p>
                 </div>
             </div>
