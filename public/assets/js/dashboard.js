@@ -1366,6 +1366,224 @@ function setupAudioSettings() {
 }
 
 /* =============================================================
+ *  ONE-CLICK UPDATE — checkForUpdate, applyUpdate, polling
+ * -------------------------------------------------------------
+ * Admin-only feature to check for and apply ChileMon updates
+ * from GitHub. Polls GET /api/check-update.php every 5 minutes.
+ *
+ * Functions exposed via window.* for onclick in header.php:
+ *   - window.checkForUpdate()
+ *   - window.applyUpdate()
+ *
+ * Dependencies: getJson(), postForm(), escapeHtml() (defined above)
+ * ============================================================= */
+
+/** Polling interval ref for update checks. null = detenido. */
+let updatePollingInterval = null;
+
+/**
+ * Checks for updates via GET /api/check-update.php.
+ * Updates the badge state and opens the confirmation modal
+ * when an update is available.
+ */
+function checkForUpdate() {
+  const badge = document.getElementById("update-status-badge");
+  const icon  = document.getElementById("update-badge-icon");
+  if (!badge) return; // badge only renders for admin
+
+  // Show "checking" state
+  badge.classList.remove("btn-update-available");
+  badge.className = "btn btn-sm btn-outline-secondary ms-2";
+  if (icon) icon.className = "bi bi-arrow-repeat";
+
+  getJson("api/check-update.php")
+    .then(function (json) {
+      if (!json || !json.ok) {
+        if (icon) icon.className = "bi bi-check-circle";
+        return;
+      }
+
+      if (json.update_available) {
+        // Pulsing warning badge
+        badge.classList.add("btn-update-available");
+        if (icon) icon.className = "bi bi-git";
+        badge.setAttribute("title", "¡Actualización disponible! Hacé clic para ver detalles.");
+
+        showUpdateModal(json);
+      } else {
+        // No update — muted check
+        badge.className = "btn btn-sm btn-outline-secondary ms-2";
+        if (icon) icon.className = "bi bi-check-circle";
+        badge.setAttribute("title", "Versión actualizada. Hacé clic para verificar.");
+      }
+    })
+    .catch(function (e) {
+      if (e.message !== "Unauthorized") {
+        console.debug("Update check error:", e.message);
+      }
+      if (icon) icon.className = "bi bi-check-circle";
+    });
+}
+
+/**
+ * Opens the Bootstrap update confirmation modal and populates
+ * the commit summary, local/remote hashes, and pending changes.
+ *
+ * @param {Object} json - Response from check-update endpoint
+ */
+function showUpdateModal(json) {
+  const modalEl = document.getElementById("updateModal");
+  const body    = document.getElementById("update-modal-body");
+  if (!modalEl || !body || !window.bootstrap) return;
+
+  // Build summary HTML with escaped values
+  var summaryHtml =
+    '<div class="mb-3">' +
+    '  <p><strong>Resumen de cambios:</strong></p>' +
+    '  <pre class="border rounded p-3 bg-light text-dark">' +
+    escapeHtml(json.summary || "Sin informaci\u00f3n") +
+    "</pre>" +
+    '  <div class="row mt-3">' +
+    '    <div class="col-6">' +
+    '      <small class="text-muted">Versi\u00f3n local:</small><br>' +
+    '      <code>' +
+    escapeHtml(json.local_commit || "?") +
+    "</code>" +
+    "    </div>" +
+    '    <div class="col-6">' +
+    '      <small class="text-muted">Versi\u00f3n remota:</small><br>' +
+    '      <code>' +
+    escapeHtml(json.remote_commit || "?") +
+    "</code>" +
+    "    </div>" +
+    "  </div>" +
+    "</div>";
+
+  body.innerHTML = summaryHtml;
+
+  // Reset result area
+  var resultDiv = document.getElementById("update-result");
+  if (resultDiv) {
+    resultDiv.className = "d-none";
+    resultDiv.innerHTML = "";
+  }
+
+  // Show modal
+  var modal = new window.bootstrap.Modal(modalEl);
+  modal.show();
+}
+
+/**
+ * Applies the update by calling POST /api/apply-update.php.
+ * Shows loading state on the confirm button, then success with
+ * a 5-second countdown before reloading the page.
+ *
+ * Exposed as window.applyUpdate for the modal confirm button.
+ */
+function applyUpdate() {
+  var confirmBtn = document.getElementById("btn-confirm-update");
+  var modalBody  = document.getElementById("update-modal-body");
+  var resultDiv  = document.getElementById("update-result");
+
+  if (!confirmBtn || !modalBody) return;
+
+  // Disable + loading spinner
+  confirmBtn.disabled = true;
+  confirmBtn.innerHTML =
+    '<span class="spinner-border spinner-border-sm me-1"></span>Aplicando...';
+
+  postForm("api/apply-update.php", { action: "apply-update" })
+    .then(function (json) {
+      if (json && json.success) {
+        // Hide body, show success message
+        modalBody.classList.add("d-none");
+        if (resultDiv) {
+          resultDiv.className = "alert alert-success mt-3";
+          resultDiv.innerHTML =
+            "<strong>Actualizaci\u00f3n completada.</strong> Recargando en 5 segundos...";
+        }
+
+        // Countdown then reload
+        var countdown = 5;
+        var timer = setInterval(function () {
+          countdown--;
+          if (resultDiv) {
+            resultDiv.innerHTML =
+              "<strong>Actualizaci\u00f3n completada.</strong> Recargando en " +
+              countdown +
+              " segundos...";
+          }
+          if (countdown <= 0) {
+            clearInterval(timer);
+            window.location.reload();
+          }
+        }, 1000);
+      } else {
+        // Show error
+        if (resultDiv) {
+          resultDiv.className = "alert alert-danger mt-3";
+          resultDiv.innerHTML =
+            "<strong>Error:</strong> " +
+            escapeHtml(
+              (json && json.message) ||
+                "No se pudo aplicar la actualizaci\u00f3n.",
+            );
+        }
+        confirmBtn.disabled = false;
+        confirmBtn.innerHTML =
+          '<i class="bi bi-arrow-up-circle"></i> Actualizar ahora';
+      }
+    })
+    .catch(function (e) {
+      if (e.message !== "Unauthorized") {
+        if (resultDiv) {
+          resultDiv.className = "alert alert-danger mt-3";
+          resultDiv.innerHTML =
+            "<strong>Error:</strong> " + escapeHtml(e.message);
+        }
+      }
+      confirmBtn.disabled = false;
+      confirmBtn.innerHTML =
+        '<i class="bi bi-arrow-up-circle"></i> Actualizar ahora';
+    });
+}
+
+/**
+ * Binds the modal confirm button click and starts the polling
+ * interval for update checks.
+ */
+function setupUpdateUI() {
+  // Only run if the badge exists (admin-only)
+  var badge = document.getElementById("update-status-badge");
+  if (!badge) return;
+
+  // Bind modal confirm button
+  var confirmBtn = document.getElementById("btn-confirm-update");
+  if (confirmBtn) {
+    confirmBtn.addEventListener("click", applyUpdate);
+  }
+
+  // Expose functions globally for onclick attributes
+  window.checkForUpdate = checkForUpdate;
+  window.applyUpdate    = applyUpdate;
+}
+
+/**
+ * Starts polling for updates every 5 minutes (300000ms).
+ * Does a first check after a 2-second delay so the page renders first.
+ */
+function startUpdatePolling() {
+  // Only start if the badge element exists (admin-only page)
+  if (!document.getElementById("update-status-badge")) return;
+  if (updatePollingInterval) return;
+
+  // First check after a short delay
+  setTimeout(checkForUpdate, 2000);
+
+  updatePollingInterval = setInterval(checkForUpdate, 300000);
+}
+
+/* =============================================================
  *  12. INIT — DOMContentLoaded
  * -------------------------------------------------------------
  * Punto de entrada único del script.
@@ -1389,6 +1607,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // 2b. Enlazar modal de configuración de audio
   setupAudioSettings();
+
+  // 2c. One-click update — bind modal + start polling (admin only)
+  setupUpdateUI();
+  startUpdatePolling();
 
   // 3. Obtener snapshot inicial para que el primer tick del auto refresh
   //    tenga una base de comparación y no recargue innecesariamente.
