@@ -184,6 +184,11 @@ class WebRTCBridgeApp:
         self._reoriginate_delay: float = 2.0  # seconds
         self._reoriginate_task: Optional[asyncio.Task[None]] = None
 
+        # Grace period on WS disconnect: keep IAX2 call alive briefly
+        # so brief WS reconnects (<15s) resume instantly without re-originate
+        self._ws_grace_period: float = 15.0  # seconds
+        self._grace_task: Optional[asyncio.Task[None]] = None
+
     # -- Auth --
 
     def validate_ws_token(self, token: str) -> bool:
@@ -331,10 +336,38 @@ class WebRTCBridgeApp:
         await self._broadcast_status()
 
     def _cancel_reoriginate(self) -> None:
-        """Cancel a pending reoriginate task."""
-        if self._reoriginate_task and not self._reoriginate_task.done():
+        """Cancel any pending reoriginate task."""
+        if self._reoriginate_task is not None and not self._reoriginate_task.done():
             self._reoriginate_task.cancel()
             self._reoriginate_task = None
+
+    # -- Grace Period (keep call alive after WS disconnect) --
+
+    def _start_grace_period(self) -> None:
+        """Start or restart the grace timer. When it fires, we hang up."""
+        self._cancel_grace_period()
+        self._grace_task = asyncio.create_task(self._grace_disconnect_loop())
+
+    async def _grace_disconnect_loop(self) -> None:
+        """Wait for grace period, then hang up IAX2 call if no WS reconnected."""
+        try:
+            await asyncio.sleep(self._ws_grace_period)
+            if not self._ws_peers and self._active_call:
+                callno = self._active_call.callno
+                logger.info("Grace period expired — hanging up callno=%d", callno)
+                self._active_call.send_hangup()
+                self._active_call = None
+                self._ptt_active = False
+                await self._broadcast_status()
+        except asyncio.CancelledError:
+            logger.debug("Grace period cancelled — WS reconnected")
+            raise
+
+    def _cancel_grace_period(self) -> None:
+        """Cancel grace timer early (WS reconnected)."""
+        if self._grace_task is not None and not self._grace_task.done():
+            self._grace_task.cancel()
+            self._grace_task = None
 
     def _schedule_reoriginate(self) -> None:
         """Schedule a delayed reoriginate."""
@@ -459,19 +492,28 @@ class WebRTCBridgeApp:
         exten = request.query.get("exten", self.config.asl_node)
         context = request.query.get("context", "webrtc")
 
-        # Trigger AMI Originate to establish inbound IAX2 call
-        # Asterisk sends an IAX2 NEW frame to our bridge listener
-        try:
-            aid = await self.ami.originate(
-                channel=f"IAX2/webrtc-bridge/{self.config.asl_node}",
-                context=context,
-                exten=exten,
-                priority=1,
-                callerid=f"\"WebRTC\" <{self.config.asl_node}>",
+        # If there's an active IAX2 call (from grace period), skip AMI Originate.
+        # The call survived the brief WS disconnect, so audio resumes instantly.
+        if self._active_call:
+            self._cancel_grace_period()
+            logger.info(
+                "WS reconnected — resuming active callno=%d (no re-originate)",
+                self._active_call.callno,
             )
-            logger.info("AMI Originate sent — exten=%s ActionID=%s", exten, aid)
-        except (RuntimeError, ConnectionError, TypeError) as exc:
-            logger.error("AMI Originate failed: %s", exc)
+        else:
+            # Trigger AMI Originate to establish inbound IAX2 call
+            # Asterisk sends an IAX2 NEW frame to our bridge listener
+            try:
+                aid = await self.ami.originate(
+                    channel=f"IAX2/webrtc-bridge/{self.config.asl_node}",
+                    context=context,
+                    exten=exten,
+                    priority=1,
+                    callerid=f"\"WebRTC\" <{self.config.asl_node}>",
+                )
+                logger.info("AMI Originate sent — exten=%s ActionID=%s", exten, aid)
+            except (RuntimeError, ConnectionError, TypeError) as exc:
+                logger.error("AMI Originate failed: %s", exc)
 
         # Send initial status
         await self._broadcast_status()
@@ -500,14 +542,17 @@ class WebRTCBridgeApp:
                 close_code, len(self._ws_peers),
             )
 
-            # If no more peers, hang up the IAX2 call and cancel reoriginate
+            # Grace period: keep IAX2 call alive for a while in case
+            # the WS reconnects quickly (browser tab refresh, brief network drop).
+            # Actual hangup happens only after _ws_grace_period seconds.
             if not self._ws_peers:
                 self._cancel_reoriginate()
-                if self._active_call:
-                    logger.info("Last WS peer gone — hanging up IAX2 call")
-                    self._active_call.send_hangup()
-                    self._active_call = None
-                    self._ptt_active = False
+                if self._active_call and not self._ptt_active:
+                    logger.info(
+                        "Last WS peer gone — starting %.0fs grace period for callno=%d",
+                        self._ws_grace_period, self._active_call.callno,
+                    )
+                    self._start_grace_period()
 
         return ws
 
