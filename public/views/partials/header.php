@@ -110,6 +110,17 @@ $headerStyle = $headerImgUrl
                 SQLite | <span id="current-time"><?= date('H:i') ?></span>
               </span>
 
+              <?php if (\App\Auth\Auth::isAdmin()): ?>
+              <button type="button"
+                      id="update-status-badge"
+                      class="btn btn-sm btn-outline-info"
+                      onclick="window.checkForUpdate()"
+                      title="Verificar actualizaciones en GitHub">
+                <i class="bi bi-check-circle" id="update-badge-icon"></i>
+                <span id="update-badge-text">Actualizar</span>
+              </button>
+              <?php endif; ?>
+
               <button class="btn btn-sm btn-outline-warning"
                       data-bs-toggle="modal"
                       data-bs-target="#favoritesModal">
