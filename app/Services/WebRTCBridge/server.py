@@ -260,12 +260,12 @@ class WebRTCBridgeApp:
             return
 
         try:
-            # RX pipeline: ulaw → PCM s16le → upscale to 16 kHz → float32
+            # RX pipeline: ulaw → PCM s16le → AGC → float32 (native 8 kHz)
             pcm_f32 = rx_process(ulaw_payload)
             msg = json.dumps({
                 "type": "audio",
                 "data": pcm_f32.hex(),
-                "rate": 16000,
+                "rate": 8000,
             })
             logger.debug("Broadcasting audio to %d WS peer(s): %d bytes → %d floats",
                          peers, len(ulaw_payload), len(pcm_f32))

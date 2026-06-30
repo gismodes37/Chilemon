@@ -11,13 +11,27 @@ This module provides the conversion chain in both directions:
                   → IAX2 mini voice frame
 
   RX: IAX2 mini voice frame → ulaw_to_pcm()
-                             → resample_8k_to_16k()
-                             → s16_to_float32()
-                             → aiortc encodes to OPUS → WebRTC track
+                             → rms_agc()  [RMS-based AGC with silence gate]
+                             → s16_to_float32()  [native 8 kHz, no upsampling]
+                             → volume gain (RX_VOLUME = 3.0)
+                             → JSON hex → WS peers
+
+AGC parameters (fix-audio-rx):
+  - Target level: -12 dBFS RMS per frame after gain.
+  - Boost frames below -18 dBFS up to target using RMS ratio.
+  - Gate (silence) frames below -40 dBFS — discard entirely.
+  - Per-frame AGC — no attack/release state across frames.
+
+8 kHz native output decision:
+  - The server no longer upsamples 8→16 kHz via linear interpolation.
+  - Float32 output stays at 8 kHz; the WS message includes ``"rate": 8000``.
+  - The browser's AudioContext.createBuffer(1, N, 8000) handles sample rate
+    conversion to the output device natively, eliminating interpolation
+    artifacts and reducing server-side CPU.
 
 Uses ``audioop-lts`` (backport of stdlib ``audioop`` removed in Python 3.13).
 aiortc handles OPUS encode/decode natively — this module only handles
-the PCM↔ulaw and resampling layers.
+the PCM↔ulaw, AGC, and resampling layers.
 """
 
 from __future__ import annotations
@@ -26,6 +40,7 @@ try:
     import audioop
 except ImportError:
     import audioop_lts as audioop  # type: ignore[no-redef]
+import math
 import struct
 import logging
 from typing import Tuple
@@ -126,8 +141,17 @@ def float32_to_s16(float32_data: bytes) -> bytes:
 # ---------------------------------------------------------------------------
 
 # RX volume boost applied before sending to WebSocket peers.
-# 1.5 = 50% louder.  Adjust if clipping occurs.
-RX_VOLUME: float = 1.5
+# 3.0 = 3× amplification.  Increased from 1.5 in fix-audio-rx.
+# Applied AFTER RMS AGC (rms_agc) in rx_process().
+RX_VOLUME: float = 3.0
+
+# AGC (Automatic Gain Control) — per-frame RMS-based, no inter-frame state.
+# Target level: frames below AGC_BOOST_THRESHOLD_DBFS are boosted toward
+# AGC_TARGET_DBFS.  Frames below AGC_GATE_DBFS are discarded as silence.
+AGC_TARGET_DBFS: float = -12.0       # target RMS level after AGC boost
+AGC_BOOST_THRESHOLD_DBFS: float = -18.0  # frames quieter than this get boosted
+AGC_GATE_DBFS: float = -40.0          # silence gate — discard frames below this
+AGC_MAX_BOOST: float = 10.0           # cap at +20 dB to prevent extreme clipping
 
 
 def resample_16k_to_8k(pcm_16k: bytes) -> bytes:
@@ -174,6 +198,60 @@ def resample_8k_to_16k(pcm_8k: bytes) -> bytes:
 
 
 # ---------------------------------------------------------------------------
+# RMS-based AGC (Automatic Gain Control)
+# ---------------------------------------------------------------------------
+
+def rms_agc(pcm_s16le: bytes) -> bytes:
+    """Apply per-frame RMS-based AGC and silence gate on PCM s16le.
+
+    Measures the RMS power of the frame.  Frames below ``AGC_GATE_DBFS``
+    are replaced with silence.  Frames below ``AGC_BOOST_THRESHOLD_DBFS``
+    are boosted toward ``AGC_TARGET_DBFS`` using a proportional RMS ratio,
+    capped at ``AGC_MAX_BOOST`` to prevent extreme clipping.
+
+    Parameters
+    ----------
+    pcm_s16le : bytes
+        Signed 16-bit linear PCM, little-endian, mono, 8 kHz.
+
+    Returns
+    -------
+    bytes
+        Gain-adjusted PCM s16le (same byte count as input), or zero-filled
+        if the frame was gated as silence.
+    """
+    samples = len(pcm_s16le) // 2
+    data = struct.unpack(f"<{samples}h", pcm_s16le)
+
+    # Compute RMS in signed int16 domain
+    sum_sq = 0
+    for s in data:
+        sum_sq += s * s
+    rms = math.sqrt(sum_sq / samples)
+
+    # Convert to dBFS (full scale for s16 is 32768)
+    if rms > 0:
+        rms_db = 20.0 * math.log10(rms / 32768.0)
+    else:
+        rms_db = -100.0  # effectively silent
+
+    # Silence gate — discard frames below gate threshold
+    if rms_db < AGC_GATE_DBFS:
+        return struct.pack(f"<{samples}h", [0] * samples)
+
+    # Apply AGC boost if frame is below boost threshold
+    if rms_db < AGC_BOOST_THRESHOLD_DBFS:
+        target_rms = 32768.0 * (10.0 ** (AGC_TARGET_DBFS / 20.0))
+        gain = target_rms / max(rms, 1.0)
+        gain = min(gain, AGC_MAX_BOOST)  # cap boost
+
+        result = [max(-32768, min(32767, int(s * gain))) for s in data]
+        return struct.pack(f"<{samples}h", *result)
+
+    return pcm_s16le  # no change if already above boost threshold
+
+
+# ---------------------------------------------------------------------------
 # Complete TX / RX pipeline helpers
 # ---------------------------------------------------------------------------
 
@@ -196,7 +274,17 @@ def tx_process(pcm_16k_f32: bytes) -> bytes:
 
 
 def rx_process(ulaw_data: bytes) -> bytes:
-    """Full receive pipeline: ulaw 8 kHz → float32 16 kHz + volume boost.
+    """Full receive pipeline: ulaw 8 kHz → float32 8 kHz + AGC + volume gain.
+
+    Pipeline order:
+      1. ulaw → PCM s16le
+      2. RMS AGC (boost quiet frames, gate silence)
+      3. s16 → float32 (native 8 kHz — no upsampling)
+      4. RX_VOLUME gain with hard clip to [-1.0, 1.0]
+
+    The output is float32 at 8 kHz.  The WebSocket message includes
+    ``"rate": 8000`` so the browser's AudioContext handles 8→device
+    sample rate conversion natively.
 
     Parameters
     ----------
@@ -206,12 +294,16 @@ def rx_process(ulaw_data: bytes) -> bytes:
     Returns
     -------
     bytes
-        Float32 PCM audio at 16 kHz, gain-adjusted, ready for aiortc
-        OPUS encode or direct WebSocket relay.
+        Float32 PCM audio at 8 kHz, AGC+gain-adjusted.
     """
     s16_8k = ulaw_to_pcm(ulaw_data)
-    s16_16k = resample_8k_to_16k(s16_8k)
-    f32 = s16_to_float32(s16_16k)
+
+    # Per-frame RMS AGC — boost quiet frames, gate silence
+    s16_8k = rms_agc(s16_8k)
+
+    # Native 8 kHz — skip 8→16 kHz resample.
+    # Browser AudioContext handles sample rate conversion natively.
+    f32 = s16_to_float32(s16_8k)
 
     # Apply volume gain (clamped to [-1.0, 1.0] to prevent clipping)
     if RX_VOLUME != 1.0:

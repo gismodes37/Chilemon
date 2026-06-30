@@ -48,9 +48,15 @@ class PTTWidget {
             /** @type {GainNode|null} */
             this._txGainNode = null;
     
-            // Previous audio source (stopped before starting new one to prevent overlap)
-            /** @type {AudioBufferSourceNode|null} */
-            this._audioSource = null;
+            // Lookahead scheduling queue for RX audio (fix-audio-rx)
+            // Each entry: { source: AudioBufferSourceNode, endTime: number }
+            /** @type {{ source: AudioBufferSourceNode, endTime: number }[]} */
+            this._scheduledSources = [];
+            this._lookaheadDepth = 5;
+            /** @type {number[]} */
+            this._audioCtxRetries = [200, 1000, 5000];
+            /** @type {Function|null} */
+            this._visibilityHandler = null;
     
             // Volume-smoothing: RMS from last N audio messages
             this.volumeSamples = [];
@@ -99,6 +105,7 @@ class PTTWidget {
     init() {
         this._createDOM();
         this._bindGlobalEvents();
+        this._setupVisibilityHandler();
         this._startStatusPolling();
         this._initVisualizer();
         this._fetchToken();
@@ -118,15 +125,15 @@ class PTTWidget {
         this._closeWebSocket();
         this._unbindGlobalEvents();
         this.stopCapture();
+        if (this._visibilityHandler) {
+            document.removeEventListener('visibilitychange', this._visibilityHandler);
+            this._visibilityHandler = null;
+        }
         if (this._visualizer) {
             this._visualizer.destroy();
             this._visualizer = null;
         }
-        if (this._audioSource) {
-            try { this._audioSource.stop(); } catch (_) {}
-            try { this._audioSource.disconnect(); } catch (_) {}
-            this._audioSource = null;
-        }
+        this._flushAudioQueue();
         if (this.audioCtx) {
             this.audioCtx.close().catch(() => {});
             this.audioCtx = null;
@@ -341,6 +348,7 @@ class PTTWidget {
         // Handle reconnecting / call dropped state
         if (msg.reconnecting === true) {
             this._setStatus('connecting', 'Reconnecting...');
+            this._flushAudioQueue();
             if (this.pttActive) {
                 this.stopCapture();
                 this.pttActive = false;
@@ -353,6 +361,7 @@ class PTTWidget {
         } else if (this.connected && this._hasHadCall) {
             // Call dropped after being established — show error
             this._setStatus('error', 'Call dropped');
+            this._flushAudioQueue();
             if (this.pttActive) {
                 this.stopCapture();
                 this.pttActive = false;
@@ -391,8 +400,8 @@ class PTTWidget {
             this._visualizer.feedPCM(floats);
         }
 
-        // Play via Web Audio API
-        this._playAudioBuffer(floats, sampleRate);
+        // Schedule via lookahead queue (fix-audio-rx)
+        this._scheduleFrame(floats, sampleRate);
     }
 
     /** Decode and play a raw ArrayBuffer of float32 PCM. */
@@ -413,37 +422,175 @@ class PTTWidget {
             this._visualizer.feedPCM(floats);
         }
 
-        this._playAudioBuffer(floats, 16000);
+        this._scheduleFrame(floats, 16000);
     }
 
-    /** Play an AudioBuffer from float32 PCM data. */
-    _playAudioBuffer(samples, sampleRate) {
+    // ---------------------------------------------------------------
+    //  RX Lookahead Scheduling Queue (fix-audio-rx)
+    // ---------------------------------------------------------------
+
+    /**
+     * Ensure AudioContext and gain node exist.
+     * Creates them lazily if needed (fallback for edge cases).
+     */
+    _ensureAudioCtx() {
+        if (this.audioCtx) return;
+        this._createAudioCtx();
+    }
+
+    /**
+     * Create AudioContext with RX gain node and state logging.
+     * Called eagerly on user gesture or lazily as fallback.
+     */
+    _createAudioCtx() {
         try {
-            if (!this.audioCtx) {
-                this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                // Create RX gain node (persists across plays)
-                this._rxGainNode = this.audioCtx.createGain();
-                this._rxGainNode.gain.value = this._getStoredGain('rx');
-                this._rxGainNode.connect(this.audioCtx.destination);
-            }
-            if (this.audioCtx.state === 'suspended') {
-                this.audioCtx.resume().catch(() => {});
-            }
+            this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            console.warn('[RX-AUDIO] AudioContext created, state=' + this.audioCtx.state);
 
-            // Stop previous source to prevent frame overlap (crackling)
-            if (this._audioSource) {
-                try { this._audioSource.stop(); } catch (_) {}
-                try { this._audioSource.disconnect(); } catch (_) {}
-            }
+            // RX gain node (persists across frames)
+            this._rxGainNode = this.audioCtx.createGain();
+            this._rxGainNode.gain.value = this._getStoredGain('rx');
+            this._rxGainNode.connect(this.audioCtx.destination);
 
-            const buf = this.audioCtx.createBuffer(1, samples.length, sampleRate);
+            // Log state transitions
+            this.audioCtx.onstatechange = function() {
+                console.warn('[RX-AUDIO] State change: ' + this.state);
+            };
+        } catch (e) {
+            console.warn('[RX-AUDIO] Failed to create AudioContext: ' + e.message);
+        }
+    }
+
+    /**
+     * Resume AudioContext with exponential backoff.
+     * @param {number} attempt - Current retry attempt (0-based).
+     */
+    _resumeAudioCtx(attempt) {
+        if (!this.audioCtx || this.audioCtx.state === 'running' || this.audioCtx.state === 'closed') {
+            return;
+        }
+        console.warn('[RX-AUDIO] Resuming (attempt ' + attempt + '), state=' + this.audioCtx.state);
+        this.audioCtx.resume().then(function() {
+            console.warn('[RX-AUDIO] Resume success, state=' + this.state);
+        }.bind(this)).catch(function(err) {
+            console.warn('[RX-AUDIO] Resume failed (attempt ' + attempt + '): ' + err.message);
+            var retries = this._audioCtxRetries;
+            if (attempt < retries.length - 1) {
+                setTimeout(function() {
+                    this._resumeAudioCtx(attempt + 1);
+                }.bind(this), retries[attempt]);
+            } else {
+                console.warn('[RX-AUDIO] Resume exhausted all ' + retries.length + ' retries');
+            }
+        }.bind(this));
+    }
+
+    /**
+     * Schedule a single audio frame in the lookahead queue.
+     * Each frame is scheduled at audioCtx.currentTime + offset
+     * where offset is determined by the current queue position.
+     * Late frames (scheduled time already passed) are dropped with a warning.
+     *
+     * @param {Float32Array} samples - PCM float32 audio data.
+     * @param {number} sampleRate - Sample rate of the audio (Hz).
+     */
+    _scheduleFrame(samples, sampleRate) {
+        this._ensureAudioCtx();
+        if (!this.audioCtx || this.audioCtx.state === 'closed') return;
+
+        // Try to resume if suspended
+        if (this.audioCtx.state === 'suspended') {
+            this._resumeAudioCtx(0);
+            // Still schedule — buffer will play once resumed
+        }
+
+        // Calculate start time: currentTime + offset based on queue position
+        var nextOffset = this._scheduledSources.length * 0.02; // 20ms per frame
+        var startTime = this.audioCtx.currentTime + nextOffset;
+
+        // Drop late frames (more than 10ms past their slot)
+        if (nextOffset > 0 && startTime < this.audioCtx.currentTime + 0.005) {
+            console.warn('[RX-AUDIO] Frame arrived late, dropping (offset=' + nextOffset.toFixed(3) + 's)');
+            return;
+        }
+
+        try {
+            var buf = this.audioCtx.createBuffer(1, samples.length, sampleRate);
             buf.copyToChannel(samples, 0);
 
-            this._audioSource = this.audioCtx.createBufferSource();
-            this._audioSource.buffer = buf;
-            this._audioSource.connect(this._rxGainNode);
-            this._audioSource.start(0);
-        } catch (_) { /* audio not available */ }
+            var source = this.audioCtx.createBufferSource();
+            source.buffer = buf;
+            source.connect(this._rxGainNode);
+            source.start(startTime);
+
+            var duration = samples.length / sampleRate;
+            var entry = {
+                source: source,
+                endTime: startTime + duration
+            };
+            this._scheduledSources.push(entry);
+
+            // Remove oldest entries if we exceed lookahead depth
+            while (this._scheduledSources.length > this._lookaheadDepth) {
+                this._scheduledSources.shift();
+            }
+
+            // Clean up played entries on ended
+            source.onended = function() {
+                this._cleanupScheduled();
+            }.bind(this);
+        } catch (e) {
+            console.warn('[RX-AUDIO] Schedule frame error: ' + e.message);
+        }
+    }
+
+    /**
+     * Remove played/expired entries from the scheduling queue.
+     * An entry is considered expired when endTime <= currentTime.
+     */
+    _cleanupScheduled() {
+        if (!this.audioCtx) return;
+        var now = this.audioCtx.currentTime;
+        this._scheduledSources = this._scheduledSources.filter(function(entry) {
+            return entry.endTime > now;
+        });
+    }
+
+    /**
+     * Flush the entire scheduling queue — stop all sources, disconnect, clear.
+     */
+    _flushAudioQueue() {
+        for (var i = 0; i < this._scheduledSources.length; i++) {
+            var entry = this._scheduledSources[i];
+            try { entry.source.stop(); } catch (_) { /* already ended */ }
+            try { entry.source.disconnect(); } catch (_) { /* already disconnected */ }
+        }
+        this._scheduledSources = [];
+    }
+
+    /**
+     * Set up Page Visibility API handler to suspend AudioContext
+     * when the tab is hidden and resume when visible again.
+     */
+    _setupVisibilityHandler() {
+        this._visibilityHandler = function() {
+            if (document.hidden) {
+                if (this.audioCtx && this.audioCtx.state === 'running') {
+                    console.warn('[RX-AUDIO] Tab hidden, suspending AudioContext');
+                    this.audioCtx.suspend().catch(function() {
+                        /* best-effort */
+                    });
+                }
+            } else {
+                if (this.audioCtx && this.audioCtx.state === 'suspended') {
+                    console.warn('[RX-AUDIO] Tab visible, resuming AudioContext');
+                    this.audioCtx.resume().catch(function() {
+                        /* best-effort */
+                    });
+                }
+            }
+        }.bind(this);
+        document.addEventListener('visibilitychange', this._visibilityHandler);
     }
 
     // ---------------------------------------------------------------
@@ -655,6 +802,11 @@ class PTTWidget {
     keyPtt() {
         if (!this.connected || this.pttActive) return;
         if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+
+        // Eager AudioContext creation on first user gesture
+        if (!this.audioCtx) {
+            this._createAudioCtx();
+        }
 
         console.log('PTT: key pressed, sending ptt key');
         this.ws.send(JSON.stringify({ type: 'ptt', action: 'key' }));

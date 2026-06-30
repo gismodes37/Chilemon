@@ -1299,7 +1299,7 @@ function setupAudioSettings() {
   // Load stored values
   const storedRx = parseFloat(localStorage.getItem("chilemon_rx_gain"));
   const storedTx = parseFloat(localStorage.getItem("chilemon_tx_gain"));
-  const rxInit = isNaN(storedRx) ? 100 : Math.round(storedRx * 100);
+  const rxInit = isNaN(storedRx) ? 70 : Math.round(storedRx * 100);
   const txInit = isNaN(storedTx) ? 100 : Math.round(storedTx * 100);
 
   rxSlider.value = rxInit;
@@ -1326,14 +1326,14 @@ function setupAudioSettings() {
 
   // Reset to defaults
   btnReset.addEventListener("click", () => {
-    rxSlider.value = 100;
+    rxSlider.value = 70;
     txSlider.value = 100;
-    rxLabel.textContent = "100%";
+    rxLabel.textContent = "70%";
     txLabel.textContent = "100%";
-    localStorage.setItem("chilemon_rx_gain", "1");
+    localStorage.setItem("chilemon_rx_gain", "0.7");
     localStorage.setItem("chilemon_tx_gain", "1");
     if (window.pttWidget) {
-      window.pttWidget.setRxGain(1);
+      window.pttWidget.setRxGain(0.7);
       window.pttWidget.setTxGain(1);
     }
   });
