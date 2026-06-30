@@ -153,12 +153,6 @@ $systemInfo = $systemInfo ?? [
                     <button class="btn btn-outline-primary" onclick="window.open('https://www.qsl.net/ca2iig/', '_blank')">
                         <i class="bi bi-globe"></i> Web Site Desarrollador
                     </button>
-                    <!--button class="btn btn-outline-primary" onclick="window.open('https://github.com/gismodes37/Chilemon/blob/main/docs/soporte.md', '_blank')">
-                        <i class="bi bi-globe"></i> Soporte
-                    </button-->
-                    <button class="btn btn-outline-primary" onclick="window.open('https://www.qsl.net/ca2iig/', '_blank')">
-                        <i class="bi bi-globe"></i> Web Site Desarrollador
-                    </button>
                     <?php if (defined('HUB_URL') && HUB_URL !== ''): ?>
                     <?php $mapUrl = HUB_MODE ? rtrim(BASE_URL, '/') . '/map.php' : rtrim(HUB_URL, '/') . '/map.php'; ?>
                     <button class="btn btn-outline-success" onclick="window.open('<?= $mapUrl ?>', '<?= HUB_MODE ? '_self' : '_blank' ?>')">
