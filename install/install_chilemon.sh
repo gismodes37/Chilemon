@@ -346,11 +346,6 @@ return [
     'webrtc_secret' => '${safe_webrtc_secret}',
     'iax_phone_user' => 'webrtc-bridge',
     'iax_phone_pass' => '${safe_iax_phone_pass}',
-
-    // URL del hub central ChileMon (opcional). Si se configura,
-    // el dashboard mostrará un banner para registrar este nodo
-    // en el mapa comunitario (https://github.com/gismodes37/Chilemon-Hub).
-    'hub_url' => '${safe_hub_url}',
 ];
 PHP
 
@@ -981,20 +976,19 @@ main() {
 
         detected_server_host="$(detect_server_host)"
 
-        read -r -p "Nombre DNS o IP del servidor [${detected_server_host}]: " server_host
+        echo
+        echo "Dirección web de este nodo (sin http://)"
+        echo "  - Raspberry Pi con imagen ASL3: node494780.local"
+        echo "  - Debian/ASL3 con IP fija:      192.168.0.125"
+        echo "  - Debian/ASL3 con DNS:          nodo.midominio.cl"
+        echo
+        read -r -p "Dirección del nodo [${detected_server_host}]: " server_host
         server_host="${server_host:-$detected_server_host}"
 
         web_proto="$(detect_web_proto)"
 
         read -r -p "Ingrese texto descriptivo del nodo [Nodo local ChileMon]: " header_tagline
         header_tagline="${header_tagline:-Nodo local ChileMon}"
-
-        echo
-        echo "--- Mapa comunitario ChileMon (opcional) ---"
-        echo "Si tienes un hub central, puedes registrar este nodo en el mapa comunitario."
-        echo "Ejemplo: http://192.168.0.111"
-        read -r -p "URL del hub ChileMon (dejar vacío para omitir): " hub_url
-        echo
 
         ami_host="$(detect_ami_host)"
         ami_port="$(detect_ami_port)"
