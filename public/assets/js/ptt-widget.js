@@ -452,9 +452,15 @@ class PTTWidget {
             this._rxGainNode.gain.value = this._getStoredGain('rx');
             this._rxGainNode.connect(this.audioCtx.destination);
 
-            // Log state transitions
+            // Log state transitions & flush queue on resume (evitar burst)
+            var self = this;
             this.audioCtx.onstatechange = function() {
                 console.warn('[RX-AUDIO] State change: ' + this.state);
+                if (this.state === 'running' && self._scheduledSources) {
+                    // Flush stale scheduled sources — después de una suspensión
+                    // larga todas las fuentes scheduleadas suenan a la vez
+                    self._scheduledSources = [];
+                }
             };
         } catch (e) {
             console.warn('[RX-AUDIO] Failed to create AudioContext: ' + e.message);
@@ -968,6 +974,45 @@ class PTTWidget {
         document.addEventListener('keydown', this._onKeyDown);
         document.addEventListener('keyup', this._onKeyUp);
         window.addEventListener('beforeunload', this._onBeforeUnload);
+
+        // AudioContext wakeup: cualquier click/touch resume el AudioContext.
+        // Chrome y Firefox suspenden el AudioContext ~30-40s sin interacción
+        // del usuario. Este handler lo despierta en cualquier gesto en la página.
+        // Además reproduce un buffer silencioso post-resume porque algunos
+        // browsers requieren audio output real para reactivar el pipeline.
+        this._wakeAudio = function() {
+            if (this.audioCtx) {
+                if (this.audioCtx.state === 'suspended') {
+                    var ctx = this.audioCtx;
+                    ctx.resume().then(function() {
+                        console.warn('[RX-AUDIO] Resumed via user gesture');
+                        // Play a silent buffer to un-stall the audio pipeline
+                        try {
+                            var silent = ctx.createBuffer(1, 220, 22050);
+                            var src = ctx.createBufferSource();
+                            src.buffer = silent;
+                            src.connect(ctx.destination);
+                            src.start(0);
+                        } catch (_) {}
+                    }).catch(function(e) {
+                        console.warn('[RX-AUDIO] Resume via gesture failed: ' + e.message);
+                    });
+                }
+            } else {
+                // Eager creation — RX solo escucha sin PTT
+                this._createAudioCtx();
+            }
+        }.bind(this);
+        document.addEventListener('click', this._wakeAudio, { once: false });
+        document.addEventListener('touchstart', this._wakeAudio, { passive: true, once: false });
+    }
+
+    _unbindGlobalEvents() {
+        document.removeEventListener('keydown', this._onKeyDown);
+        document.removeEventListener('keyup', this._onKeyUp);
+        window.removeEventListener('beforeunload', this._onBeforeUnload);
+        document.removeEventListener('click', this._wakeAudio);
+        document.removeEventListener('touchstart', this._wakeAudio);
     }
 
     _unbindGlobalEvents() {
