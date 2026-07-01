@@ -886,15 +886,37 @@ class IAX2Call:
         for d in digits:
             self.send_dtmf(d)
 
-    def send_voice(self, ulaw_payload: bytes) -> None:
-        """Send ulaw audio as a mini voice frame to the peer."""
-        if self.state == CALL_STATE_HUNGUP:
-            return
+    def send_voice(self, ulaw_payload: bytes) -> bool:
+        """Send ulaw audio as a mini voice frame to the peer.
+
+        Parameters
+        ----------
+        ulaw_payload : bytes
+            ulaw-encoded audio (any length; 20 ms = 160 bytes typical).
+
+        Returns
+        -------
+        bool
+            True if the frame was sent, False if the call is not active.
+        """
+        if self.state != CALL_STATE_ACTIVE:
+            logger.warning("send_voice ignored: call not active (state=%d, callno=%d)",
+                           self.state, self.callno)
+            return False
         ts_raw = int((time.monotonic() - self._start_ts) * 1000)
         ts_low = ts_raw & 0xFFFF
         type_field = 0x8000 | (self.peer_callno & 0x7FFF)
         mini = struct.pack("!HH", type_field, ts_low)
-        self._transport.sendto(mini + ulaw_payload, self.peer_addr)
+        frame = mini + ulaw_payload
+        logger.debug("send_voice: callno=%d peer_callno=%d peer_addr=%s ts=%d payload=%d B",
+                     self.callno, self.peer_callno, self.peer_addr,
+                     ts_low, len(ulaw_payload))
+        try:
+            self._transport.sendto(frame, self.peer_addr)
+        except OSError as exc:
+            logger.error("send_voice failed: %s (callno=%d)", exc, self.callno)
+            return False
+        return True
 
     def send_ack(self) -> None:
         """Send ACK frame (C=1) for this call."""

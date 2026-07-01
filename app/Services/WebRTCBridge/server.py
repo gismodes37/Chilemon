@@ -618,7 +618,11 @@ class WebRTCBridgeApp:
                 ulaw = tx_process(pcm_f32)
                 sent = self._active_call.send_voice(ulaw)
                 if sent:
-                    logger.debug("audio_tx sent %d bytes ulaw (rate=%d)", len(ulaw), rate)
+                    logger.info("audio_tx sent %d bytes ulaw (rate=%d, active_call=True)",
+                                len(ulaw), rate)
+                else:
+                    logger.warning("audio_tx NOT sent: send_voice returned False (callno=%d)",
+                                   self._active_call.callno)
             except (ValueError, KeyError) as exc:
                 logger.warning("audio_tx parse error: %s", exc)
 
