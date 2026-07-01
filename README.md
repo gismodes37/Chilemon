@@ -13,7 +13,7 @@ Modern dashboard for monitoring and controlling AllStarLink nodes
 </p>
 
 <p align="center">
-<img src="https://img.shields.io/badge/version-0.4.0-brightgreen">
+<img src="https://img.shields.io/badge/version-0.5.0--dev-blue">
 <img src="https://img.shields.io/badge/php-8.2+-blue">
 <img src="https://img.shields.io/badge/database-SQLite-green">
 <img src="https://img.shields.io/badge/ASL3-compatible-green">
@@ -250,7 +250,13 @@ ChileMon can be installed directly on an **ASL3** node. It is recommended to use
 
 ### 📦 Option 1: Automatic Installation (Recommended)
 
-The installer auto-detects between **NEW** (full interactive setup) and **UPDATE** (adds missing dependencies only, preserves existing config). Just copy and paste these commands:
+The installer auto-detects between **NEW** (full interactive setup) and **UPDATE** (adds missing dependencies only, preserves existing config). Just copy and paste these commands **one by one**:
+
+#### 0. Install Git (only if fresh system)
+```bash
+sudo apt-get update && sudo apt-get install -y git
+```
+*Git is required to download ChileMon. Fresh Debian systems don't include it by default.*
 
 #### 1. Download ChileMon
 ```bash
@@ -275,7 +281,7 @@ The installer runs **13 steps**:
 9. Configure Apache alias
 10. Enable Apache WebSocket proxy
 11. Validate PHP modules + initialize database
-12. **Install WebRTC Audio Bridge** (browser PTT — aiohttp, aiortc, websockets, systemd service)
+12. **Install WebRTC Audio Bridge** (browser PTT — aiohttp, aiortc, websockets, audioop-lts, systemd service)
 13. Create admin user (NEW) or run installation verification (UPDATE)
 
 > ⚠️ **NEW installation**: Have your ASL **node number** and **AMI password** (from `/etc/asterisk/manager.conf`) ready. The installer will ask you for them.
@@ -284,7 +290,7 @@ The installer runs **13 steps**:
 
 > 🗺️ **Installation Map (optional)**: During NEW installation, you'll be asked for a **hub URL**. If you have a ChileMon Hub instance, enter its URL (e.g. `http://192.168.0.111`) and your node will be able to register on the community map. This is optional — skip it if you don't have a hub.
 
-> 🎯 **WebRTC Audio Bridge**: The bridge for browser-based radio PTT is now **installed automatically** in step 12. No separate script needed. Just configure the credentials in `/etc/default/chilemon-webrtc` after installation.
+> 🎯 **WebRTC Audio Bridge**: The bridge for browser-based radio PTT is now **installed automatically** in step 12. The installer generates random `webrtc_secret` and `iax_phone_pass` — no manual credential setup needed for a fresh install. To override, edit `/etc/default/chilemon-webrtc` and `config/local.php` after installation.
 
 ---
 
@@ -405,11 +411,15 @@ Open `http://<your-vm-ip>/chilemon` — browser PTT included 🇨🇱
 
 <img alt="Static Badge" src="https://img.shields.io/badge/Version-0.4.0-brightgreen">
 
-**Current Release** — Security overhaul, PTT Audio Bridge, Bridge IAX2 reversal, rate limiting, CSRF protection, user roles, admin panel, health check, installation map (hub + agent registration), interactive map picker with address geocoding
+**Shipped** — Security overhaul, PTT Audio Bridge, Bridge IAX2 reversal, rate limiting, CSRF protection, user roles, admin panel, health check, installation map (hub + agent registration), interactive map picker with address geocoding
 
 <img alt="Static Badge" src="https://img.shields.io/badge/Version-0.5.x-blue">
 
-**Next** — Deploy & production testing, TURN/STUN for remote PTT access, HTTPS/WSS, multi-user sessions, production image
+**Current** — One-click update from dashboard, RX audio fixes (Chrome + Firefox support, AGC, lookahead scheduling, AudioContext hardening), TX audio fixes (sample rate correction, slow-motion fix), IAX2 auto-reoriginate on call drop, WS grace period for brief reconnects
+
+<img alt="Static Badge" src="https://img.shields.io/badge/Version-0.6.x-orange">
+
+**Next** — TURN/STUN for remote WebRTC access, HTTPS/WSS with Let's Encrypt, multi-user sessions in bridge, GitHub Actions CI, production Docker image
 
 <img alt="Static Badge" src="https://img.shields.io/badge/Version-1.0-green">
 

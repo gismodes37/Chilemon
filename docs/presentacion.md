@@ -1,7 +1,7 @@
 # 🇨🇱 ChileMon — Presentación técnica
 
 > Documento preparado para presentación y material audiovisual.
-> Versión: v0.4.0 — Junio 2026
+> Versión: v0.5.0-dev — Junio 2026
 
 ---
 
@@ -806,7 +806,7 @@ pct exec 105 -- bash -c 'cd /opt/chilemon-hub && git pull'
 
 ## 9. Roadmap
 
-### v0.4.0 (Actual)
+### v0.4.0 (Entregado)
 - ✅ WebRTC Audio Bridge — PTT desde el navegador
 - ✅ Bridge IAX2 Direction Reversal
 - ✅ Instalación mapa comunitario (Agent + Hub)
@@ -816,12 +816,18 @@ pct exec 105 -- bash -c 'cd /opt/chilemon-hub && git pull'
 - ✅ PHPUnit scaffold con tests
 - ✅ Instalador automático completo
 
-### v0.5.x (Próximo)
-- 🔲 Validación end-to-end en producción
+### v0.5.x (Actual)
+- ✅ Actualización one-click desde el dashboard
+- ✅ Fix audio RX — AGC, lookahead scheduling, AudioContext hardening
+- ✅ Fix audio TX — corrección sample rate, slow-motion
+- ✅ Soporte Chrome + Firefox para audio RX (antes solo Firefox)
+- ✅ Auto-reoriginate IAX2 al caer llamada
+- ✅ WS grace period para reconexiones breves
 - 🔲 TURN/STUN para acceso remoto WebRTC
 - 🔲 HTTPS/WSS con Let's Encrypt
 - 🔲 Sesiones multi-usuario en el bridge
 - 🔲 GitHub Actions CI
+- 🔲 Imagen Docker production
 
 ### v1.0 (Estable)
 - 🔲 Producción lista

@@ -13,7 +13,7 @@ Modern dashboard for monitoring and controlling AllStarLink nodes
 </p>
 
 <p align="center">
-<img src="https://img.shields.io/badge/version-0.4.0-brightgreen">
+<img src="https://img.shields.io/badge/version-0.5.0--dev-blue">
 <img src="https://img.shields.io/badge/php-8.2+-blue">
 <img src="https://img.shields.io/badge/database-SQLite-green">
 <img src="https://img.shields.io/badge/ASL3-compatible-green">
@@ -247,6 +247,14 @@ ChileMon puede instalarse directamente en un nodo **ASL3**. Se recomienda utiliz
 
 El instalador detecta automáticamente si es una instalación **NUEVA** (setup interactivo completo) o una **ACTUALIZACIÓN** (solo agrega dependencias faltantes, preserva la configuración existente).
 
+Solo necesitas copiar y pegar estos comandos **uno por uno**:
+
+#### 0. Instalar Git (solo si es sistema nuevo)
+```bash
+sudo apt-get update && sudo apt-get install -y git
+```
+*Git es necesario para descargar ChileMon. En sistemas Debian nuevos no viene instalado.*
+
 #### 1. Descargar ChileMon
 ```bash
 sudo git clone https://github.com/gismodes37/Chilemon.git /opt/chilemon
@@ -270,14 +278,14 @@ El instalador ejecuta **pasos 13**:
 9. Configurar alias de Apache
 10. Habilitar proxy WebSocket de Apache
 11. Validar módulos PHP + inicializar base de datos
-12. **Instalar puente WebRTC** (PTT desde el navegador — aiohttp, aiortc, websockets, systemd service)
+12. **Instalar puente WebRTC** (PTT desde el navegador — aiohttp, aiortc, websockets, audioop-lts, systemd service)
 13. Crear usuario administrador (NUEVO) o ejecutar verificación (ACTUALIZACIÓN)
 
 > ⚠️ **Instalación NUEVA**: Ten a mano tu **número de nodo** ASL y la **clave AMI** (de `/etc/asterisk/manager.conf`). El instalador te las va a pedir.
 
 > 💡 **ACTUALIZACIÓN (sistema existente)**: El instalador detecta `config/local.php` y omite todos los prompts — solo agrega dependencias faltantes, configura WebRTC/WebSocket, y ejecuta una verificación completa.
 
-> 🎯 **WebRTC Audio Bridge**: El puente para hablar por radio desde el navegador ya **se instala automáticamente** en el paso 12. No necesitas ejecutar un script aparte. Solo configura las credenciales en `/etc/default/chilemon-webrtc` después de la instalación.
+> 🎯 **WebRTC Audio Bridge**: El puente para hablar por radio desde el navegador ya **se instala automáticamente** en el paso 12. El instalador genera `webrtc_secret` e `iax_phone_pass` aleatorios — no necesitas configurar credenciales manualmente en una instalación nueva. Para sobrescribir, edita `/etc/default/chilemon-webrtc` y `config/local.php` después de instalar.
 
 ---
 
@@ -394,11 +402,15 @@ Abrí `http://<ip-de-tu-vm>/chilemon` — PTT desde el navegador incluido 🇨�
 
 <img alt="Static Badge" src="https://img.shields.io/badge/Version-0.4.0-brightgreen">
 
-**Release Actual** — Overhaul de seguridad, PTT Audio Bridge, inversión IAX2, rate limiting, CSRF, roles, panel admin, health check
+**Entregado** — Overhaul de seguridad, PTT Audio Bridge, inversión IAX2, rate limiting, CSRF, roles, panel admin, health check, mapa comunitario (hub + registro), picker de mapa interactivo con geocoding
 
 <img alt="Static Badge" src="https://img.shields.io/badge/Version-0.5.x-blue">
 
-**Siguiente** — Despliegue y pruebas en producción, TURN/STUN para PTT remoto, HTTPS/WSS, sesiones multiusuario, imagen production
+**Actual** — Actualización one-click desde el dashboard, fixes de audio RX (soporte Chrome + Firefox, AGC, lookahead scheduling, AudioContext hardening), fixes de audio TX (corrección de sample rate, slow-motion), auto-reoriginate IAX2 al caer llamada, WS grace period para reconexiones breves
+
+<img alt="Static Badge" src="https://img.shields.io/badge/Version-0.6.x-orange">
+
+**Siguiente** — TURN/STUN para acceso remoto WebRTC, HTTPS/WSS con Let's Encrypt, sesiones multiusuario en el bridge, GitHub Actions CI, imagen Docker production
 
 <img alt="Static Badge" src="https://img.shields.io/badge/Version-1.0-green">
 

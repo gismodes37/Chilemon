@@ -101,20 +101,41 @@ main() {
     apt-get update -qq
     apt-get install -y python3-aiohttp python3-aiohttp-cors python3-websockets python3-venv
 
+    # PEP 668 (Debian 13+): pip refuses system install without --break-system-packages.
+    # --ignore-installed avoids conflicts with Debian-packaged libs (e.g. cryptography).
+    local pip_opts=""
+    if pip3 install --help 2>/dev/null | grep -q break-system-packages; then
+        pip_opts="--break-system-packages --ignore-installed"
+    fi
+
     # aiortc may need pip if apt version is too old
-    if dpkg -s python3-aiortc &>/dev/null 2>&1; then
+    if python3 -c "import aiortc" &>/dev/null; then
+        ok "python3-aiortc ya importable (vía apt o pip)"
+    elif dpkg -s python3-aiortc &>/dev/null 2>&1; then
         ok "python3-aiortc ya instalado vía apt"
     else
         info "python3-aiortc no disponible en apt — intentando pip"
         if command -v pip3 &>/dev/null; then
-            pip3 install "aiortc>=1.4.0"
-            ok "python3-aiortc instalado vía pip3"
+            pip3 install $pip_opts "aiortc>=1.4.0" && ok "python3-aiortc instalado vía pip3" \
+                || warn "python3-aiortc no se pudo instalar"
         elif command -v pip &>/dev/null; then
-            pip install "aiortc>=1.4.0"
-            ok "python3-aiortc instalado vía pip"
+            pip install $pip_opts "aiortc>=1.4.0" && ok "python3-aiortc instalado vía pip" \
+                || warn "python3-aiortc no se pudo instalar"
         else
             warn "pip no disponible — se omite aiortc (WebRTC deshabilitado)"
         fi
+    fi
+
+    # Step 2b: Install audioop-lts (backport for Python 3.13+)
+    info "Instalando audioop-lts (compatibilidad Python ≥ 3.13)"
+    if command -v pip3 &>/dev/null; then
+        pip3 install $pip_opts audioop-lts >/dev/null 2>&1 && ok "audioop-lts instalado vía pip3" \
+            || warn "audioop-lts no se pudo instalar"
+    elif command -v pip &>/dev/null; then
+        pip install $pip_opts audioop-lts >/dev/null 2>&1 && ok "audioop-lts instalado vía pip" \
+            || warn "audioop-lts no se pudo instalar"
+    else
+        warn "pip no disponible — audioop-lts no instalado"
     fi
 
     # Verify critical packages are importable
@@ -131,6 +152,14 @@ main() {
         ok "python3-websockets verificada"
     else
         warn "python3-websockets no importable — WebSocket podría no funcionar"
+    fi
+
+    if python3 -c "import audioop" &>/dev/null; then
+        ok "audioop (stdlib) disponible"
+    elif python3 -c "import audioop_lts" &>/dev/null; then
+        ok "audioop_lts (backport) disponible"
+    else
+        warn "audioop/audioop_lts no disponible — transcodificación ulaw puede fallar"
     fi
 
     if [[ "$import_fail" -ne 0 ]]; then

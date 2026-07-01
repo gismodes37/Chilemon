@@ -282,6 +282,8 @@ write_local_config() {
     local ami_pass="$7"
     local ami_timeout="$8"
     local hub_url="$9"
+    local webrtc_secret="${10}"
+    local iax_phone_pass="${11}"
 
     mkdir -p "$(dirname "$LOCAL_CONFIG")"
     backup_if_exists "$LOCAL_CONFIG"
@@ -289,7 +291,7 @@ write_local_config() {
     local safe_local_node safe_server_host safe_header_tagline
     local safe_ami_host safe_ami_user safe_ami_pass
     local safe_repo_dir safe_db_path safe_wrapper_path
-    local safe_hub_url
+    local safe_hub_url safe_webrtc_secret safe_iax_phone_pass
 
     safe_local_node="$(escape_php_string "$local_node")"
     safe_server_host="$(escape_php_string "$server_host")"
@@ -301,6 +303,8 @@ write_local_config() {
     safe_db_path="$(escape_php_string "${DATA_DIR}/chilemon.sqlite")"
     safe_wrapper_path="$(escape_php_string "$WRAPPER_PATH")"
     safe_hub_url="$(escape_php_string "$hub_url")"
+    safe_webrtc_secret="$(escape_php_string "$webrtc_secret")"
+    safe_iax_phone_pass="$(escape_php_string "$iax_phone_pass")"
 
     cat > "$LOCAL_CONFIG" <<PHP
 <?php
@@ -337,6 +341,12 @@ return [
     'ami_pass' => '${safe_ami_pass}',
     'ami_timeout' => ${ami_timeout},
 
+    // WebRTC Audio Bridge — secrets generados automáticamente.
+    'webrtc_port' => 9091,
+    'webrtc_secret' => '${safe_webrtc_secret}',
+    'iax_phone_user' => 'webrtc-bridge',
+    'iax_phone_pass' => '${safe_iax_phone_pass}',
+
     // URL del hub central ChileMon (opcional). Si se configura,
     // el dashboard mostrará un banner para registrar este nodo
     // en el mapa comunitario (https://github.com/gismodes37/Chilemon-Hub).
@@ -353,38 +363,15 @@ write_wrapper_if_missing() {
         return
     fi
 
-    cat > "$WRAPPER_PATH" <<'BASH'
-#!/usr/bin/env bash
-# ==============================================================================
-# ChileMon - Wrapper seguro para comandos rpt de Asterisk (v0.3.1)
-# ==============================================================================
-# Limpieza de parámetros para evitar inyecciones y fallos de comillas desde PHP
-CMD=$(echo ${1:-} | tr -d "'\"")
-LOCAL=$(echo ${2:-} | tr -d "'\"")
-REMOTE=$(echo ${3:-} | tr -d "'\"")
+    if [[ ! -f "$REPO_DIR/bin/chilemon-rpt" ]]; then
+        warn "No se encuentra bin/chilemon-rpt — se omite wrapper"
+        return
+    fi
 
-# LOG DE DEPURACIÓN (Ayuda a ver qué llega desde la web)
-# echo "[$(date)] WEB_CMD: $CMD LOCAL:$LOCAL REMOTE:$REMOTE" >> /tmp/chilemon.log
-
-case "$CMD" in
-    nodes) /usr/sbin/asterisk -rx "rpt nodes $LOCAL" ;;
-    stats) /usr/sbin/asterisk -rx "rpt stats $LOCAL" ;;
-    connect)
-        # Conectar a nodo remoto (*3 = transceive)
-        # Funciona tanto para ASL como EchoLink (prefijo 3xxxxxx)
-        /usr/sbin/asterisk -rx "rpt fun $LOCAL *3$REMOTE"
-        ;;
-    disconnect) /usr/sbin/asterisk -rx "rpt fun $LOCAL *1$REMOTE" ;;
-    sys-restart-asterisk) systemctl restart asterisk ;;
-    sys-restart-apache) systemctl restart apache2 ;;
-    sys-poweroff) poweroff ;;
-    *) echo "Comando invalido: $CMD" >> /tmp/chilemon.log; exit 1 ;;
-esac
-BASH
-
+    cp "$REPO_DIR/bin/chilemon-rpt" "$WRAPPER_PATH"
     chmod 755 "$WRAPPER_PATH"
     chown root:root "$WRAPPER_PATH"
-    ok "Wrapper robusto instalado en $WRAPPER_PATH"
+    ok "Wrapper instalado desde bin/chilemon-rpt en $WRAPPER_PATH"
 }
 
 write_sudoers() {
@@ -749,6 +736,9 @@ validate_installation() {
 # WebRTC Audio Bridge installation
 # ------------------------------------------------------------------------------
 install_webrtc_bridge() {
+    local webrtc_secret="$1"
+    local iax_phone_pass="$2"
+
     info "Instalando puente WebRTC para PTT desde el navegador"
     info "Esto permite hablar por radio SIN equipos externos 🇨🇱"
 
@@ -779,20 +769,41 @@ install_webrtc_bridge() {
     # Step B: Install Python packages
     apt-get install -y python3-aiohttp python3-aiohttp-cors python3-websockets python3-venv
 
+    # PEP 668 (Debian 13+): pip refuses system install without --break-system-packages.
+    # --ignore-installed avoids conflicts with Debian-packaged libs (e.g. cryptography).
+    local pip_opts=""
+    if pip3 install --help 2>/dev/null | grep -q break-system-packages; then
+        pip_opts="--break-system-packages --ignore-installed"
+    fi
+
     # aiortc may need pip
-    if dpkg -s python3-aiortc &>/dev/null 2>&1; then
+    if python3 -c "import aiortc" &>/dev/null; then
+        ok "python3-aiortc ya importable (vía apt o pip)"
+    elif dpkg -s python3-aiortc &>/dev/null 2>&1; then
         ok "python3-aiortc instalado vía apt"
     else
         info "python3-aiortc no disponible en apt — intentando pip"
         if command -v pip3 &>/dev/null; then
-            pip3 install "aiortc>=1.4.0"
-            ok "python3-aiortc instalado vía pip3"
+            pip3 install $pip_opts "aiortc>=1.4.0" && ok "python3-aiortc instalado vía pip3" \
+                || warn "python3-aiortc no se pudo instalar"
         elif command -v pip &>/dev/null; then
-            pip install "aiortc>=1.4.0"
-            ok "python3-aiortc instalado vía pip"
+            pip install $pip_opts "aiortc>=1.4.0" && ok "python3-aiortc instalado vía pip" \
+                || warn "python3-aiortc no se pudo instalar"
         else
             warn "pip no disponible — WebRTC deshabilitado (se requiere aiortc)"
         fi
+    fi
+
+    # Step B2: Install audioop-lts (backport for Python 3.13+)
+    info "Instalando audioop-lts (compatibilidad Python ≥ 3.13)"
+    if command -v pip3 &>/dev/null; then
+        pip3 install $pip_opts audioop-lts >/dev/null 2>&1 && ok "audioop-lts instalado vía pip3" \
+            || warn "audioop-lts no se pudo instalar"
+    elif command -v pip &>/dev/null; then
+        pip install $pip_opts audioop-lts >/dev/null 2>&1 && ok "audioop-lts instalado vía pip" \
+            || warn "audioop-lts no se pudo instalar"
+    else
+        warn "pip no disponible — audioop-lts no instalado"
     fi
 
     # Verify critical imports
@@ -807,6 +818,13 @@ install_webrtc_bridge() {
         ok "python3-websockets verificada"
     else
         warn "python3-websockets no importable — WebSocket podría no funcionar"
+    fi
+    if python3 -c "import audioop" &>/dev/null; then
+        ok "audioop (stdlib) disponible"
+    elif python3 -c "import audioop_lts" &>/dev/null; then
+        ok "audioop_lts (backport) disponible"
+    else
+        warn "audioop/audioop_lts no disponible — transcodificación ulaw puede fallar"
     fi
 
     if [[ "$import_fail" -ne 0 ]]; then
@@ -840,10 +858,10 @@ WEBRTC_PORT=9091
 
 # Asterisk IAX2 credentials (must match iax.conf phone extension)
 IAX_PHONE_USER=webrtc-bridge
-IAX_PHONE_PASS=CHANGE_ME
+IAX_PHONE_PASS=${iax_phone_pass}
 
 # HMAC secret for WebSocket auth (must match config/local.php webrtc_secret)
-WEBRTC_SECRET=CHANGE_ME
+WEBRTC_SECRET=${webrtc_secret}
 
 # Local ASL node number
 ASL_NODE=${ASL_NODE_VAL}
@@ -858,10 +876,9 @@ EOF
         chmod 600 "$DEFAULT_ENV_FILE"
         ok "Configuración WebRTC creada en $DEFAULT_ENV_FILE"
         echo
-        echo "  ${C_YELLOW}IMPORTANTE: Configure credenciales reales:${C_RESET}"
-        echo "  sudo nano $DEFAULT_ENV_FILE"
-        echo "  - IAX_PHONE_PASS: misma clave que en /etc/asterisk/iax.conf"
-        echo "  - WEBRTC_SECRET: misma clave que en config/local.php webrtc_secret"
+        echo "  ${C_YELLOW}IMPORTANTE: Verifique que coincidan:${C_RESET}"
+        echo "  - WEBRTC_SECRET   → config/local.php  → webrtc_secret"
+        echo "  - IAX_PHONE_PASS  → /etc/asterisk/iax.conf → [webrtc-bridge] secret"
         echo
     else
         ok "Configuración WebRTC ya existe en $DEFAULT_ENV_FILE"
@@ -927,6 +944,7 @@ main() {
     ensure_package php
     ensure_package php-sqlite3
     ensure_package php-curl
+    ensure_package php-mbstring
     ensure_package sqlite3
     ensure_package sudo
     ensure_package python3
@@ -947,6 +965,8 @@ main() {
     local ami_pass=""
     local ami_timeout="$DEFAULT_AMI_TIMEOUT"
     local hub_url=""
+    local webrtc_secret=""
+    local iax_phone_pass=""
 
     if [[ "$INSTALL_MODE" == "new" ]]; then
         # ----------------------------------------------------------
@@ -1030,6 +1050,32 @@ main() {
         fi
     fi
 
+    # ----------------------------------------------------------
+    # Generate WebRTC secrets (for NEW) or read existing (for UPDATE)
+    # ----------------------------------------------------------
+    if [[ "$INSTALL_MODE" == "new" ]]; then
+        if command -v openssl &>/dev/null; then
+            webrtc_secret="$(openssl rand -hex 32)"
+            iax_phone_pass="$(openssl rand -hex 16)"
+        else
+            webrtc_secret="$(date +%s | sha256sum | head -c 64)"
+            iax_phone_pass="$(date +%s%N | sha256sum | head -c 32)"
+        fi
+        ok "Secrets WebRTC generados automáticamente"
+    else
+        # Read existing secrets from current local.php
+        webrtc_secret="$(php -r "\$cfg = require '$LOCAL_CONFIG'; echo \$cfg['webrtc_secret'] ?? '';")"
+        iax_phone_pass="$(php -r "\$cfg = require '$LOCAL_CONFIG'; echo \$cfg['iax_phone_pass'] ?? '';")"
+        if [[ -z "$webrtc_secret" ]]; then
+            warn "webrtc_secret no encontrado en config existente — generando nuevo"
+            webrtc_secret="$(openssl rand -hex 32 2>/dev/null || date +%s | sha256sum | head -c 64)"
+        fi
+        if [[ -z "$iax_phone_pass" ]]; then
+            warn "iax_phone_pass no encontrado en config existente — generando nuevo"
+            iax_phone_pass="$(openssl rand -hex 16 2>/dev/null || date +%s%N | sha256sum | head -c 32)"
+        fi
+    fi
+
     step "4" "Preparando carpetas y permisos"
     mkdir -p "$DATA_DIR" "$LOG_DIR" "$BACKUP_DIR" "$REPO_DIR/config"
     chown -R www-data:www-data "$DATA_DIR" "$LOG_DIR" "$BACKUP_DIR"
@@ -1050,7 +1096,9 @@ main() {
             "$ami_user" \
             "$ami_pass" \
             "$ami_timeout" \
-            "$hub_url"
+            "$hub_url" \
+            "$webrtc_secret" \
+            "$iax_phone_pass"
     fi
 
     step "6" "Configurando módulos de Asterisk para ASL3"
@@ -1074,7 +1122,7 @@ main() {
     run_php_installer
 
     step "12" "Instalando puente WebRTC"
-    install_webrtc_bridge
+    install_webrtc_bridge "$webrtc_secret" "$iax_phone_pass"
 
     if [[ "$INSTALL_MODE" == "new" ]]; then
         step "13" "Creando usuario administrador de ChileMon"
