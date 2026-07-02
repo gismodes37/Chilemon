@@ -288,8 +288,6 @@ The installer runs **13 steps**:
 
 > 💡 **UPDATE (existing system)**: The installer detects `config/local.php` and skips all prompts — it only adds missing dependencies, configures WebRTC/WebSocket, and runs a full verification.
 
-> 🗺️ **Installation Map (optional)**: During NEW installation, you'll be asked for a **hub URL**. If you have a ChileMon Hub instance, enter its URL (e.g. `http://192.168.0.111`) and your node will be able to register on the community map. This is optional — skip it if you don't have a hub.
-
 > 🎯 **WebRTC Audio Bridge**: The bridge for browser-based radio PTT is now **installed automatically** in step 12. The installer generates random `webrtc_secret` and `iax_phone_pass` — no manual credential setup needed for a fresh install. To override, edit `/etc/default/chilemon-webrtc` and `config/local.php` after installation.
 
 ---
@@ -331,21 +329,13 @@ sudo bash install
 #### 3.4 Install ChileMon
 ```bash
 cd /opt
-sudo git clone -b v0.4.0 https://github.com/gismodes37/Chilemon.git chilemon
+sudo git clone https://github.com/gismodes37/Chilemon.git chilemon
 cd chilemon
 sudo bash install/install_chilemon.sh
 ```
-> The installer detects NEW vs UPDATE mode automatically. In NEW mode it will ask for the ASL node number and AMI password.
+> The installer detects NEW vs UPDATE mode automatically. In NEW mode it will ask for the ASL node number and AMI password. The WebRTC bridge is configured automatically (step 12) — no manual credential setup needed.
 
-#### 3.5 Configure WebRTC Bridge
-The bridge is installed automatically (Step 12). Just configure the real credentials:
-```bash
-sudo nano /etc/default/chilemon-webrtc
-# Set IAX_PHONE_PASS and WEBRTC_SECRET
-sudo systemctl restart chilemon-webrtc
-```
-
-#### 3.6 Access the Dashboard
+#### 3.5 Access the Dashboard
 Open `http://<your-vm-ip>/chilemon` — browser PTT included 🇨🇱
 
 ---
@@ -430,6 +420,22 @@ Open `http://<your-vm-ip>/chilemon` — browser PTT included 🇨🇱
 ## 📦 Release
 
 # 📦 Releases
+
+## v0.5.0
+- **One-Click Update**: Dashboard button to detect new version, pull updates, restart WebRTC bridge, and reload Apache — includes version badge in header
+- **Interactive Community Map**: Leaflet + OpenStreetMap with clickable coordinate picker and address geocoding via Nominatim
+- **Cross-Origin Registration**: Agent nodes register on the hub without a pre-existing session
+- **WS Grace Period**: Brief WebSocket reconnects no longer disconnect the bridge immediately
+- **Audio RX — Chrome fix**: AudioContext created only inside user gesture (click), preventing Chrome auto-suspension after ~30s
+- **Audio RX — keepalive**: Silent keepalive buffer every 25s to keep AudioContext alive
+- **Audio RX — simplification**: Removed lookahead scheduling queue, reverted to direct playback with source stop
+- **Audio TX — sample rate fix**: Corrected mismatch between AudioContext (48kHz) and mic hardware
+- **Audio TX — slow-motion fix**: Fixed audio transmitted in slow motion due to sample rate mismatch
+- **IAX2 auto-reoriginate**: Bridge automatically restarts IAX2 call if it drops
+- **send_voice return value**: Fixed `IAX2Call.send_voice()` to return bool and validate ACTIVE state
+- **Installer banner**: Fixed protocol in final banner — now uses detected (http/https) instead of always https
+- **Installer auto-generate secrets**: Automatically generates random `webrtc_secret` and `iax_phone_pass`
+- **Installer audioop-lts**: Auto-installs `audioop-lts` for Python 3.13+ compatibility
 
 ## v0.4.0
 - **WebRTC Audio Bridge**: Browser-based Push-to-Talk (PTT) via Python bridge — WebRTC audio from dashboard to Asterisk IAX2

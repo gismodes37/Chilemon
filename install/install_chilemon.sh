@@ -684,8 +684,8 @@ print_final_banner() {
     echo -e " ${C_GREEN}Nodo ASL local :${C_RESET} ${local_node}"
     echo -e " ${C_GREEN}Usuario AMI    :${C_RESET} ${ami_user}"
     echo
-    echo -e " ${C_GREEN}Dirección nodo :${C_RESET} ${DEFAULT_NODE_PROTO}://${server_host}"
-    echo -e " ${C_GREEN}Acceso ChileMon:${C_RESET} ${DEFAULT_NODE_PROTO}://${server_host}/chilemon"
+    echo -e " ${C_GREEN}Dirección nodo :${C_RESET} ${web_proto}://${server_host}"
+    echo -e " ${C_GREEN}Acceso ChileMon:${C_RESET} ${web_proto}://${server_host}/chilemon"
     echo
     echo -e " ${C_GREEN}Usuario web    :${C_RESET} ${web_user}"
     echo -e " ${C_GREEN}Módulos ASL3   :${C_RESET} ${ASL3_MODULES_ADDED:-0} load => agregados"

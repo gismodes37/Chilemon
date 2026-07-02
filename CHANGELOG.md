@@ -10,6 +10,30 @@ https://semver.org/lang/es/
 
 ---
 
+# [0.5.0] - 2026-07-02
+
+## ✨ One-Click Update + Audio Bridge Fixes
+
+### 📡 Añadido
+- **Actualización One-Click**: Botón de actualización desde el dashboard — detecta nueva versión, ejecuta git pull + restart webrtc + reload apache. Incluye badge de versión en el header.
+- **Mapa comunitario interactivo**: Leaflet + OpenStreetMap con picker de coordenadas clickeable y geocoding de direcciones vía Nominatim.
+- **Registro cross-origin**: Nodos agentes se registran en el hub sin sesión preexistente.
+- **WS grace period**: Reconexiones breves de WebSocket no desconectan el bridge inmediatamente.
+
+### 🔧 Corregido
+- **Audio RX — Chrome fix**: AudioContext se crea solo dentro de gesto del usuario (click), evitando suspensión automática de Chrome después de ~30s.
+- **Audio RX — keepalive**: Timer de keepalive cada 25s (buffer silencioso) para mantener AudioContext activo.
+- **Audio RX — simplificación**: Eliminada lookahead scheduling queue, retorno a reproducción directa con stop del source anterior.
+- **Audio TX — sample rate**: Corrección de mismatch entre AudioContext (48kHz) y mic hardware, eliminando error de AudioNodes cross-origin.
+- **Audio TX — slow-motion fix**: Corrección de audio transmitido en cámara lenta por sample rate mismatch.
+- **IAX2 auto-reoriginate**: Bridge reinicia automáticamente la llamada IAX2 si se cae.
+- **send_voice return value**: Corregido `IAX2Call.send_voice()` para retornar bool y validar estado ACTIVE.
+- **Installer banner**: Corregido protocolo en banner final — ahora usa el detectado (http/https) en vez de siempre https.
+- **Installer auto-generate secrets**: Genera `webrtc_secret` e `iax_phone_pass` aleatorios automáticamente.
+- **Installer audioop-lts**: Instalación automática de `audioop-lts` para compatibilidad Python 3.13+.
+
+---
+
 # [0.4.0] - 2026-06-21
 
 ## ✨ WebRTC Audio Bridge + Seguridad v0.4.x

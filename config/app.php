@@ -53,6 +53,9 @@ if (!defined('APP_ENV')) {
     // dev|prod (default prod)
     define('APP_ENV', getenv('CHILEMON_ENV') ?: 'prod');
 }
+if (!defined('CHILEMON_VERSION')) {
+    define('CHILEMON_VERSION', '0.5.0');
+}
 
 /**
  * Forzar config/local.php en producción.
