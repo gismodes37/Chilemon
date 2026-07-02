@@ -51,8 +51,8 @@ class PTTWidget {
             // Lookahead scheduling queue for RX audio (fix-audio-rx)
             // Each entry: { source: AudioBufferSourceNode, endTime: number }
             /** @type {{ source: AudioBufferSourceNode, endTime: number }[]} */
-            this._scheduledSources = [];
-            this._lookaheadDepth = 5;
+            this._diagnosticPlayed = false;
+            this._keepAliveInterval = null;
             /** @type {number[]} */
             this._audioCtxRetries = [200, 1000, 5000];
             /** @type {Function|null} */
@@ -90,6 +90,11 @@ class PTTWidget {
             // Call state (from server status messages)
             this._inCall = false;
             this._hasHadCall = false; // true after first successful call
+            // Audio initialization guard: AudioContext solo se crea DENTRO
+            // de un gesto del usuario (click), no desde el handler de WS.
+            // Chrome no permite AudioContext 'running' sin gesto, incluso
+            // con resume() — el fix está en _wakeAudio.
+            this._audioReady = false;
             // TX AudioContext state monitor
             this._txStateTimer = null;
 
@@ -132,6 +137,10 @@ class PTTWidget {
         if (this._visualizer) {
             this._visualizer.destroy();
             this._visualizer = null;
+        }
+        if (this._keepAliveInterval) {
+            clearInterval(this._keepAliveInterval);
+            this._keepAliveInterval = null;
         }
         this._flushAudioQueue();
         if (this.audioCtx) {
@@ -400,8 +409,8 @@ class PTTWidget {
             this._visualizer.feedPCM(floats);
         }
 
-        // Schedule via lookahead queue (fix-audio-rx)
-        this._scheduleFrame(floats, sampleRate);
+        // Play via Web Audio API
+        this._playAudioBuffer(floats, sampleRate);
     }
 
     /** Decode and play a raw ArrayBuffer of float32 PCM. */
@@ -422,45 +431,49 @@ class PTTWidget {
             this._visualizer.feedPCM(floats);
         }
 
-        this._scheduleFrame(floats, 16000);
+        this._playAudioBuffer(floats, 16000);
     }
 
     // ---------------------------------------------------------------
-    //  RX Lookahead Scheduling Queue (fix-audio-rx)
+    //  RX Audio playback
     // ---------------------------------------------------------------
 
     /**
-     * Ensure AudioContext and gain node exist.
-     * Creates them lazily if needed (fallback for edge cases).
-     */
-    _ensureAudioCtx() {
-        if (this.audioCtx) return;
-        this._createAudioCtx();
-    }
-
-    /**
-     * Create AudioContext with RX gain node and state logging.
-     * Called eagerly on user gesture or lazily as fallback.
+     * Create AudioContext with RX gain node.
+     * Solo se llama desde _wakeAudio (primer click del usuario).
      */
     _createAudioCtx() {
         try {
             this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             console.warn('[RX-AUDIO] AudioContext created, state=' + this.audioCtx.state);
 
-            // RX gain node (persists across frames)
+            // RX gain node (persiste entre frames)
             this._rxGainNode = this.audioCtx.createGain();
             this._rxGainNode.gain.value = this._getStoredGain('rx');
             this._rxGainNode.connect(this.audioCtx.destination);
 
-            // Log state transitions & flush queue on resume (evitar burst)
-            var self = this;
+            // Diagnostic beep 440Hz (una sola vez al crear el contexto)
+            if (!this._diagnosticPlayed) {
+                this._diagnosticPlayed = true;
+                try {
+                    const sr = this.audioCtx.sampleRate;
+                    const len = Math.floor(sr * 0.3);
+                    const buf = this.audioCtx.createBuffer(1, len, sr);
+                    const ch = buf.getChannelData(0);
+                    for (let i = 0; i < len; i++) {
+                        ch[i] = Math.sin(2 * Math.PI * 440 * i / sr) * 0.3;
+                    }
+                    var src = this.audioCtx.createBufferSource();
+                    src.buffer = buf;
+                    src.connect(this._rxGainNode);
+                    src.start(0);
+                    console.warn('[RX-AUDIO] DIAGNOSTIC 440Hz beep, gain=' + this._rxGainNode.gain.value);
+                } catch (_) {}
+            }
+
+            // Log state transitions
             this.audioCtx.onstatechange = function() {
                 console.warn('[RX-AUDIO] State change: ' + this.state);
-                if (this.state === 'running' && self._scheduledSources) {
-                    // Flush stale scheduled sources — después de una suspensión
-                    // larga todas las fuentes scheduleadas suenan a la vez
-                    self._scheduledSources = [];
-                }
             };
         } catch (e) {
             console.warn('[RX-AUDIO] Failed to create AudioContext: ' + e.message);
@@ -468,110 +481,74 @@ class PTTWidget {
     }
 
     /**
-     * Resume AudioContext with exponential backoff.
-     * @param {number} attempt - Current retry attempt (0-based).
-     */
-    _resumeAudioCtx(attempt) {
-        if (!this.audioCtx || this.audioCtx.state === 'running' || this.audioCtx.state === 'closed') {
-            return;
-        }
-        console.warn('[RX-AUDIO] Resuming (attempt ' + attempt + '), state=' + this.audioCtx.state);
-        this.audioCtx.resume().then(function() {
-            console.warn('[RX-AUDIO] Resume success, state=' + this.state);
-        }.bind(this)).catch(function(err) {
-            console.warn('[RX-AUDIO] Resume failed (attempt ' + attempt + '): ' + err.message);
-            var retries = this._audioCtxRetries;
-            if (attempt < retries.length - 1) {
-                setTimeout(function() {
-                    this._resumeAudioCtx(attempt + 1);
-                }.bind(this), retries[attempt]);
-            } else {
-                console.warn('[RX-AUDIO] Resume exhausted all ' + retries.length + ' retries');
-            }
-        }.bind(this));
-    }
-
-    /**
-     * Schedule a single audio frame in the lookahead queue.
-     * Each frame is scheduled at audioCtx.currentTime + offset
-     * where offset is determined by the current queue position.
-     * Late frames (scheduled time already passed) are dropped with a warning.
+     * Play a float32 PCM frame immediately.
+     * Reemplaza el frame anterior para evitar superposición.
+     * Si el AudioContext está suspended, intenta resume().
      *
-     * @param {Float32Array} samples - PCM float32 audio data.
-     * @param {number} sampleRate - Sample rate of the audio (Hz).
+     * @param {Float32Array} samples - PCM float32 audio.
+     * @param {number} sampleRate - Sample rate en Hz.
      */
-    _scheduleFrame(samples, sampleRate) {
-        this._ensureAudioCtx();
-        if (!this.audioCtx || this.audioCtx.state === 'closed') return;
+    _playAudioBuffer(samples, sampleRate) {
+        // Sin AudioContext o sin gesture del usuario → saltear
+        if (!this.audioCtx || !this._audioReady) return;
+        if (this.audioCtx.state === 'closed') return;
 
-        // Try to resume if suspended
+        // Intentar resume si está suspended
         if (this.audioCtx.state === 'suspended') {
-            this._resumeAudioCtx(0);
-            // Still schedule — buffer will play once resumed
-        }
-
-        // Calculate start time: currentTime + offset based on queue position
-        var nextOffset = this._scheduledSources.length * 0.02; // 20ms per frame
-        var startTime = this.audioCtx.currentTime + nextOffset;
-
-        // Drop late frames (more than 10ms past their slot)
-        if (nextOffset > 0 && startTime < this.audioCtx.currentTime + 0.005) {
-            console.warn('[RX-AUDIO] Frame arrived late, dropping (offset=' + nextOffset.toFixed(3) + 's)');
-            return;
+            this.audioCtx.resume().catch(function() {});
         }
 
         try {
+            // Stop previous source para evitar crackling
+            if (this._audioSource) {
+                try { this._audioSource.stop(); } catch (_) {}
+                try { this._audioSource.disconnect(); } catch (_) {}
+            }
+
             var buf = this.audioCtx.createBuffer(1, samples.length, sampleRate);
             buf.copyToChannel(samples, 0);
 
-            var source = this.audioCtx.createBufferSource();
-            source.buffer = buf;
-            source.connect(this._rxGainNode);
-            source.start(startTime);
-
-            var duration = samples.length / sampleRate;
-            var entry = {
-                source: source,
-                endTime: startTime + duration
-            };
-            this._scheduledSources.push(entry);
-
-            // Remove oldest entries if we exceed lookahead depth
-            while (this._scheduledSources.length > this._lookaheadDepth) {
-                this._scheduledSources.shift();
-            }
-
-            // Clean up played entries on ended
-            source.onended = function() {
-                this._cleanupScheduled();
-            }.bind(this);
-        } catch (e) {
-            console.warn('[RX-AUDIO] Schedule frame error: ' + e.message);
-        }
+            this._audioSource = this.audioCtx.createBufferSource();
+            this._audioSource.buffer = buf;
+            this._audioSource.connect(this._rxGainNode);
+            this._audioSource.start(0);
+        } catch (_) { /* audio no disponible */ }
     }
 
     /**
-     * Remove played/expired entries from the scheduling queue.
-     * An entry is considered expired when endTime <= currentTime.
+     * Anti-suspensión: Chrome suspende el AudioContext después de ~30s sin
+     * reproducción. Este timer reproduce un buffer silencioso cada 25s
+     * para mantener el pipeline activo mientras no hay audio de radio.
      */
-    _cleanupScheduled() {
-        if (!this.audioCtx) return;
-        var now = this.audioCtx.currentTime;
-        this._scheduledSources = this._scheduledSources.filter(function(entry) {
-            return entry.endTime > now;
-        });
+    _startKeepAlive() {
+        if (this._keepAliveInterval) clearInterval(this._keepAliveInterval);
+        this._keepAliveInterval = setInterval(function() {
+            if (!this.audioCtx || this.audioCtx.state === 'closed') return;
+            if (this.audioCtx.state === 'suspended') {
+                this.audioCtx.resume().catch(function() {});
+            }
+            // Buffer silencioso para mantener el pipeline vivo
+            if (this.audioCtx.state === 'running') {
+                try {
+                    var buf = this.audioCtx.createBuffer(1, 220, 22050);
+                    var src = this.audioCtx.createBufferSource();
+                    src.buffer = buf;
+                    src.connect(this.audioCtx.destination);
+                    src.start(0);
+                } catch (_) {}
+            }
+        }.bind(this), 25000);
     }
 
     /**
-     * Flush the entire scheduling queue — stop all sources, disconnect, clear.
+     * Stop current audio source and flush queue.
      */
     _flushAudioQueue() {
-        for (var i = 0; i < this._scheduledSources.length; i++) {
-            var entry = this._scheduledSources[i];
-            try { entry.source.stop(); } catch (_) { /* already ended */ }
-            try { entry.source.disconnect(); } catch (_) { /* already disconnected */ }
+        if (this._audioSource) {
+            try { this._audioSource.stop(); } catch (_) {}
+            try { this._audioSource.disconnect(); } catch (_) {}
+            this._audioSource = null;
         }
-        this._scheduledSources = [];
     }
 
     /**
@@ -612,14 +589,11 @@ class PTTWidget {
     startCapture() {
         if (this._micStream) return; // already capturing
 
-        // Dedicated TX AudioContext — try 16 kHz, fallback to default
-        try {
-            this._txCtx = new (window.AudioContext || window.webkitAudioContext)({
-                sampleRate: 16000,
-            });
-        } catch (_) {
-            this._txCtx = new (window.AudioContext || window.webkitAudioContext)();
-        }
+        // Dedicated TX AudioContext — usar sampleRate del sistema (default).
+        // NO forzar 16000 Hz porque Chrome NO puede hacer
+        // createMediaStreamSource() si el sample rate del micrófono
+        // difiere del AudioContext. El servidor maneja el resample.
+        this._txCtx = new (window.AudioContext || window.webkitAudioContext)();
         if (this._txCtx.state === 'suspended') {
             this._txCtx.resume().catch(() => {});
         }
@@ -627,10 +601,11 @@ class PTTWidget {
             + this._txCtx.sampleRate + ', state=' + this._txCtx.state);
 
         // Monitor AudioContext state — auto-resume if Chrome suspends it
-        this._txCtx.addEventListener('statechange', () => {
-            if (this._txCtx.state === 'suspended') {
+        var txCtx = this._txCtx;
+        txCtx.addEventListener('statechange', () => {
+            if (txCtx && txCtx.state === 'suspended') {
                 console.log('[PTT-DIAG] TX AudioContext suspended — resuming...');
-                this._txCtx.resume().catch(() => {
+                txCtx.resume().catch(() => {
                     console.warn('[PTT-DIAG] TX AudioContext resume blocked');
                 });
             }
@@ -642,9 +617,10 @@ class PTTWidget {
         }
         this._txStateTimer = setInterval(() => {
             if (!this.pttActive) return;
-            if (this._txCtx && this._txCtx.state === 'suspended') {
+            var ctx = this._txCtx;
+            if (ctx && ctx.state === 'suspended') {
                 console.log('[PTT-DIAG] TX AudioContext suspended (interval) — resuming...');
-                this._txCtx.resume().catch(() => {});
+                ctx.resume().catch(() => {});
             }
         }, 2000);
 
@@ -981,27 +957,20 @@ class PTTWidget {
         // Además reproduce un buffer silencioso post-resume porque algunos
         // browsers requieren audio output real para reactivar el pipeline.
         this._wakeAudio = function() {
-            if (this.audioCtx) {
-                if (this.audioCtx.state === 'suspended') {
-                    var ctx = this.audioCtx;
-                    ctx.resume().then(function() {
-                        console.warn('[RX-AUDIO] Resumed via user gesture');
-                        // Play a silent buffer to un-stall the audio pipeline
-                        try {
-                            var silent = ctx.createBuffer(1, 220, 22050);
-                            var src = ctx.createBufferSource();
-                            src.buffer = silent;
-                            src.connect(ctx.destination);
-                            src.start(0);
-                        } catch (_) {}
-                    }).catch(function(e) {
-                        console.warn('[RX-AUDIO] Resume via gesture failed: ' + e.message);
-                    });
-                }
-            } else {
-                // Eager creation — RX solo escucha sin PTT
-                this._createAudioCtx();
+            // AudioContext solo se crea UNA VEZ, dentro de un gesto del
+            // usuario, para garantizar que arranque en estado 'running'.
+            // Fijate que _ensureAudioCtx() chequea _audioReady y no crea
+            // nada hasta que este flag se setea acá.
+            if (this._audioReady) {
+                console.warn('[RX-AUDIO] _wakeAudio: already initialized, state=' + (this.audioCtx ? this.audioCtx.state : 'no ctx'));
+                return;
             }
+            console.warn('[RX-AUDIO] _wakeAudio: FIRST gesture — creating AudioContext');
+            this._audioReady = true;
+            this._createAudioCtx();
+            console.warn('[RX-AUDIO] _wakeAudio: AudioContext state after create = ' + (this.audioCtx ? this.audioCtx.state : 'null'));
+            // Start keepalive timer to prevent Chrome 30s suspension
+            this._startKeepAlive();
         }.bind(this);
         document.addEventListener('click', this._wakeAudio, { once: false });
         document.addEventListener('touchstart', this._wakeAudio, { passive: true, once: false });
