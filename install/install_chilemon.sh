@@ -533,6 +533,21 @@ configure_webrtc_asterisk() {
                 ok "Snippet IAX2 ([webrtc-bridge]) agregado a $ASTERISK_IAX_CONF"
                 warn "IMPORTANTE: Cambie CHANGEME_PHONE_SECRET en $ASTERISK_IAX_CONF"
             fi
+
+            # CRITICAL: Ensure calltokenoptional=127.0.0.1 exists in [general]
+            # Without it in [general], ASL3 drops REGREQ frames that lack
+            # IE_CALLTOKEN — the bridge never registers, peer stays UNKNOWN,
+            # and no IAX2 call can be established (RX/TX completely dead).
+            if ! grep -q 'calltokenoptional=127.0.0.1' "$ASTERISK_IAX_CONF"; then
+                backup_if_exists "$ASTERISK_IAX_CONF"
+                # Insert after requirecalltoken=no in [general] section
+                if grep -q 'requirecalltoken=no' "$ASTERISK_IAX_CONF"; then
+                    sed -i '/^requirecalltoken=no/a calltokenoptional=127.0.0.1' "$ASTERISK_IAX_CONF"
+                    ok "calltokenoptional=127.0.0.1 agregado a [general] de iax.conf"
+                else
+                    warn "No se encontró requirecalltoken=no en iax.conf — calltokenoptional no agregado"
+                fi
+            fi
         else
             warn "$ASTERISK_IAX_CONF no existe — se omite snippet IAX2"
         fi
