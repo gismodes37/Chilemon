@@ -538,7 +538,11 @@ configure_webrtc_asterisk() {
             # Without it in [general], ASL3 drops REGREQ frames that lack
             # IE_CALLTOKEN — the bridge never registers, peer stays UNKNOWN,
             # and no IAX2 call can be established (RX/TX completely dead).
-            if ! grep -q 'calltokenoptional=127.0.0.1' "$ASTERISK_IAX_CONF"; then
+            # NOTE: grep the [general] section only — the [webrtc-bridge] section
+            # also has calltokenoptional which would false-positive a whole-file grep.
+            local general_has_ct
+            general_has_ct=$(awk '/^\[general\]/{found=1} found && /calltokenoptional=127\.0\.0\.1/{print "yes"; exit} /^\[/{if(found && !/general/)exit}' "$ASTERISK_IAX_CONF")
+            if [[ "$general_has_ct" != "yes" ]]; then
                 backup_if_exists "$ASTERISK_IAX_CONF"
                 # Insert after requirecalltoken=no in [general] section
                 if grep -q 'requirecalltoken=no' "$ASTERISK_IAX_CONF"; then

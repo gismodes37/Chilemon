@@ -89,7 +89,58 @@ class PTTWidget {
 
             this._diagChunkCount = 0;
             this._diagLogInterval = 30; // log every N chunks
+
+            // User-gesture AudioContext unlock (required by modern browsers)
+            this._audioReady = false;
+            this._keepAliveInterval = null;
+            this._onUserGesture = this._onUserGesture.bind(this);
         }
+
+    // ---------------------------------------------------------------
+    //  AudioContext unlock (user-gesture required by browsers)
+    // ---------------------------------------------------------------
+
+    /**
+     * Called on first user click/touch. Creates AudioContext inside the
+     * gesture handler so browsers allow audio output. Subsequent calls
+     * just resume if suspended.
+     */
+    _onUserGesture() {
+        if (!this.audioCtx) {
+            this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            this._rxGainNode = this.audioCtx.createGain();
+            this._rxGainNode.gain.value = this._getStoredGain('rx');
+            this._rxGainNode.connect(this.audioCtx.destination);
+            this._audioReady = true;
+            this._startKeepAlive();
+            console.warn('[RX-AUDIO] AudioContext created by user gesture, state=' + this.audioCtx.state);
+        }
+        if (this.audioCtx.state === 'suspended') {
+            this.audioCtx.resume().then(() => {
+                console.warn('[RX-AUDIO] AudioContext resumed → running');
+            });
+        }
+    }
+
+    /** Play silent buffer every 25s to prevent browser auto-suspend. */
+    _startKeepAlive() {
+        if (this._keepAliveInterval) clearInterval(this._keepAliveInterval);
+        this._keepAliveInterval = setInterval(() => {
+            if (!this.audioCtx || this.audioCtx.state === 'closed') return;
+            if (this.audioCtx.state === 'suspended') {
+                this.audioCtx.resume().catch(() => {});
+            }
+            if (this.audioCtx.state === 'running') {
+                try {
+                    const buf = this.audioCtx.createBuffer(1, 220, 22050);
+                    const src = this.audioCtx.createBufferSource();
+                    src.buffer = buf;
+                    src.connect(this.audioCtx.destination);
+                    src.start(0);
+                } catch (_) { /* ignore */ }
+            }
+        }, 25000);
+    }
 
     // ---------------------------------------------------------------
     //  Public API
@@ -118,6 +169,10 @@ class PTTWidget {
         this._closeWebSocket();
         this._unbindGlobalEvents();
         this.stopCapture();
+        if (this._keepAliveInterval) {
+            clearInterval(this._keepAliveInterval);
+            this._keepAliveInterval = null;
+        }
         if (this._visualizer) {
             this._visualizer.destroy();
             this._visualizer = null;
@@ -418,14 +473,10 @@ class PTTWidget {
 
     /** Play an AudioBuffer from float32 PCM data. */
     _playAudioBuffer(samples, sampleRate) {
+        // Wait for user gesture to create AudioContext
+        if (!this.audioCtx || !this._audioReady) return;
+
         try {
-            if (!this.audioCtx) {
-                this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                // Create RX gain node (persists across plays)
-                this._rxGainNode = this.audioCtx.createGain();
-                this._rxGainNode.gain.value = this._getStoredGain('rx');
-                this._rxGainNode.connect(this.audioCtx.destination);
-            }
             if (this.audioCtx.state === 'suspended') {
                 this.audioCtx.resume().catch(() => {});
             }
@@ -816,12 +867,17 @@ class PTTWidget {
         document.addEventListener('keydown', this._onKeyDown);
         document.addEventListener('keyup', this._onKeyUp);
         window.addEventListener('beforeunload', this._onBeforeUnload);
+        // User-gesture unlock for AudioContext (required by browsers)
+        document.addEventListener('click', this._onUserGesture, { once: false });
+        document.addEventListener('touchstart', this._onUserGesture, { passive: true, once: false });
     }
 
     _unbindGlobalEvents() {
         document.removeEventListener('keydown', this._onKeyDown);
         document.removeEventListener('keyup', this._onKeyUp);
         window.removeEventListener('beforeunload', this._onBeforeUnload);
+        document.removeEventListener('click', this._onUserGesture);
+        document.removeEventListener('touchstart', this._onUserGesture);
     }
 
     _onKeyDown(e) {
