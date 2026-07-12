@@ -178,6 +178,9 @@ class WebRTCBridgeApp:
         # Active IAX2 call (set when Asterisk calls us via AMI Originate)
         self._active_call: IAX2Call | None = None
 
+        # Timestamp of last received audio frame (for liveness check)
+        self._last_audio_time: float = 0.0
+
         # Connected WebSocket peers
         self._ws_peers: set[web.WebSocketResponse] = set()
 
@@ -237,6 +240,7 @@ class WebRTCBridgeApp:
         self._active_call = call
         self._reoriginate_count = 0  # reset retry counter
         self._cancel_reoriginate()   # cancel any pending reoriginate
+        self._last_audio_time = asyncio.get_event_loop().time()
         logger.info(
             "Inbound NEW from Asterisk — callno=%d called=%s (reoriginate_count=%d)",
             call.callno, call.called_num, self._reoriginate_count,
@@ -266,6 +270,7 @@ class WebRTCBridgeApp:
 
     async def _on_iax_audio(self, ulaw_payload: bytes) -> None:
         """Forward received ulaw audio from Asterisk to all WS peers."""
+        self._last_audio_time = asyncio.get_event_loop().time()
         peers = len(self._ws_peers)
         if not peers:
             logger.debug("Audio dropped: no WS peers")
@@ -505,13 +510,26 @@ class WebRTCBridgeApp:
         context = request.query.get("context", "webrtc")
 
         # If there's an active IAX2 call (from grace period), skip AMI Originate.
-        # The call survived the brief WS disconnect, so audio resumes instantly.
-        if self._active_call:
+        # But verify the call is still alive (audio received in last 10s).
+        now = asyncio.get_event_loop().time()
+        call_alive = (
+            self._active_call is not None
+            and (now - self._last_audio_time) < 10.0
+        )
+        if call_alive:
             self._cancel_grace_period()
             logger.info(
                 "WS reconnected — resuming active callno=%d (no re-originate)",
                 self._active_call.callno,
             )
+        elif self._active_call:
+            # Call object exists but no recent audio — call is dead, re-originate
+            logger.warning(
+                "WS reconnected but callno=%d is stale (no audio for %.1fs) — re-originating",
+                self._active_call.callno,
+                now - self._last_audio_time,
+            )
+            self._active_call = None
         else:
             # Trigger AMI Originate to establish inbound IAX2 call
             # Asterisk sends an IAX2 NEW frame to our bridge listener

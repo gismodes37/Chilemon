@@ -526,7 +526,9 @@ class PTTWidget {
 
         // Monitor AudioContext state — auto-resume if Chrome suspends it
         this._txCtx.addEventListener('statechange', () => {
-            if (this._txCtx.state === 'suspended') {
+            // Guard: stopCapture() may have closed and nullified _txCtx
+            // before this async callback fires.
+            if (this._txCtx && this._txCtx.state === 'suspended') {
                 console.log('[PTT-DIAG] TX AudioContext suspended — resuming...');
                 this._txCtx.resume().catch(() => {
                     console.warn('[PTT-DIAG] TX AudioContext resume blocked');
