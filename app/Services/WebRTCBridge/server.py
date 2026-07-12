@@ -507,7 +507,7 @@ class WebRTCBridgeApp:
 
         # Determine extension to call (overridable via query param)
         exten = request.query.get("exten", self.config.asl_node)
-        context = request.query.get("context", "webrtc")
+        context = request.query.get("context", "radio-ptt")
 
         # If there's an active IAX2 call (from grace period), skip AMI Originate.
         # But verify the call is still alive (audio received in last 10s).
