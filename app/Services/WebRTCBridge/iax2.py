@@ -997,12 +997,17 @@ class IAX2Server:
     LAGRQ→LAGRP) at the transport level, and routes call-specific
     frames to the appropriate IAX2Call instance.
 
+    Also handles IAX2 registration so Asterisk learns the server's
+    address (127.0.0.1:9092) for incoming call routing.
+
     Usage
     -----
         server = IAX2Server()
         server.on_new_call = my_on_new_call_callback
         await server.start("0.0.0.0", 9092)
+        await server.register("webrtc-bridge", "secret", "127.0.0.1", 4569)
         ...
+        await server.unregister("127.0.0.1", 4569)
         await server.stop()
     """
 
@@ -1012,12 +1017,22 @@ class IAX2Server:
         self._next_callno: int = 0x0001
         self._start_ts: float = 0.0
 
+        # Registration state
+        self._registered: bool = False
+        self._reg_callno: int = REG_CALLNO & 0x7FFF
+        self._reg_response_event: Optional[asyncio.Event] = None
+        self._reg_response_data: Optional[str] = None
+
         # -- Public callback --
         self.on_new_call: Optional[Callable[[IAX2Call], Awaitable[None]]] = None
 
     @property
     def is_running(self) -> bool:
         return self._transport is not None
+
+    @property
+    def is_registered(self) -> bool:
+        return self._registered
 
     async def start(self, host: str = "0.0.0.0", port: int = 9092) -> None:
         """Start the UDP listener on *host*:*port*."""
@@ -1055,6 +1070,125 @@ class IAX2Server:
         self._transport.close()
         self._transport = None
         logger.info("IAX2 server stopped")
+
+    # -- Registration --
+
+    async def register(
+        self,
+        username: str,
+        password: str,
+        host: str = "127.0.0.1",
+        port: int = 4569,
+        timeout: float = REG_TIMEOUT,
+    ) -> bool:
+        """Register with Asterisk so it knows our address for incoming calls.
+
+        Sends REGREQ from the server socket (port 9092) so Asterisk learns
+        the bridge's address.  Returns True on success.
+        Raises PermissionError on REGREJ, TimeoutError on timeout.
+        """
+        if self._registered:
+            return True
+        if self._transport is None:
+            raise RuntimeError("IAX2 server not started — cannot register")
+
+        self._reg_response_event = asyncio.Event()
+        retries = 0
+
+        while retries < MAX_REG_RETRIES:
+            self._reg_response_event.clear()
+            self._reg_response_data = None
+            self._send_regreq(username, password, (host, port))
+
+            try:
+                await asyncio.wait_for(
+                    self._reg_response_event.wait(), timeout=timeout
+                )
+            except asyncio.TimeoutError:
+                retries += 1
+                logger.warning(
+                    "REGREQ timeout (%d/%d)", retries, MAX_REG_RETRIES
+                )
+                continue
+
+            if self._reg_response_data == "REGACK":
+                self._registered = True
+                logger.info(
+                    "IAX2 registered as '%s' (server mode) → %s:%d",
+                    username, host, port,
+                )
+                return True
+
+            if self._reg_response_data == "REGREJ":
+                self._registered = False
+                raise PermissionError(
+                    "IAX2 registration rejected by Asterisk"
+                )
+
+            # REGAUTH — auth challenge not supported in server mode yet
+            if self._reg_response_data == "REGAUTH":
+                logger.warning(
+                    "REGAUTH received — auth challenge not yet "
+                    "implemented in server mode (calltokenoptional "
+                    "should bypass this for localhost)"
+                )
+                retries += 1
+                continue
+
+        raise TimeoutError("IAX2 registration failed after all retries")
+
+    async def unregister(
+        self,
+        host: str = "127.0.0.1",
+        port: int = 4569,
+    ) -> None:
+        """Send REGREL to release the registration."""
+        if not self._registered:
+            return
+        self._send_regrel((host, port))
+        self._registered = False
+        logger.info("IAX2 unregistered (server mode)")
+
+    def _send_regreq(
+        self,
+        username: str,
+        password: str,
+        addr: tuple[str, int],
+    ) -> None:
+        """Send REGREQ from the server socket."""
+        payload = (
+            _make_ie(IE_USERNAME, username)
+            + _make_ie(IE_PASSWORD, password)
+        )
+        ts = int((time.monotonic() - self._start_ts) * 1000) & 0xFFFFFFFF
+        first_word = 0x8000 | (self._reg_callno & 0x7FFF)
+        second_word = 0
+        cs = IAX_CMD_REGREQ & 0x7F
+
+        header = struct.pack(
+            "!HHIBBBB",
+            first_word, second_word, ts, 0, 0,
+            IAX_TYPE_IAX, cs,
+        )
+        if self._transport:
+            self._transport.sendto(header + payload, addr)
+        logger.debug("REGREQ sent to %s:%d as '%s'", *addr, username)
+
+    def _send_regrel(self, addr: tuple[str, int]) -> None:
+        """Send REGREL from the server socket."""
+        ts = int((time.monotonic() - self._start_ts) * 1000) & 0xFFFFFFFF
+        first_word = 0x8000 | (self._reg_callno & 0x7FFF)
+        second_word = 0
+        cs = IAX_CMD_REGREL & 0x7F
+
+        header = struct.pack(
+            "!HHIBBBB",
+            first_word, second_word, ts, 0, 0,
+            IAX_TYPE_IAX, cs,
+        )
+        if self._transport:
+            self._transport.sendto(header, addr)
+        logger.debug("REGREL sent to %s:%d", *addr)
 
     def _on_datagram(self, data: bytes, addr: tuple[str, int]) -> None:
         """Parse an incoming datagram and dispatch."""
@@ -1134,6 +1268,13 @@ class IAX2Server:
         c = (cs >> 7) & 1
         subclass = cs & 0x7F
 
+        # --- Registration responses (dest_callno == 0, from Asterisk) ---
+        if dest_callno == 0 and frametype == IAX_TYPE_IAX and subclass in (
+            IAX_CMD_REGACK, IAX_CMD_REGREJ, IAX_CMD_REGAUTH, 0x28,
+        ):
+            self._on_registration_response(subclass, src_callno, payload)
+            return
+
         # --- NEW frame (dest_callno == 0, subclass == NEW) ---
         if dest_callno == 0 and frametype == IAX_TYPE_IAX and subclass == IAX_CMD_NEW:
             self._on_new(data, addr, src_callno, ts, oseqno)
@@ -1185,6 +1326,26 @@ class IAX2Server:
             src_callno, dest_callno, seq_advanced,
         )
         call.handle_frame(frametype, subclass, c, payload)
+
+    def _on_registration_response(
+        self, subclass: int, src_callno: int, payload: bytes
+    ) -> None:
+        """Handle REGACK/REGREJ/REGAUTH/0x28 from Asterisk."""
+        if subclass == IAX_CMD_REGACK:
+            logger.info("REGACK received — IAX2 registration successful")
+            self._reg_response_data = "REGACK"
+        elif subclass == IAX_CMD_REGREJ:
+            logger.warning("REGREJ received — IAX2 registration rejected")
+            self._reg_response_data = "REGREJ"
+        elif subclass == IAX_CMD_REGAUTH:
+            logger.info("REGAUTH received (standard) — auth challenge")
+            self._reg_response_data = "REGAUTH"
+        elif subclass == 0x28:
+            logger.info("CallToken challenge (0x28) received — auth challenge")
+            self._reg_response_data = "REGAUTH"
+
+        if self._reg_response_event:
+            self._reg_response_event.set()
 
     def _on_new(self, data: bytes, addr: tuple[str, int],
                 src_callno: int, ts: int, oseqno: int) -> None:

@@ -25,8 +25,15 @@ AMI_USER                 admin              No       Asterisk AMI username
 AMI_PASS                 —                  Yes      Asterisk AMI password
 WEBRTC_SECRET            —                  Yes      HMAC secret for WS auth
 ASL_NODE                 494780             No       Local ASL node number
+IAX_PHONE_USER           webrtc-bridge      No       IAX2 registration username
+IAX_PHONE_PASS           —                  No*      IAX2 registration password (required for AMI Originate)
+IAX_HOST                 127.0.0.1          No       Asterisk IAX2 bind address
+IAX_PORT                 4569               No       Asterisk IAX2 UDP port
 LOG_LEVEL                INFO               No       Python log level
 ========================  =================  ======  ===========================
+
+* IAX_PHONE_PASS is required for AMI Originate to work (bridge must register
+  so Asterisk knows its address).
 
 Startup
 -------
@@ -129,6 +136,11 @@ class BridgeConfig:
         self.ami_pass: str = _env_str("AMI_PASS", "")
         self.webrtc_secret: str = _env_str("WEBRTC_SECRET", "")
         self.asl_node: str = _env_str("ASL_NODE", "494780")
+        # IAX2 registration credentials (bridge registers with Asterisk)
+        self.iax_phone_user: str = _env_str("IAX_PHONE_USER", "webrtc-bridge")
+        self.iax_phone_pass: str = _env_str("IAX_PHONE_PASS", "")
+        self.iax_host: str = _env_str("IAX_HOST", "127.0.0.1")
+        self.iax_port: int = _env_int("IAX_PORT", 4569)
 
     def validate(self) -> list[str]:
         """Return list of missing required config items."""
@@ -637,6 +649,7 @@ class WebRTCBridgeApp:
             "status": "ok",
             "ami_connected": self.ami.connected,
             "iax_server_running": self.iax_server.is_running,
+            "iax_registered": self.iax_server.is_registered,
             "in_call": in_call,
             "active_call": in_call,
             "ptt_active": self._ptt_active,
@@ -696,7 +709,31 @@ async def _on_startup(app: web.Application) -> None:
         logger.error("AMI startup failed: %s", exc)
         # Don't crash — health endpoint will show ami_connected=false
 
-    # 3. Start keepalive background task
+    # 3. Register with Asterisk so it knows our IAX2 address
+    if bridge.config.iax_phone_pass:
+        try:
+            await bridge.iax_server.register(
+                username=bridge.config.iax_phone_user,
+                password=bridge.config.iax_phone_pass,
+                host=bridge.config.iax_host,
+                port=bridge.config.iax_port,
+            )
+            logger.info(
+                "IAX2 registered as '%s' → %s:%d",
+                bridge.config.iax_phone_user,
+                bridge.config.iax_host,
+                bridge.config.iax_port,
+            )
+        except (PermissionError, TimeoutError) as exc:
+            logger.error("IAX2 registration failed: %s", exc)
+            # Don't crash — health endpoint will show registration status
+    else:
+        logger.warning(
+            "IAX_PHONE_PASS not set — skipping IAX2 registration "
+            "(AMI Originate will not work without registration)"
+        )
+
+    # 4. Start keepalive background task
     bridge._start_keepalive()
 
 
@@ -707,6 +744,12 @@ async def _on_shutdown(app: web.Application) -> None:
 
     # Stop IAX2 server (hangs up active calls + closes UDP transport)
     try:
+        # Unregister from Asterisk before shutting down
+        if bridge.iax_server.is_registered:
+            await bridge.iax_server.unregister(
+                host=bridge.config.iax_host,
+                port=bridge.config.iax_port,
+            )
         await bridge.iax_server.stop()
     except Exception as exc:
         logger.warning("IAX2 server stop error: %s", exc)
