@@ -1172,7 +1172,10 @@ class IAX2Server:
         )
         if self._transport:
             self._transport.sendto(header + payload, addr)
-        logger.debug("REGREQ sent to %s:%d as '%s'", *addr, username)
+        logger.debug(
+            "REGREQ sent to %s:%d as '%s' payload_hex=%s frame_hex=%s",
+            *addr, username, payload.hex(), (header + payload).hex(),
+        )
 
     def _send_regrel(self, addr: tuple[str, int]) -> None:
         """Send REGREL from the server socket."""
@@ -1335,13 +1338,16 @@ class IAX2Server:
             logger.info("REGACK received — IAX2 registration successful")
             self._reg_response_data = "REGACK"
         elif subclass == IAX_CMD_REGREJ:
-            logger.warning("REGREJ received — IAX2 registration rejected")
+            logger.warning(
+                "REGREJ received — IAX2 registration rejected payload_hex=%s",
+                payload.hex(),
+            )
             self._reg_response_data = "REGREJ"
         elif subclass == IAX_CMD_REGAUTH:
-            logger.info("REGAUTH received (standard) — auth challenge")
+            logger.info("REGAUTH received (standard) — auth challenge payload_hex=%s", payload.hex())
             self._reg_response_data = "REGAUTH"
         elif subclass == 0x28:
-            logger.info("CallToken challenge (0x28) received — auth challenge")
+            logger.info("CallToken challenge (0x28) received payload_hex=%s", payload.hex())
             self._reg_response_data = "REGAUTH"
 
         if self._reg_response_event:
