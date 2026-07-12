@@ -1253,24 +1253,28 @@ class IAX2Server:
         logger.debug("REGREL sent to %s:%d", *addr)
 
     def _send_regreq_with_calltoken(self) -> None:
-        """Send REGREQ with CallToken echoed back + password.
+        """Send REGREQ with CallToken + MD5(challenge + password).
 
-        Called after receiving REGREJ with CallToken IE.
-        The CallToken value from REGREJ is echoed back to signal we
-        acknowledge the CallToken requirement. Password is sent in
-        plaintext (matching iax.conf secret= without auth=md5).
+        Called after receiving REGREJ/REGAUTH with CallToken IE.
+        Per chan_iax2 CallToken auth flow:
+          - IE_USERNAME
+          - IE_CALLTOKEN (echo back the challenge)
+          - IE_MD5_RESPONSE = MD5(CallToken_bytes + password)
 
-        Per chan_iax2 behavior: REGREJ with CallToken means "CallToken
-        required" — echo it back + credentials to proceed.
+        NO plaintext IE_PASSWORD — the MD5 replaces it.
         """
         if self._reg_calltoken is None:
             logger.error("_send_regreq_with_calltoken: no CallToken stored")
             return
 
+        # MD5(CallToken_bytes + password)
+        md5_input = self._reg_calltoken + self._reg_password.encode("utf-8")
+        md5_hash = hashlib.md5(md5_input).digest()
+
         payload = (
             _make_ie(IE_USERNAME, self._reg_username)
-            + _make_ie(IE_PASSWORD, self._reg_password)
             + _make_ie(IE_CALLTOKEN, self._reg_calltoken)
+            + _make_ie(IE_MD5_RESPONSE, md5_hash)
         )
         ts = int((time.monotonic() - self._start_ts) * 1000) & 0xFFFFFFFF
         first_word = 0x8000 | (self._reg_callno & 0x7FFF)
@@ -1286,8 +1290,8 @@ class IAX2Server:
         if self._transport:
             self._transport.sendto(header + payload, addr)
         logger.debug(
-            "REGREQ (CallToken+password) sent to %s:%d payload_hex=%s",
-            *addr, payload.hex(),
+            "REGREQ (CallToken+MD5) sent to %s:%d calltoken_hex=%s md5_hex=%s",
+            *addr, self._reg_calltoken.hex(), md5_hash.hex(),
         )
 
     def _on_datagram(self, data: bytes, addr: tuple[str, int]) -> None:
