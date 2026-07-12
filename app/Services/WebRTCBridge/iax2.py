@@ -1433,11 +1433,26 @@ class IAX2Server:
             logger.info("REGACK received — IAX2 registration successful")
             self._reg_response_data = "REGACK"
         elif subclass == IAX_CMD_REGREJ:
-            logger.warning(
-                "REGREJ received — IAX2 registration rejected payload_hex=%s",
-                payload.hex(),
-            )
-            self._reg_response_data = "REGREJ"
+            # ASL3 sends REGREJ with CallToken IE when calltoken is required.
+            # This is NOT a hard failure — it's a challenge-response prompt.
+            ies = _parse_ies(payload)
+            if IE_CALLTOKEN in ies:
+                self._reg_calltoken = ies[IE_CALLTOKEN]
+                logger.info(
+                    "REGREJ with CallToken challenge: token=%d bytes hex=%s, "
+                    "cause_text=%s",
+                    len(self._reg_calltoken),
+                    self._reg_calltoken.hex(),
+                    ies.get(0x16, b"").decode(errors="replace"),
+                )
+                self._reg_response_data = "REGAUTH"
+            else:
+                logger.warning(
+                    "REGREJ received (no CallToken) — IAX2 registration rejected "
+                    "payload_hex=%s",
+                    payload.hex(),
+                )
+                self._reg_response_data = "REGREJ"
         elif subclass == IAX_CMD_REGAUTH:
             logger.info("REGAUTH received (standard) — auth challenge payload_hex=%s", payload.hex())
             # Extract CallToken IE from REGAUTH payload
