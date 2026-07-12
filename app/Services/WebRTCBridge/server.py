@@ -709,8 +709,11 @@ async def _on_startup(app: web.Application) -> None:
         logger.error("AMI startup failed: %s", exc)
         # Don't crash — health endpoint will show ami_connected=false
 
-    # 3. Register with Asterisk so it knows our IAX2 address
-    if bridge.config.iax_phone_pass:
+    # 3. Register with Asterisk (only if iax.conf uses host=dynamic)
+    #    With host=<IP> (static), Asterisk already knows our address — no registration needed.
+    iax_host_lower = bridge.config.iax_host.lower()
+    is_static_host = iax_host_lower not in ("dynamic", "")
+    if bridge.config.iax_phone_pass and not is_static_host:
         try:
             await bridge.iax_server.register(
                 username=bridge.config.iax_phone_user,
@@ -727,6 +730,12 @@ async def _on_startup(app: web.Application) -> None:
         except (PermissionError, TimeoutError) as exc:
             logger.error("IAX2 registration failed: %s", exc)
             # Don't crash — health endpoint will show registration status
+    elif is_static_host:
+        logger.info(
+            "IAX2 static host '%s:%d' — skipping registration (not needed)",
+            bridge.config.iax_host,
+            bridge.config.iax_port,
+        )
     else:
         logger.warning(
             "IAX_PHONE_PASS not set — skipping IAX2 registration "
