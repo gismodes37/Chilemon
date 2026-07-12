@@ -35,6 +35,7 @@ Offset  Size  Field        Description
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 import struct
 import time
@@ -83,6 +84,7 @@ CONTROL_ANSWER = 0x04
 # -- Information Element types --
 IE_USERNAME = 0x01
 IE_PASSWORD = 0x02
+IE_MD5_RESPONSE = 0x0E   # MD5 authentication response
 IE_CAUSE = 0x04
 IE_CALLING_NUMBER = 0x0A
 IE_CALLING_NAME = 0x0B
@@ -90,6 +92,7 @@ IE_DATAFORMAT = 0x1D
 IE_CODEC = 0x1E
 IE_CALLED_NUMBER = 0x01  # RFC 5456 §8.7
 IE_FORMAT = 0x09         # RFC 5456 §8.7 — codec format bitmask
+IE_CALLTOKEN = 0x2A      # CallToken IE for ASL3 auth challenge
 IE_VERSION = 0x2B
 
 # -- Codec IDs --
@@ -127,6 +130,20 @@ def _make_ie(ie_type: int, value: bytes | str) -> bytes:
     if isinstance(value, str):
         value = value.encode("utf-8")
     return struct.pack("!BB", ie_type, len(value)) + value
+
+
+def _parse_ies(payload: bytes) -> dict[int, bytes]:
+    """Parse IAX2 Information Elements from a payload into a dict."""
+    ies: dict[int, bytes] = {}
+    offset = 0
+    while offset + 2 <= len(payload):
+        ie_type = payload[offset]
+        ie_len = payload[offset + 1]
+        if offset + 2 + ie_len > len(payload):
+            break
+        ies[ie_type] = payload[offset + 2: offset + 2 + ie_len]
+        offset += 2 + ie_len
+    return ies
 
 
 # ---------------------------------------------------------------------------
@@ -1022,6 +1039,13 @@ class IAX2Server:
         self._reg_callno: int = REG_CALLNO & 0x7FFF
         self._reg_response_event: Optional[asyncio.Event] = None
         self._reg_response_data: Optional[str] = None
+        self._reg_calltoken: Optional[bytes] = None  # CallToken from REGAUTH
+
+        # Registration params (stored for REGAUTH retry)
+        self._reg_username: str = ""
+        self._reg_password: str = ""
+        self._reg_host: str = "127.0.0.1"
+        self._reg_port: int = 4569
 
         # -- Public callback --
         self.on_new_call: Optional[Callable[[IAX2Call], Awaitable[None]]] = None
@@ -1086,11 +1110,24 @@ class IAX2Server:
         Sends REGREQ from the server socket (port 9092) so Asterisk learns
         the bridge's address.  Returns True on success.
         Raises PermissionError on REGREJ, TimeoutError on timeout.
+
+        Supports ASL3 CallToken challenge-response:
+        1. Send REGREQ (username + calltoken IE if available)
+        2. Receive REGAUTH(0x28) with CallToken challenge
+        3. Compute MD5(CallToken + password)
+        4. Send REGREQ with CallToken IE + MD5 response (no plaintext password)
         """
         if self._registered:
             return True
         if self._transport is None:
             raise RuntimeError("IAX2 server not started — cannot register")
+
+        # Store params for REGAUTH retry
+        self._reg_username = username
+        self._reg_password = password
+        self._reg_host = host
+        self._reg_port = port
+        self._reg_calltoken = None
 
         self._reg_response_event = asyncio.Event()
         retries = 0
@@ -1098,7 +1135,14 @@ class IAX2Server:
         while retries < MAX_REG_RETRIES:
             self._reg_response_event.clear()
             self._reg_response_data = None
-            self._send_regreq(username, password, (host, port))
+
+            if self._reg_calltoken is not None:
+                # REGAUTH received — send MD5 challenge-response
+                logger.info("Sending REGREQ with CallToken + MD5 response")
+                self._send_regreq_with_calltoken()
+            else:
+                # Initial REGREQ (with calltoken IE if we have one cached)
+                self._send_regreq(username, password, (host, port))
 
             try:
                 await asyncio.wait_for(
@@ -1121,19 +1165,28 @@ class IAX2Server:
 
             if self._reg_response_data == "REGREJ":
                 self._registered = False
+                self._reg_calltoken = None
                 raise PermissionError(
                     "IAX2 registration rejected by Asterisk"
                 )
 
-            # REGAUTH — auth challenge not supported in server mode yet
+            # REGAUTH — CallToken challenge received
             if self._reg_response_data == "REGAUTH":
-                logger.warning(
-                    "REGAUTH received — auth challenge not yet "
-                    "implemented in server mode (calltokenoptional "
-                    "should bypass this for localhost)"
-                )
-                retries += 1
-                continue
+                # CallToken is stored by _on_registration_response
+                if self._reg_calltoken is not None:
+                    logger.info(
+                        "REGAUTH challenge received — CallToken=%d bytes, "
+                        "will send MD5 response next",
+                        len(self._reg_calltoken),
+                    )
+                    retries += 1
+                    continue
+                else:
+                    logger.warning(
+                        "REGAUTH received but no CallToken extracted"
+                    )
+                    retries += 1
+                    continue
 
         raise TimeoutError("IAX2 registration failed after all retries")
 
@@ -1192,6 +1245,48 @@ class IAX2Server:
         if self._transport:
             self._transport.sendto(header, addr)
         logger.debug("REGREL sent to %s:%d", *addr)
+
+    def _send_regreq_with_calltoken(self) -> None:
+        """Send REGREQ with CallToken + MD5 response (no plaintext password).
+
+        Called after receiving REGAUTH(0x28) with a CallToken challenge.
+        Computes MD5(CallToken + password) and sends:
+          - IE_USERNAME
+          - IE_CALLTOKEN (echo back the challenge)
+          - IE_MD5_RESPONSE (hash)
+
+        Per RFC 5456 §10.11 and chan_iax2 CallToken auth flow.
+        """
+        if self._reg_calltoken is None:
+            logger.error("_send_regreq_with_calltoken: no CallToken stored")
+            return
+
+        # MD5(CallToken_bytes + password)
+        md5_input = self._reg_calltoken + self._reg_password.encode("utf-8")
+        md5_hash = hashlib.md5(md5_input).digest()
+
+        payload = (
+            _make_ie(IE_USERNAME, self._reg_username)
+            + _make_ie(IE_CALLTOKEN, self._reg_calltoken)
+            + _make_ie(IE_MD5_RESPONSE, md5_hash)
+        )
+        ts = int((time.monotonic() - self._start_ts) * 1000) & 0xFFFFFFFF
+        first_word = 0x8000 | (self._reg_callno & 0x7FFF)
+        second_word = 0
+        cs = IAX_CMD_REGREQ & 0x7F
+
+        header = struct.pack(
+            "!HHIBBBB",
+            first_word, second_word, ts, 0, 0,
+            IAX_TYPE_IAX, cs,
+        )
+        addr = (self._reg_host, self._reg_port)
+        if self._transport:
+            self._transport.sendto(header + payload, addr)
+        logger.debug(
+            "REGREQ (CallToken+MD5) sent to %s:%d payload_hex=%s",
+            *addr, payload.hex(),
+        )
 
     def _on_datagram(self, data: bytes, addr: tuple[str, int]) -> None:
         """Parse an incoming datagram and dispatch."""
@@ -1345,9 +1440,25 @@ class IAX2Server:
             self._reg_response_data = "REGREJ"
         elif subclass == IAX_CMD_REGAUTH:
             logger.info("REGAUTH received (standard) — auth challenge payload_hex=%s", payload.hex())
+            # Extract CallToken IE from REGAUTH payload
+            ies = _parse_ies(payload)
+            if IE_CALLTOKEN in ies:
+                self._reg_calltoken = ies[IE_CALLTOKEN]
+                logger.info(
+                    "CallToken extracted: %d bytes hex=%s",
+                    len(self._reg_calltoken), self._reg_calltoken.hex(),
+                )
             self._reg_response_data = "REGAUTH"
         elif subclass == 0x28:
             logger.info("CallToken challenge (0x28) received payload_hex=%s", payload.hex())
+            # Extract CallToken IE from 0x28 payload
+            ies = _parse_ies(payload)
+            if IE_CALLTOKEN in ies:
+                self._reg_calltoken = ies[IE_CALLTOKEN]
+                logger.info(
+                    "CallToken extracted from 0x28: %d bytes hex=%s",
+                    len(self._reg_calltoken), self._reg_calltoken.hex(),
+                )
             self._reg_response_data = "REGAUTH"
 
         if self._reg_response_event:
