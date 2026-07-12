@@ -1208,10 +1208,16 @@ class IAX2Server:
         password: str,
         addr: tuple[str, int],
     ) -> None:
-        """Send REGREQ from the server socket."""
+        """Send REGREQ from the server socket.
+
+        Includes an empty CallToken IE to signal CallToken support.
+        With calltokenoptional=127.0.0.1 in iax.conf, Asterisk should
+        accept this without requiring a full challenge-response.
+        """
         payload = (
             _make_ie(IE_USERNAME, username)
             + _make_ie(IE_PASSWORD, password)
+            + _make_ie(IE_CALLTOKEN, b"")  # Empty CallToken signals support
         )
         ts = int((time.monotonic() - self._start_ts) * 1000) & 0xFFFFFFFF
         first_word = 0x8000 | (self._reg_callno & 0x7FFF)
@@ -1247,28 +1253,24 @@ class IAX2Server:
         logger.debug("REGREL sent to %s:%d", *addr)
 
     def _send_regreq_with_calltoken(self) -> None:
-        """Send REGREQ with CallToken + MD5 response (no plaintext password).
+        """Send REGREQ with CallToken echoed back + password.
 
-        Called after receiving REGAUTH(0x28) with a CallToken challenge.
-        Computes MD5(CallToken + password) and sends:
-          - IE_USERNAME
-          - IE_CALLTOKEN (echo back the challenge)
-          - IE_MD5_RESPONSE (hash)
+        Called after receiving REGREJ with CallToken IE.
+        The CallToken value from REGREJ is echoed back to signal we
+        acknowledge the CallToken requirement. Password is sent in
+        plaintext (matching iax.conf secret= without auth=md5).
 
-        Per RFC 5456 §10.11 and chan_iax2 CallToken auth flow.
+        Per chan_iax2 behavior: REGREJ with CallToken means "CallToken
+        required" — echo it back + credentials to proceed.
         """
         if self._reg_calltoken is None:
             logger.error("_send_regreq_with_calltoken: no CallToken stored")
             return
 
-        # MD5(CallToken_bytes + password)
-        md5_input = self._reg_calltoken + self._reg_password.encode("utf-8")
-        md5_hash = hashlib.md5(md5_input).digest()
-
         payload = (
             _make_ie(IE_USERNAME, self._reg_username)
+            + _make_ie(IE_PASSWORD, self._reg_password)
             + _make_ie(IE_CALLTOKEN, self._reg_calltoken)
-            + _make_ie(IE_MD5_RESPONSE, md5_hash)
         )
         ts = int((time.monotonic() - self._start_ts) * 1000) & 0xFFFFFFFF
         first_word = 0x8000 | (self._reg_callno & 0x7FFF)
@@ -1284,7 +1286,7 @@ class IAX2Server:
         if self._transport:
             self._transport.sendto(header + payload, addr)
         logger.debug(
-            "REGREQ (CallToken+MD5) sent to %s:%d payload_hex=%s",
+            "REGREQ (CallToken+password) sent to %s:%d payload_hex=%s",
             *addr, payload.hex(),
         )
 
