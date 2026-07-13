@@ -94,6 +94,39 @@ class AudioVisualizer {
     }
 
     /**
+     * Feed pre-computed spectrum metadata from companion app.
+     * Call this when receiving audio_level WS messages.
+     * @param {number} rms  RMS level 0..1
+     * @param {number[]} spectrum  Array of 4 bin levels 0..1
+     */
+    feedMetadata(rms, spectrum) {
+        this._lastFeed = Date.now();
+        const bins = spectrum || [0, 0, 0, 0];
+
+        // Map the 4 companion bins across the 48 visualizer bars
+        for (let b = 0; b < this.barCount; b++) {
+            const t = b / this.barCount;
+            // Interpolate from 4 bins to barCount bars
+            const binIdx = Math.min(Math.floor(t * bins.length), bins.length - 1);
+            const frac = (t * bins.length) - binIdx;
+            const nextIdx = Math.min(binIdx + 1, bins.length - 1);
+            const value = bins[binIdx] * (1 - frac) + bins[nextIdx] * frac;
+
+            // Smooth towards target (same smoothing as FFT path)
+            const prev = this.bars[b];
+            this.bars[b] = prev + (value - prev) * (1 - this.smoothFactor);
+
+            // Update peak
+            if (this.bars[b] > this.peaks[b]) {
+                this.peaks[b] = this.bars[b];
+            }
+        }
+
+        // Optionally use rms for a brightness/scale factor
+        this._rms = rms;
+    }
+
+    /**
      * Feed raw PCM float32 samples into the visualizer.
      * Call this from your audio RX/TX handlers.
      * @param {Float32Array|Array<number>} samples

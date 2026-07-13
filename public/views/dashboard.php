@@ -163,6 +163,11 @@ $systemInfo = $systemInfo ?? [
                         title="Configuración de audio">
                         <i class="bi bi-sliders"></i> Audio
                     </button>
+                    <button class="btn btn-outline-secondary" id="btn-companion-download"
+                        onclick="window.open('https://github.com/gismodes37/Chilemon/releases/latest', '_blank')"
+                        title="Descargar Companion App (audio nativo)">
+                        <i class="bi bi-download"></i> Companion App
+                    </button>
                     <button class="btn btn-outline-danger" id="btn-restart-asterisk"
                         onclick="confirmarReinicio('Asterisk', 'restart-asterisk')"
                         title="Reiniciar el servicio Asterisk">

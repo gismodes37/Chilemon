@@ -1,0 +1,24 @@
+# ChileMon Companion App Configuration
+# Copy this file to ~/.chilemon/config.toml and edit.
+
+[asterisk]
+host = "127.0.0.1"
+port = 4569
+
+[peer]
+username = "companion-app"
+password = "CHANGE_ME"
+
+[audio]
+input_device = ""       # empty = default device
+output_device = ""      # empty = default device
+sample_rate = 8000      # ulaw is 8 kHz
+frames_per_buffer = 160 # 20ms at 8 kHz
+
+[ws]
+bind_host = "127.0.0.1"
+bind_port = 9093
+
+[logging]
+level = "INFO"          # DEBUG, INFO, WARNING, ERROR
+file = ""               # empty = stdout
