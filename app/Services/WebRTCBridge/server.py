@@ -413,7 +413,7 @@ class WebRTCBridgeApp:
             )
             await self.ami.originate(
                 channel=f"IAX2/webrtc-bridge/{self.config.asl_node}",
-                context="webrtc",
+                context="radio-ptt",
                 exten=self.config.asl_node,
                 priority=1,
                 callerid=f"\"WebRTC\" <{self.config.asl_node}>",
@@ -441,6 +441,10 @@ class WebRTCBridgeApp:
             "reconnecting": reconnecting,
         }
         msg = json.dumps(status)
+        logger.debug(
+            "Broadcasting status: in_call=%s reconnecting=%s peers=%d",
+            in_call, reconnecting, len(self._ws_peers),
+        )
         for ws in list(self._ws_peers):
             try:
                 await ws.send_str(msg)

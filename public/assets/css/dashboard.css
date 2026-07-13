@@ -825,6 +825,34 @@ html, body{
     cursor: not-allowed;
 }
 
+/* Connect button — shown before AudioContext unlock */
+.ptt-connect-btn {
+    display: block;
+    width: 100%;
+    padding: 8px 12px;
+    margin-bottom: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    background: linear-gradient(135deg, #1a7a4c, #0d5c33);
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.ptt-connect-btn:hover:not(:disabled) {
+    background: linear-gradient(135deg, #22a060, #1a7a4c);
+    box-shadow: 0 0 10px rgba(26, 122, 76, 0.4);
+}
+
+.ptt-connect-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 /* PTT active (transmitting) state */
 .ptt-button.ptt-active {
     background: radial-gradient(circle at 30% 30%, #dc3545, #8a1a1a);

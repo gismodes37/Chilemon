@@ -146,13 +146,14 @@ class PTTWidget {
     //  Public API
     // ---------------------------------------------------------------
 
-    /** Initialize: create DOM, bind events, fetch token, connect. */
+    /** Initialize: create DOM, bind events. Does NOT connect yet —
+     *  user must click "Connect" to trigger AudioContext + WS. */
     init() {
         this._createDOM();
         this._bindGlobalEvents();
         this._startStatusPolling();
         this._initVisualizer();
-        this._fetchToken();
+        // Do NOT auto-connect — wait for user gesture (Connect button)
     }
 
     /** Wire up the spectrum visualizer if the canvas exists. */
@@ -239,6 +240,10 @@ class PTTWidget {
             this.connected = true;
             this.reconnectAttempts = 0;
             this._setStatus('connected', 'Bridge Connected');
+            // Hide connect button — WS is live
+            if (this.connectBtn) {
+                this.connectBtn.style.display = 'none';
+            }
             this._updateUI();
         };
 
@@ -248,6 +253,12 @@ class PTTWidget {
             this._inCall = false;
             this._hasHadCall = false;
             this._setStatus('disconnected', 'Disconnected');
+            // Show connect button again
+            if (this.connectBtn) {
+                this.connectBtn.style.display = '';
+                this.connectBtn.disabled = false;
+                this.connectBtn.innerHTML = '<i class="bi bi-plug"></i> Connect';
+            }
             this._updateUI();
             this._scheduleReconnect();
         };
@@ -405,6 +416,10 @@ class PTTWidget {
                 this.connected = true;
             }
             this._setStatus('connected', 'Bridge Connected');
+            // Hide connect button once we have a call
+            if (this.connectBtn) {
+                this.connectBtn.style.display = 'none';
+            }
         } else if (this.connected && this._hasHadCall) {
             // Call dropped after being established — show error
             this._setStatus('error', 'Call dropped');
@@ -424,7 +439,10 @@ class PTTWidget {
     _handleHexAudio(hexStr, sampleRate) {
         // Convert hex to float32 array
         const bytes = this._hexToBytes(hexStr);
-        if (!bytes || bytes.length < 4) return;
+        if (!bytes || bytes.length < 4) {
+            console.warn('[RX-AUDIO] hexToBytes failed or too short:', hexStr?.length, '→ bytes:', bytes?.length);
+            return;
+        }
 
         const floatCount = Math.floor(bytes.length / 4);
         const floats = new Float32Array(floatCount);
@@ -437,6 +455,8 @@ class PTTWidget {
             rms += sample * sample;
         }
         rms = Math.sqrt(rms / floatCount);
+
+        console.log('[RX-AUDIO] hex=%d bytes → %d floats, rms=%.6f, rate=%d', hexStr.length, floatCount, rms, sampleRate);
 
         // Update volume
         this._pushVolume(rms);
@@ -474,7 +494,10 @@ class PTTWidget {
     /** Play an AudioBuffer from float32 PCM data. */
     _playAudioBuffer(samples, sampleRate) {
         // Wait for user gesture to create AudioContext
-        if (!this.audioCtx || !this._audioReady) return;
+        if (!this.audioCtx || !this._audioReady) {
+            console.warn('[RX-AUDIO] Skipped: audioCtx=%s _audioReady=%s', !!this.audioCtx, this._audioReady);
+            return;
+        }
 
         try {
             if (this.audioCtx.state === 'suspended') {
@@ -494,7 +517,9 @@ class PTTWidget {
             this._audioSource.buffer = buf;
             this._audioSource.connect(this._rxGainNode);
             this._audioSource.start(0);
-        } catch (_) { /* audio not available */ }
+        } catch (err) {
+            console.error('[RX-AUDIO] Playback error:', err.message, 'samples:', samples.length, 'rate:', sampleRate, 'ctxState:', this.audioCtx?.state);
+        }
     }
 
     // ---------------------------------------------------------------
@@ -821,12 +846,15 @@ class PTTWidget {
         this.widget.innerHTML = `
             <div class="ptt-header">
                 <span class="ptt-status-dot ptt-status-disconnected" id="ptt-status-dot"></span>
-                <span class="ptt-status-text" id="ptt-status-text">Initializing...</span>
+                <span class="ptt-status-text" id="ptt-status-text">Disconnected</span>
             </div>
             <div class="ptt-volume-bar" id="ptt-volume-bar">
                 <div class="ptt-volume-fill" id="ptt-volume-fill"></div>
             </div>
-            <button class="ptt-button" id="ptt-button" title="Push to Talk (hold spacebar)" aria-label="Push to Talk">
+            <button class="ptt-connect-btn" id="ptt-connect-btn" title="Connect to bridge">
+                <i class="bi bi-plug"></i> Connect
+            </button>
+            <button class="ptt-button" id="ptt-button" title="Push to Talk (hold spacebar)" aria-label="Push to Talk" disabled>
                 <i class="bi bi-mic"></i>
             </button>
             <div class="ptt-label" id="ptt-label">PTT</div>
@@ -841,6 +869,15 @@ class PTTWidget {
         this.statusText = this.widget.querySelector('#ptt-status-text');
         this.volumeFill = this.widget.querySelector('#ptt-volume-fill');
         this.volumeContainer = this.widget.querySelector('#ptt-volume-bar');
+        this.connectBtn = this.widget.querySelector('#ptt-connect-btn');
+
+        // Connect button: user gesture (AudioContext) + WS connect
+        this.connectBtn.addEventListener('click', () => {
+            this._onUserGesture();   // creates AudioContext (user gesture)
+            this.connectBtn.disabled = true;
+            this.connectBtn.textContent = 'Connecting...';
+            this._fetchToken();      // fetch token + open WS
+        });
 
         // Bind widget-specific events
         this.pttButton.addEventListener('mousedown', (e) => {
