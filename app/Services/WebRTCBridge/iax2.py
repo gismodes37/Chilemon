@@ -602,9 +602,11 @@ class IAX2Session:
         f = (type_field >> 15) & 1
 
         if f:
-            self._on_mini_frame(data)
-        else:
+            # F=1 → Full frame (RFC 5456 §4.2, bit 15 set)
             self._on_full_frame(data)
+        else:
+            # F=0 → Mini frame (voice, 4-byte header)
+            self._on_mini_frame(data)
 
     def _on_mini_frame(self, data: bytes) -> None:
         """Handle incoming mini frame (voice from Asterisk)."""
@@ -614,6 +616,11 @@ class IAX2Session:
 
         type_field, _ts_low = struct.unpack("!HH", data[:4])
         callno = type_field & 0x7FFF
+
+        logger.debug(
+            "RX mini frame: callno=%d len=%d",
+            callno, len(data),
+        )
 
         voice_payload = data[4:]
         if voice_payload and self.on_audio_frame:
@@ -639,13 +646,6 @@ class IAX2Session:
         # Track incoming sequence number
         if c == 0:
             self._iseqno = oseqno
-
-        dst_callno = second_word & 0x7FFF
-        logger.info(
-            "RX full frame: type=0x%02X subclass=0x%02X src=%d dst=%d len=%d payload_hex=%s",
-            frametype, subclass, src_callno, dst_callno, len(payload),
-            payload.hex()[:64] if payload else "",
-        )
 
         # Dispatch by frame type
         if frametype == IAX_TYPE_IAX:
