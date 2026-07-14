@@ -179,8 +179,10 @@ class CompanionSession:
     async def place_call(self, node: str = "") -> None:
         """Place an IAX2 call to the given ASL node.
 
-        If already in a call, hangs up first so Asterisk doesn't get
-        confused by concurrent calls from the same static peer.
+        If already in a call, logs a warning but still attempts the new call.
+        The caller should hang up first for reliable operation — Asterisk 22
+        (ASL3) may reject concurrent calls from the same static peer beyond
+        the 2nd one.
         """
         target = node or self._node
         if not target:
@@ -190,12 +192,9 @@ class CompanionSession:
             logger.warning("Cannot call: not registered")
             return
 
-        # Hang up any existing call before placing a new one
         if self._in_call:
-            logger.info("In call — hanging up first before new call to %s", target)
-            await self.hangup_call()
-            # Small settling delay so Asterisk cleans up the channel
-            await asyncio.sleep(0.5)
+            logger.warning("Already in a call — place_call proceeding anyway; "
+                           "client should hang up first for reliability")
 
         try:
             logger.info("Starting call to node %s", target)
