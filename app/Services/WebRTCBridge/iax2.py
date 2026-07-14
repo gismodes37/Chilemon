@@ -343,7 +343,12 @@ class IAX2Session:
         if not self.is_registered:
             raise RuntimeError("Cannot call: not registered")
 
-        self._callno = 0x0001
+        # Use a fresh call number each time to avoid conflicts with
+        # stale Asterisk channels that still reference the old callno
+        next_callno = self._callno + 1
+        if next_callno > 0x7FFE:
+            next_callno = 0x0001
+        self._callno = next_callno
         self._dest_callno = 0
         self._state = self.STATE_CALLING
 
