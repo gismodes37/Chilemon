@@ -444,7 +444,8 @@ class IAX2Session:
 
     def _send_regreq(self) -> None:
         payload = (
-            _make_ie(IE_USERNAME, self.username)
+            _make_ie(IE_USERNAME, self.username)  # 0x01 = CALLED_NUMBER → caller_number
+            + _make_ie(IE_CALLING_NAME, self.username)  # 0x0B = CALLING_NAME → caller_name
             + _make_ie(IE_PASSWORD, self.password)
         )
         self._send_full_frame(

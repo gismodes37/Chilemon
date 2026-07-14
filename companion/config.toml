@@ -8,6 +8,7 @@ port = 4569
 [peer]
 username = "companion-app"
 password = "CHANGE_ME"
+skip_registration = true     # true for static peer in iax.conf; false for dynamic auth
 
 [audio]
 input_device = ""       # empty = default device

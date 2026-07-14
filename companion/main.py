@@ -76,6 +76,7 @@ class CompanionApp:
             username=peer_cfg.get("username", "companion-app"),
             password=peer_cfg.get("password", ""),
             node=config.get("node", ""),
+            skip_registration=peer_cfg.get("skip_registration", True),
         )
 
         # Audio

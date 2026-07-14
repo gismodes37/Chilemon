@@ -37,12 +37,14 @@ class CompanionSession:
         username: str = "companion-app",
         password: str = "",
         node: str = "",
+        skip_registration: bool = True,
     ) -> None:
         self._host = host
         self._port = port
         self._username = username
         self._password = password
         self._node = node
+        self._skip_registration = skip_registration
 
         self._session: Optional[IAX2Session] = None
         self._registered = False
@@ -121,30 +123,35 @@ class CompanionSession:
     # -- Registration --
 
     async def _register_with_retry(self) -> None:
-        """Attempt registration with retries and exponential backoff."""
-        delay = REG_RETRY_DELAY
-        for attempt in range(1, MAX_REG_RETRIES + 1):
-            try:
-                if self._session is None:
-                    raise RuntimeError("Session not created")
-                success = await self._session.register()
-                if success:
-                    self._registered = True
-                    logger.info("Registered as '%s' (attempt %d)", self._username, attempt)
-                    await self._emit_status()
-                    return
-            except (PermissionError, TimeoutError, ConnectionError, RuntimeError) as exc:
-                logger.warning(
-                    "Registration attempt %d/%d failed: %s",
-                    attempt, MAX_REG_RETRIES, exc,
-                )
+        """Attempt registration if not configured to skip it.
 
-            if attempt < MAX_REG_RETRIES:
-                await asyncio.sleep(delay)
-                delay = min(delay * 1.5, 15.0)
+        With a static peer (host=127.0.0.1:9094 in iax.conf), Asterisk
+        already knows our address — registration is unnecessary.
+        When skip_registration=True we skip the 15s timeout entirely.
+        """
+        if self._skip_registration:
+            # Static peer — Asterisk knows our address from iax.conf
+            self._registered = True
+            if self._session is not None:
+                self._session._state = 2  # STATE_REGISTERED
+            logger.info("Static peer — registration skipped, starting immediately")
+            await self._emit_status()
+            return
+
+        try:
+            if self._session is None:
+                raise RuntimeError("Session not created")
+            success = await self._session.register()
+            if success:
+                self._registered = True
+                logger.info("Registered as '%s'", self._username)
+                await self._emit_status()
+                return
+        except (PermissionError, TimeoutError, ConnectionError, RuntimeError) as exc:
+            logger.warning("Registration attempt failed: %s", exc)
 
         self._registered = False
-        logger.error("Registration failed after %d attempts", MAX_REG_RETRIES)
+        logger.error("Registration failed after all attempts")
         await self._emit_status(error="Registration failed")
 
     async def _reconnect(self) -> None:
