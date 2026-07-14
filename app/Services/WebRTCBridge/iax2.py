@@ -580,6 +580,10 @@ class IAX2Session:
             frametype & 0xFF,
             cs & 0xFF,
         )
+        logger.debug(
+            "TX frame: type=0x%02X subclass=0x%02X dst=%d src=%d len=%d",
+            frametype, subclass, dest_callno, src, len(payload),
+        )
         self._transport_send(header + payload)
 
     def _transport_send(self, data: bytes) -> None:

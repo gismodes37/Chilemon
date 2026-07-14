@@ -187,6 +187,14 @@ class CompanionSession:
             return
 
         try:
+            logger.info("Starting call to node %s via new_call", target)
+            # Log transport state before call
+            if self._session is not None:
+                transport = getattr(self._session, '_transport', None)
+                logger.info("Transport state: transport=%s, state=%s, callno=%s",
+                    transport is not None,
+                    self._session._state,
+                    self._session._callno)
             success = await self._session.start_call(target)
             if success:
                 self._in_call = True
