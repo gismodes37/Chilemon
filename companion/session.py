@@ -130,11 +130,14 @@ class CompanionSession:
         When skip_registration=True we skip the 15s timeout entirely.
         """
         if self._skip_registration:
-            # Static peer — Asterisk knows our address from iax.conf
-            self._registered = True
+            # Static peer — Asterisk knows our address from iax.conf.
+            # Still need to connect() so the UDP transport is established
+            # for sending/receiving IAX2 frames.
             if self._session is not None:
+                await self._session.connect()
                 self._session._state = 2  # STATE_REGISTERED
-            logger.info("Static peer — registration skipped, starting immediately")
+            self._registered = True
+            logger.info("Static peer — registration skipped, transport connected")
             await self._emit_status()
             return
 
