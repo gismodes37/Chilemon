@@ -21,5 +21,5 @@ bind_host = "127.0.0.1"
 bind_port = 9093
 
 [logging]
-level = "DEBUG"         # DEBUG, INFO, WARNING, ERROR
+level = "INFO"          # DEBUG, INFO, WARNING, ERROR
 file = ""               # empty = stdout

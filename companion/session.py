@@ -177,7 +177,11 @@ class CompanionSession:
     # -- Call management --
 
     async def place_call(self, node: str = "") -> None:
-        """Place an IAX2 call to the given ASL node."""
+        """Place an IAX2 call to the given ASL node.
+
+        If already in a call, hangs up first so Asterisk doesn't get
+        confused by concurrent calls from the same static peer.
+        """
         target = node or self._node
         if not target:
             logger.warning("place_call: no node number configured")
@@ -186,15 +190,21 @@ class CompanionSession:
             logger.warning("Cannot call: not registered")
             return
 
+        # Hang up any existing call before placing a new one
+        if self._in_call:
+            logger.info("In call — hanging up first before new call to %s", target)
+            await self.hangup_call()
+            # Small settling delay so Asterisk cleans up the channel
+            await asyncio.sleep(0.5)
+
         try:
-            logger.info("Starting call to node %s via new_call", target)
+            logger.info("Starting call to node %s", target)
             # Log transport state before call
-            if self._session is not None:
-                transport = getattr(self._session, '_transport', None)
-                logger.info("Transport state: transport=%s, state=%s, callno=%s",
-                    transport is not None,
-                    self._session._state,
-                    self._session._callno)
+            transport = getattr(self._session, '_transport', None)
+            logger.info("Transport state: transport=%s, state=%s, callno=%s",
+                transport is not None,
+                self._session._state,
+                self._session._callno)
             success = await self._session.start_call(target)
             if success:
                 self._in_call = True
