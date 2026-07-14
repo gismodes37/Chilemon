@@ -467,7 +467,7 @@ class IAX2Session:
     def _send_new(self, called_number: str) -> None:
         payload = (
             _make_ie(IE_CALLED_NUMBER, called_number)
-            + _make_ie(IE_CODEC, struct.pack("!H", CODEC_ULAW))
+            + _make_ie(IE_FORMAT, struct.pack("!I", CODEC_ULAW))
         )
         self._send_full_frame(
             dest_callno=0,
