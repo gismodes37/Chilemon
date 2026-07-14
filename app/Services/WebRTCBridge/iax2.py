@@ -640,9 +640,11 @@ class IAX2Session:
         if c == 0:
             self._iseqno = oseqno
 
-        logger.debug(
-            "RX frame: type=0x%02X subclass=0x%02X src=%d len=%d",
-            frametype, subclass, src_callno, len(payload),
+        dst_callno = second_word & 0x7FFF
+        logger.info(
+            "RX full frame: type=0x%02X subclass=0x%02X src=%d dst=%d len=%d payload_hex=%s",
+            frametype, subclass, src_callno, dst_callno, len(payload),
+            payload.hex()[:64] if payload else "",
         )
 
         # Dispatch by frame type
