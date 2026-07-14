@@ -48,9 +48,9 @@ log_info "Python version: $PYTHON_VERSION"
 log_info "Installing system dependencies..."
 if command -v apt-get &>/dev/null; then
     sudo apt-get update -qq
-    sudo apt-get install -y -qq python3-pip portaudio19-dev python3-pyaudio 2>/dev/null || true
+    sudo apt-get install -y -qq python3-pip python3-sounddevice python3-numpy 2>/dev/null || true
 elif command -v yum &>/dev/null; then
-    sudo yum install -y portaudio-devel python3-pip 2>/dev/null || true
+    sudo yum install -y python3-pip portaudio-devel 2>/dev/null || true
 elif command -v pacman &>/dev/null; then
     sudo pacman -S --noconfirm portaudio python-pip 2>/dev/null || true
 else
@@ -68,7 +68,7 @@ cp -r "$REPO_ROOT/companion/"* "$INSTALL_DIR/"
 # --- Install Python dependencies ---
 log_info "Installing Python packages..."
 pip3 install --upgrade pip --quiet
-pip3 install pyaudio aiohttp tomli-w --quiet
+pip3 install sounddevice aiohttp numpy --quiet
 
 # --- Create default config ---
 if [ ! -f "$CONFIG_DIR/config.toml" ]; then

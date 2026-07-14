@@ -1,37 +1,161 @@
 """
-companion/audio.py -- Native audio capture and playback via pyaudio.
+companion/audio.py -- Native audio capture and playback via sounddevice.
 
-Handles mic input (TX) and speaker output (RX) using PortAudio.
+Handles mic input (TX) and speaker output (RX) using PortAudio via sounddevice.
 Converts between ulaw (IAX2 codec) and PCM (native audio format).
 Extracts RMS and FFT metadata for browser visualizer.
+
+NOTE: audioop was removed in Python 3.13. We implement ulaw encode/decode
+manually using the standard G.711 μ-law companding algorithm.
 """
 
 from __future__ import annotations
 
-import audioop
 import logging
 import math
 import struct
 import threading
 from typing import Callable, Optional
 
+import numpy as np
+
 try:
-    import pyaudio
+    import sounddevice as sd
 except ImportError:
-    pyaudio = None  # type: ignore[assignment]
+    sd = None  # type: ignore[assignment]
 
 logger = logging.getLogger("companion.audio")
 
 # Audio constants
-FORMAT = pyaudio.paInt16 if pyaudio else 8  # 16-bit PCM
-CHANNELS = 1
 RATE = 8000  # ulaw is 8 kHz
 FRAMES_PER_BUFFER = 160  # 20 ms at 8000 Hz
-ULAW_INPUT_SCALE = 1 / 32768.0  # s16 → float for RMS
+DTYPE = "int16"  # 16-bit PCM
+ULAW_INPUT_SCALE = 1 / 32768.0  # s16 -> float for RMS
+
+# ---------------------------------------------------------------------------
+# G.711 μ-law encode/decode (replaces deprecated audioop)
+# ---------------------------------------------------------------------------
+
+# μ-law lookup table: 8-bit ulaw -> int16 PCM
+_ULAW_DECODE_TABLE: list[int] = []
+# Seed the table
+_BIAS = 0x84  # bias for linear code
+for _mag in range(128):
+    _mant = _mag << 4
+    _seg = (_mag >> 4) & 0x07
+    if _seg == 0:
+        _decoded = _mant << 2
+    elif _seg == 1:
+        _decoded = (_mant << 3) + 0x100
+    elif _seg == 2:
+        _decoded = (_mant << 4) + 0x200
+    elif _seg == 3:
+        _decoded = (_mant << 5) + 0x400
+    elif _seg == 4:
+        _decoded = (_mant << 6) + 0x800
+    elif _seg == 5:
+        _decoded = (_mant << 7) + 0x1000
+    elif _seg == 6:
+        _decoded = (_mant << 8) + 0x2000
+    else:  # seg == 7
+        _decoded = (_mant << 9) + 0x4000
+    _ULAW_DECODE_TABLE.append(_decoded)
+
+# μ-law encode table (int16 PCM segment -> exponent)
+_ULAW_ENCODE_SEG: list[int] = [
+    0, 0, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3,
+    4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
+    5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
+    5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
+    6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
+    6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
+    6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
+    6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
+    7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+    7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+    7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+    7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+    7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+    7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+    7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+    7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+]
+
+
+def ulaw2lin(ulaw_data: bytes) -> bytes:
+    """Decode μ-law bytes to 16-bit linear PCM (little-endian).
+
+    Replaces audioop.ulaw2lin(data, 2).
+    """
+    pcm = bytearray(len(ulaw_data) * 2)
+    for i, ulaw_byte in enumerate(ulaw_data):
+        ulaw_val = ~ulaw_byte & 0xFF  # invert (μ-law uses ones-complement)
+        sign = ulaw_val & 0x80
+        magnitude = ulaw_val & 0x7F
+        decoded = _ULAW_DECODE_TABLE[magnitude]
+        if sign:
+            decoded = -decoded
+        pcm[i * 2:i * 2 + 2] = struct.pack("<h", decoded)
+    return bytes(pcm)
+
+
+def lin2ulaw(pcm_data: bytes) -> bytes:
+    """Encode 16-bit linear PCM (little-endian) to μ-law bytes.
+
+    Replaces audioop.lin2ulaw(data, 2).
+    """
+    ulaw = bytearray(len(pcm_data) // 2)
+    for i in range(0, len(pcm_data), 2):
+        sample = struct.unpack("<h", pcm_data[i:i + 2])[0]
+
+        # Get sign and magnitude
+        if sample >= 0:
+            sign = 0x00
+            abs_sample = sample
+        else:
+            sign = 0x80
+            abs_sample = -sample
+
+        # Clamp to 13-bit range (0-8159)
+        if abs_sample > 8159:
+            abs_sample = 8159
+
+        # Compand: determine exponent (segment) and mantissa
+        # abs_sample is a 13-bit signed value (s12)
+        # Normalize to 13-bit: shift until top 4 bits fit
+        comp = abs_sample + _BIAS
+        seg = _ULAW_ENCODE_SEG[abs_sample >> 4]
+        if seg == 0:
+            mant = (comp >> 2) & 0x0F
+        elif seg == 1:
+            mant = (comp >> 3) & 0x0F
+        elif seg == 2:
+            mant = (comp >> 4) & 0x0F
+        elif seg == 3:
+            mant = (comp >> 5) & 0x0F
+        elif seg == 4:
+            mant = (comp >> 6) & 0x0F
+        elif seg == 5:
+            mant = (comp >> 7) & 0x0F
+        elif seg == 6:
+            mant = (comp >> 8) & 0x0F
+        else:  # seg == 7
+            mant = (comp >> 9) & 0x0F
+
+        # Combine: sign | segment | mantissa, then invert (μ-law ones-complement)
+        ulaw_val = sign | (seg << 4) | mant
+        ulaw[i // 2] = ~ulaw_val & 0xFF
+
+    return bytes(ulaw)
+
+
+# ---------------------------------------------------------------------------
+# Audio Engine
+# ---------------------------------------------------------------------------
 
 
 class AudioEngine:
-    """Manages mic capture and speaker playback via pyaudio.
+    """Manages mic capture and speaker playback via sounddevice.
 
     Provides callbacks for:
     - TX: captured ulaw frames ready to send
@@ -47,12 +171,13 @@ class AudioEngine:
         self._input_device = input_device
         self._output_device = output_device
 
-        self._pa: Optional[pyaudio.PyAudio] = None
-        self._input_stream: Optional["pyaudio.Stream"] = None
-        self._output_stream: Optional["pyaudio.Stream"] = None
         self._running = False
-        self._rx_buffer: list[bytes] = []
+        self._input_stream: Optional[sd.InputStream] = None
+        self._output_stream: Optional[sd.OutputStream] = None
+
+        # Thread safety for RX queue
         self._lock = threading.Lock()
+        self._rx_queue: list[bytes] = []
 
         # Callbacks
         self.on_tx_audio: Optional[Callable[[bytes], None]] = None
@@ -61,57 +186,67 @@ class AudioEngine:
     # -- Lifecycle --
 
     def start(self) -> None:
-        """Initialize PyAudio and open input/output streams."""
-        if pyaudio is None:
-            logger.error("pyaudio not installed — audio disabled")
+        """Open audio streams and start capture/playback."""
+        if sd is None:
+            logger.warning("sounddevice not installed — audio disabled")
+            self._running = False
             return
 
-        self._pa = pyaudio.PyAudio()
         self._running = True
 
-        # Open input stream (mic)
-        try:
-            input_dev_idx = self._resolve_device(self._input_device, is_input=True)
-            self._input_stream = self._pa.open(
-                format=FORMAT,
-                channels=CHANNELS,
-                rate=RATE,
-                input=True,
-                input_device_index=input_dev_idx,
-                frames_per_buffer=FRAMES_PER_BUFFER,
-                stream_callback=self._input_callback,
-            )
-            logger.info(
-                "Audio input opened (device=%s)", input_dev_idx if input_dev_idx is not None else "default"
-            )
-        except Exception as exc:
-            logger.error("Failed to open audio input: %s", exc)
+        # Resolve device IDs
+        input_id = self._resolve_device(self._input_device, is_input=True)
+        output_id = self._resolve_device(self._output_device, is_input=False)
 
-        # Open output stream (speaker)
+        logger.info(
+            "Starting audio: input=%s (%s), output=%s (%s)",
+            self._input_device or "default",
+            input_id,
+            self._output_device or "default",
+            output_id,
+        )
+
+        # Input stream (mic) — callback pushes TX audio
         try:
-            output_dev_idx = self._resolve_device(self._output_device, is_input=False)
-            self._output_stream = self._pa.open(
-                format=FORMAT,
-                channels=CHANNELS,
-                rate=RATE,
-                output=True,
-                output_device_index=output_dev_idx,
-                frames_per_buffer=FRAMES_PER_BUFFER,
-                stream_callback=self._output_callback,
+            self._input_stream = sd.InputStream(
+                samplerate=RATE,
+                blocksize=FRAMES_PER_BUFFER,
+                device=input_id,
+                channels=1,
+                dtype=DTYPE,
+                callback=self._input_callback,
             )
-            logger.info(
-                "Audio output opened (device=%s)", output_dev_idx if output_dev_idx is not None else "default"
-            )
+            self._input_stream.start()
         except Exception as exc:
-            logger.error("Failed to open audio output: %s", exc)
+            logger.warning("Failed to open input stream: %s", exc)
+            self._input_stream = None
+
+        # Output stream (speaker) — callback pulls RX audio
+        try:
+            self._output_stream = sd.OutputStream(
+                samplerate=RATE,
+                blocksize=FRAMES_PER_BUFFER,
+                device=output_id,
+                channels=1,
+                dtype=DTYPE,
+                callback=self._output_callback,
+            )
+            self._output_stream.start()
+        except Exception as exc:
+            logger.warning("Failed to open output stream: %s", exc)
+            self._output_stream = None
+
+        if self._input_stream is None and self._output_stream is None:
+            logger.warning("No audio streams opened — audio is disabled")
+            self._running = False
 
     def stop(self) -> None:
-        """Close audio streams and terminate PyAudio."""
+        """Stop and close audio streams."""
         self._running = False
 
         if self._input_stream is not None:
             try:
-                self._input_stream.stop_stream()
+                self._input_stream.stop()
                 self._input_stream.close()
             except Exception:
                 pass
@@ -119,149 +254,168 @@ class AudioEngine:
 
         if self._output_stream is not None:
             try:
-                self._output_stream.stop_stream()
+                self._output_stream.stop()
                 self._output_stream.close()
             except Exception:
                 pass
             self._output_stream = None
 
-        if self._pa is not None:
-            self._pa.terminate()
-            self._pa = None
+        logger.info("Audio stopped")
 
-        logger.info("Audio engine stopped")
+    @property
+    def is_running(self) -> bool:
+        """Whether audio streams are active."""
+        return self._running
 
-    # -- RX: receive ulaw from IAX2 and play --
+    # -- RX: playback (called from session when audio arrives) --
 
     def play_ulaw(self, ulaw_payload: bytes) -> None:
-        """Queue received ulaw audio for playback.
-
-        Called from session.py when audio frames arrive from Asterisk.
-        Converts ulaw to PCM s16 and writes to a thread-safe buffer
-        consumed by the output stream callback.
-        """
-        if not self._running:
+        """Queue received ulaw audio for speaker playback."""
+        if not self._running or self._output_stream is None:
             return
-        try:
-            # ulaw → PCM s16le
-            pcm_s16 = audioop.ulaw2lin(ulaw_payload, 2)
-            with self._lock:
-                self._rx_buffer.append(pcm_s16)
+        with self._lock:
+            self._rx_queue.append(ulaw_payload)
 
-            # Compute RMS for visualizer
-            rms, spectrum = self._compute_levels(ulaw_payload)
-            if self.on_levels:
-                self.on_levels(rms, spectrum)
-        except Exception as exc:
-            logger.warning("play_ulaw error: %s", exc)
+    # -- TX: capture (called from input callback) --
 
-    # -- TX: capture mic and convert to ulaw --
+    def send_audio(self, ulaw_payload: bytes) -> None:
+        """Forward mic audio to IAX2 session (called from input callback).
+
+        This is typically called by the input_callback, not directly.
+        """
+        if self.on_tx_audio and ulaw_payload:
+            self.on_tx_audio(ulaw_payload)
+
+    # -- Audio callbacks (sounddevice) --
 
     def _input_callback(
         self,
-        in_data: bytes,
-        frame_count: int,
-        time_info: dict,
-        status_flags: int,
-    ) -> tuple[Optional[bytes], int]:
-        """Callback from pyaudio input stream — mic data ready.
+        indata: np.ndarray,
+        frames: int,
+        time_info: object,
+        status: sd.CallbackFlags,
+    ) -> None:
+        """Called by sounddevice when mic data is available.
 
-        Converts PCM s16 to ulaw and fires on_tx_audio callback.
+        Converts PCM int16 -> ulaw and fires on_tx_audio.
         """
-        if not self._running or in_data is None:
-            return (None, pyaudio.paAbort if pyaudio else 0)
+        if status:
+            logger.debug("Input callback status: %s", status)
 
-        try:
-            # PCM s16le → ulaw
-            ulaw = audioop.lin2ulaw(in_data, 2)
+        if not self._running or self.on_tx_audio is None:
+            return
 
-            if self.on_tx_audio:
-                self.on_tx_audio(ulaw)
-        except Exception as exc:
-            logger.warning("Input callback error: %s", exc)
+        # Convert PCM int16 -> ulaw
+        pcm_bytes = indata.tobytes()
+        ulaw_payload = lin2ulaw(pcm_bytes)
 
-        return (None, pyaudio.paContinue if pyaudio else 0)
+        # Fire TX callback (hand off to IAX2 session)
+        self.on_tx_audio(ulaw_payload)
+
+        # Emit audio levels for visualizer
+        self._emit_levels(ulaw_payload)
 
     def _output_callback(
         self,
-        in_data: bytes,
-        frame_count: int,
-        time_info: dict,
-        status_flags: int,
-    ) -> tuple[Optional[bytes], int]:
-        """Callback from pyaudio output stream — speaker needs data.
+        outdata: np.ndarray,
+        frames: int,
+        time_info: object,
+        status: sd.CallbackFlags,
+    ) -> None:
+        """Called by sounddevice when speaker needs data.
 
-        Reads from the RX buffer. Returns silence if buffer is empty.
+        Pulls ulaw from RX queue, converts to PCM int16, fills outdata.
         """
+        if status:
+            logger.debug("Output callback status: %s", status)
+
+        ulaw_payload: Optional[bytes] = None
         with self._lock:
-            if self._rx_buffer:
-                data = self._rx_buffer.pop(0)
-            else:
-                data = b"\x00" * (frame_count * 2)
+            if self._rx_queue:
+                ulaw_payload = self._rx_queue.pop(0)
 
-        return (data, pyaudio.paContinue if pyaudio else 0)
+        if ulaw_payload is not None and len(ulaw_payload) == frames:
+            # Convert ulaw -> PCM int16
+            pcm_bytes = ulaw2lin(ulaw_payload)
+            outdata[:] = np.frombuffer(pcm_bytes, dtype=np.int16).reshape(-1, 1)
+        else:
+            # No data — silent frame
+            outdata.fill(0)
 
-    # -- Level computation (for visualizer) --
+    # -- Level computation --
+
+    def _emit_levels(self, ulaw_payload: bytes) -> None:
+        """Compute RMS and spectrum from ulaw payload and fire callback."""
+        if self.on_levels is None:
+            return
+
+        rms, spectrum = self._compute_levels(ulaw_payload)
+        try:
+            self.on_levels(rms, spectrum)
+        except Exception:
+            pass  # Don't crash audio thread on callback errors
 
     @staticmethod
-    def _compute_levels(ulaw_data: bytes) -> tuple[float, list[float]]:
-        """Compute RMS and simple frequency bins from ulaw audio.
+    def _compute_levels(ulaw_payload: bytes) -> tuple[float, list[float]]:
+        """Compute RMS and 4-bin spectrum from ulaw audio data.
 
-        Returns (rms: float, spectrum: list of 4 bin levels 0..1).
-        Uses fast approximations suitable for real-time visualizer.
+        Returns (rms, [bin1, bin2, bin3, bin4]) where each bin is 0..1.
         """
+        if not ulaw_payload:
+            return 0.0, [0.0, 0.0, 0.0, 0.0]
+
+        # Decode ulaw -> s16 PCM
         try:
-            pcm_s16 = audioop.ulaw2lin(ulaw_data, 2)
-            samples = struct.unpack(f"<{len(pcm_s16) // 2}h", pcm_s16)
+            pcm = ulaw2lin(ulaw_payload)
         except Exception:
-            return (0.0, [0.0, 0.0, 0.0, 0.0])
+            return 0.0, [0.0, 0.0, 0.0, 0.0]
 
-        n = len(samples)
-        if n == 0:
-            return (0.0, [0.0, 0.0, 0.0, 0.0])
+        # Compute RMS
+        samples = struct.unpack(f"<{len(pcm) // 2}h", pcm)
+        if not samples:
+            return 0.0, [0.0, 0.0, 0.0, 0.0]
 
-        # RMS (normalized 0..1)
         sum_sq = sum(s * s for s in samples)
-        rms = math.sqrt(sum_sq / n) * ULAW_INPUT_SCALE
+        rms = math.sqrt(sum_sq / len(samples)) / 32768.0
         rms = min(rms, 1.0)
 
-        # Simple 4-bin spectrum: compute average magnitude in
-        # 4 frequency bands using a rough FFT-free approach
-        # (energy in each quarter of the sample window)
-        quarter = n // 4
-        bins = [0.0, 0.0, 0.0, 0.0]
+        # Simple 4-bin spectrum via fixed decimation
+        bin_size = len(samples) // 4
+        spectrum: list[float] = []
         for i in range(4):
-            start = i * quarter
-            end = start + quarter if i < 3 else n
-            if end > start:
-                energy = sum(abs(samples[j]) for j in range(start, end))
-                bins[i] = min(energy / (end - start) * ULAW_INPUT_SCALE * 2, 1.0)
-
-        return (rms, bins)
-
-    # -- Device resolution --
-
-    def _resolve_device(self, name: str, is_input: bool) -> Optional[int]:
-        """Resolve a device name (or substring) to a PyAudio device index.
-
-        Returns None for default device.
-        """
-        if not name or self._pa is None:
-            return None
-
-        for i in range(self._pa.get_device_count()):
-            try:
-                dev_info = self._pa.get_device_info_by_index(i)
-                dev_name: str = dev_info.get("name", "") or ""
-                max_inputs: int = dev_info.get("maxInputChannels", 0) or 0
-                max_outputs: int = dev_info.get("maxOutputChannels", 0) or 0
-
-                if is_input and max_inputs > 0 and name.lower() in dev_name.lower():
-                    return i
-                if not is_input and max_outputs > 0 and name.lower() in dev_name.lower():
-                    return i
-            except Exception:
+            if bin_size == 0:
+                spectrum.append(0.0)
                 continue
+            chunk = samples[i * bin_size : (i + 1) * bin_size]
+            if chunk:
+                energy = sum(abs(s) for s in chunk) / len(chunk)
+                spectrum.append(min(energy / 32768.0, 1.0))
+            else:
+                spectrum.append(0.0)
+
+        return rms, spectrum
+
+    # -- Helpers --
+
+    @staticmethod
+    def _resolve_device(name: str, is_input: bool) -> int:
+        """Resolve device name to sounddevice device ID (0 = default)."""
+        if sd is None or not name:
+            return 0
+
+        try:
+            device_id = int(name)
+            return device_id
+        except ValueError:
+            pass
+
+        # Search by name substring
+        for i, dev in enumerate(sd.query_devices()):
+            if name.lower() in dev["name"].lower():
+                if is_input and dev["max_input_channels"] > 0:
+                    return i
+                if not is_input and dev["max_output_channels"] > 0:
+                    return i
 
         logger.warning("Device '%s' not found — using default", name)
-        return None
+        return 0
