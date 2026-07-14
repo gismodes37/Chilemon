@@ -116,6 +116,7 @@ CALL_STATE_HUNGUP = 3
 MAX_REG_RETRIES = 3
 REG_TIMEOUT = 5.0
 CALL_SETUP_TIMEOUT = 15.0
+CALL_ANSWER_TIMEOUT = 3.0  # brief wait for ANSWER before treating call as active
 
 # Registration call number convention
 REG_CALLNO = 0x8000
@@ -204,6 +205,7 @@ class IAX2Session:
         # Async response synchronisation
         self._response_event = asyncio.Event()
         self._response_data: Optional[str] = None
+        self._ignore_retransmit: bool = False
         self._loop: Optional[asyncio.AbstractEventLoop] = None
 
         # Inbound call state (set when Asterisk calls our registered phone)
@@ -333,8 +335,10 @@ class IAX2Session:
     async def start_call(self, called_number: str) -> bool:
         """Place a call to *called_number* via phone context.
 
-        Sends NEW → waits for NEWACK → waits for ANSWER.
-        Returns True when answered.
+        Sends NEW → waits for NEWACK → considers call active.
+        With ASL3 Rpt(), Asterisk accepts the call (ACCEPT/NEWACK) but
+        may not send a separate ANSWER frame — treat NEWACK as success.
+        We also briefly wait for ANSWER in case Asterisk sends one.
         """
         if not self.is_registered:
             raise RuntimeError("Cannot call: not registered")
@@ -357,26 +361,41 @@ class IAX2Session:
             self._state = self.STATE_REGISTERED
             raise TimeoutError("Call setup timeout (no NEWACK)")
 
-        # --- Wait for ANSWER ---
+        # NEWACK received — call is accepted by Asterisk
+        logger.info(
+            "Call to %s accepted (dest_callno=%d) — waiting briefly for ANSWER",
+            called_number, self._dest_callno,
+        )
+
+        # --- Brief wait for ANSWER (retransmissions are ignored) ---
         self._response_event.clear()
         self._response_data = None
+        self._ignore_retransmit = True  # ignore ACCEPT retransmissions
 
         try:
             await asyncio.wait_for(
-                self._response_event.wait(), timeout=CALL_SETUP_TIMEOUT
+                self._response_event.wait(), timeout=CALL_ANSWER_TIMEOUT
             )
         except asyncio.TimeoutError:
-            self._state = self.STATE_REGISTERED
-            raise TimeoutError("Call setup timeout (no ANSWER)")
+            # No ANSWER received — call is still active (ASL3 Rpt() doesn't always send ANSWER)
+            logger.info(
+                "No ANSWER received within %.1fs — call considered active",
+                CALL_ANSWER_TIMEOUT,
+            )
+            self._state = self.STATE_ACTIVE
+            self._ignore_retransmit = False
+            return True
+
+        self._ignore_retransmit = False
 
         if self._response_data == "ANSWER":
             logger.info("Call to %s answered (dest_callno=%d)", called_number, self._dest_callno)
             self._state = self.STATE_ACTIVE
             return True
 
-        logger.warning("Call result: %s", self._response_data)
-        self._state = self.STATE_REGISTERED
-        return False
+        logger.warning("Call result: %s — treating as connected", self._response_data)
+        self._state = self.STATE_ACTIVE
+        return True
 
     async def hangup_call(self) -> None:
         """Hang up the active IAX2 call."""
@@ -674,6 +693,10 @@ class IAX2Session:
             self._response_event.set()
 
         elif subclass == IAX_CMD_ACCEPT:
+            if self._ignore_retransmit and self._response_data == "NEWACK":
+                # Retransmission of ACCEPT — ignore to avoid waking up
+                # the ANSWER wait with stale data
+                return
             self._dest_callno = src_callno
             logger.debug("NEWACK received, dest_callno=%d", self._dest_callno)
             self._response_data = "NEWACK"
