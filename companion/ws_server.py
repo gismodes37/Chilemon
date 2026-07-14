@@ -25,6 +25,7 @@ logger = logging.getLogger("companion.ws")
 MSG_PTT = "ptt"
 MSG_DTMF = "dtmf"
 MSG_STATUS = "status"
+MSG_CALL = "call"
 
 # Message types (companion -> browser)
 MSG_STATUS_RESP = "status"
@@ -59,6 +60,8 @@ class WSServer:
         self.on_ptt_unkey: Optional[Callable[[], Awaitable[None]]] = None
         self.on_dtmf: Optional[Callable[[str], None]] = None
         self.on_status_request: Optional[Callable[[], dict]] = None
+        self.on_call: Optional[Callable[[str], Awaitable[None]]] = None
+        self.on_hangup: Optional[Callable[[], Awaitable[None]]] = None
 
     # -- Lifecycle --
 
@@ -143,6 +146,16 @@ class WSServer:
             digit = payload.get("digit", "")
             if digit and self.on_dtmf:
                 self.on_dtmf(digit)
+
+        elif msg_type == MSG_CALL:
+            action = payload.get("action", "")
+            if action == "hangup":
+                if self.on_hangup:
+                    await self.on_hangup()
+            else:
+                node = payload.get("node", "")
+                if node and self.on_call:
+                    await self.on_call(node)
 
         elif msg_type == MSG_STATUS:
             await self._send_status(ws)

@@ -108,11 +108,13 @@ class CompanionApp:
         # Audio -> WS: level metadata
         self.audio.on_levels = self._on_audio_levels
 
-        # WS -> Session: PTT, DTMF
+        # WS -> Session: PTT, DTMF, call
         self.ws_server.on_ptt_key = self.session.ptt_key
         self.ws_server.on_ptt_unkey = self.session.ptt_unkey
         self.ws_server.on_dtmf = self.session.send_dtmf
         self.ws_server.on_status_request = self.session.get_status
+        self.ws_server.on_call = self.session.place_call
+        self.ws_server.on_hangup = self.session.hangup_call
 
     async def _on_session_audio_rx(self, ulaw_payload: bytes) -> None:
         """Forward received audio from IAX2 to speaker."""
