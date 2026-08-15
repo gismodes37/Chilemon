@@ -284,7 +284,7 @@ class WebRTCBridgeApp:
                 "data": pcm_f32.hex(),
                 "rate": 16000,
             })
-            logger.debug("Broadcasting audio to %d WS peer(s): %d bytes → %d floats",
+            logger.debug("Broadcasting audio to %d WS peer(s): %d bytes -> %d floats",
                          peers, len(ulaw_payload), len(pcm_f32))
             for ws in list(self._ws_peers):
                 try:
@@ -744,7 +744,7 @@ async def _on_startup(app: web.Application) -> None:
                 port=bridge.config.iax_port,
             )
             logger.info(
-                "IAX2 registered as '%s' → %s:%d",
+                "IAX2 registered as '%s' -> %s:%d",
                 bridge.config.iax_phone_user,
                 bridge.config.iax_host,
                 bridge.config.iax_port,

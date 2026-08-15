@@ -86,13 +86,14 @@ IE_USERNAME = 0x01
 IE_PASSWORD = 0x02
 IE_MD5_RESPONSE = 0x0E   # MD5 authentication response
 IE_CAUSE = 0x04
-IE_CALLING_NUMBER = 0x0A
-IE_CALLING_NAME = 0x0B
+IE_CALLING_NUMBER = 0x02  # RFC 5456 §8.7 — calling number (caller ID number)
+IE_CALLING_NAME = 0x03    # RFC 5456 §8.7 — calling name (caller ID name)
 IE_DATAFORMAT = 0x1D
 IE_CODEC = 0x1E
 IE_CALLED_NUMBER = 0x01  # RFC 5456 §8.7
 IE_FORMAT = 0x09         # RFC 5456 §8.7 — codec format bitmask
 IE_CALLTOKEN = 0x2A      # CallToken IE for ASL3 auth challenge
+IE_CHALLENGE = 0x17      # Challenge IE in AUTHREQ (raw challenge bytes)
 IE_VERSION = 0x2B
 
 # -- Codec IDs --
@@ -120,6 +121,10 @@ CALL_ANSWER_TIMEOUT = 3.0  # brief wait for ANSWER before treating call as activ
 
 # Registration call number convention
 REG_CALLNO = 0x8000
+
+# Dedicated callno for POKE/PONG qualify exchange — must not collide
+# with REG_CALLNO or user callno range (0x0001-0x7FFE)
+POKE_CALLNO = 0x7FFE
 
 
 # ---------------------------------------------------------------------------
@@ -178,11 +183,13 @@ class IAX2Session:
         port: int = 4569,
         username: str = "webrtc-bridge",
         password: str = "",
+        local_addr: tuple[str, int] | None = None,
     ) -> None:
         self.host = host
         self.port = port
         self.username = username
         self.password = password
+        self.local_addr = local_addr
 
         self._transport: Optional[asyncio.DatagramTransport] = None
         self._state = self.STATE_IDLE
@@ -192,9 +199,16 @@ class IAX2Session:
         self._callno: int = 0x0001
         self._dest_callno: int = 0
 
-        # Sequence tracking
+        # Sequence tracking (per-callno — each call gets its own)
         self._oseqno: int = 0
         self._iseqno: int = 0
+
+        # Dedicated callno + sequence for qualify POKE/PONG
+        # Must NOT share the main _oseqno/_callno to avoid polluting
+        # Asterisk's per-call sequence state for user-initiated calls.
+        self._poke_callno: int = POKE_CALLNO
+        self._poke_oseqno: int = 0
+        self._poke_iseqno: int = 0
 
         # Timestamp base
         self._start_ts: float = 0.0
@@ -210,6 +224,9 @@ class IAX2Session:
 
         # Inbound call state (set when Asterisk calls our registered phone)
         self._inbound_called_num: str = ""
+
+        # Call authentication state (AUTHREQ → AUTHREP flow)
+        self._call_auth_challenge: Optional[bytes] = None
 
         # -- Public callbacks --
         self.on_audio_frame: Optional[Callable[[bytes], Awaitable[None]]] = None
@@ -248,16 +265,28 @@ class IAX2Session:
                 self._owner._on_datagram(data)
 
             def error_received(self, exc: Exception) -> None:
-                logger.error("IAX2 transport error: %s", exc)
+                logger.error("IAX2 transport error: [%s] %s", type(exc).__name__, exc)
 
         try:
+            kwargs: dict = {
+                "protocol_factory": lambda: _Protocol(self),
+                "remote_addr": (self.host, self.port),
+            }
+            if self.local_addr is not None:
+                kwargs["local_addr"] = self.local_addr
+
             self._transport, _ = await self._loop.create_datagram_endpoint(
-                lambda: _Protocol(self),
-                remote_addr=(self.host, self.port),
+                **kwargs,
             )
-            logger.info(
-                "IAX2 transport open → %s:%s", self.host, self.port
-            )
+            if self.local_addr:
+                logger.info(
+                    "IAX2 transport open -> %s:%s (bound to %s:%d)",
+                    self.host, self.port, *self.local_addr,
+                )
+            else:
+                logger.info(
+                    "IAX2 transport open -> %s:%s", self.host, self.port
+                )
         except OSError as exc:
             raise ConnectionError(
                 f"Cannot connect IAX2 to {self.host}:{self.port}: {exc}"
@@ -332,16 +361,25 @@ class IAX2Session:
 
     # -- Call management --
 
-    async def start_call(self, called_number: str) -> bool:
+    async def start_call(self, called_number: str, caller_number: str = "") -> bool:
         """Place a call to *called_number* via phone context.
 
         Sends NEW → waits for NEWACK → considers call active.
         With ASL3 Rpt(), Asterisk accepts the call (ACCEPT/NEWACK) but
         may not send a separate ANSWER frame — treat NEWACK as success.
         We also briefly wait for ANSWER in case Asterisk sends one.
+
+        *caller_number* is the numeric caller ID to send. AllStar's app_rpt
+        rejects connections with non-numeric or empty caller IDs, so this
+        MUST be a string of digits. Defaults to digits extracted from
+        the username if not provided.
         """
         if not self.is_registered:
             raise RuntimeError("Cannot call: not registered")
+
+        # Default caller_number: extract digits from username
+        if not caller_number:
+            caller_number = "".join(c for c in self.username if c.isdigit()) or "0"
 
         # Use a fresh call number each time to avoid conflicts with
         # stale Asterisk channels that still reference the old callno
@@ -350,12 +388,13 @@ class IAX2Session:
             next_callno = 0x0001
         self._callno = next_callno
         self._dest_callno = 0
+        self._call_auth_challenge = None  # Clear stale auth state
         self._state = self.STATE_CALLING
 
         # --- NEW ---
         self._response_event.clear()
         self._response_data = None
-        self._send_new(called_number)
+        self._send_new(called_number, caller_number)
         self._oseqno = (self._oseqno + 1) & 0xFF
 
         try:
@@ -397,6 +436,11 @@ class IAX2Session:
             logger.info("Call to %s answered (dest_callno=%d)", called_number, self._dest_callno)
             self._state = self.STATE_ACTIVE
             return True
+
+        if self._response_data == "HANGUP":
+            logger.error("Call to %s rejected by Asterisk (HANGUP during ANSWER wait)", called_number)
+            self._state = self.STATE_REGISTERED
+            return False
 
         logger.warning("Call result: %s — treating as connected", self._response_data)
         self._state = self.STATE_ACTIVE
@@ -468,8 +512,8 @@ class IAX2Session:
 
     def _send_regreq(self) -> None:
         payload = (
-            _make_ie(IE_USERNAME, self.username)  # 0x01 = CALLED_NUMBER → caller_number
-            + _make_ie(IE_CALLING_NAME, self.username)  # 0x0B = CALLING_NAME → caller_name
+            _make_ie(IE_USERNAME, self.username)  # IE 0x01 — username / called number
+            + _make_ie(IE_CALLING_NAME, self.username)  # IE 0x03 — calling name
             + _make_ie(IE_PASSWORD, self.password)
         )
         self._send_full_frame(
@@ -488,10 +532,12 @@ class IAX2Session:
             subclass=IAX_CMD_REGREL,
         )
 
-    def _send_new(self, called_number: str) -> None:
+    def _send_new(self, called_number: str, caller_number: str = "") -> None:
         payload = (
             _make_ie(IE_CALLED_NUMBER, called_number)
+            + _make_ie(IE_CALLING_NUMBER, caller_number)
             + _make_ie(IE_FORMAT, struct.pack("!I", CODEC_ULAW))
+            + _make_ie(IE_CALLTOKEN, b"")  # Signal CallToken support to ASL3
         )
         self._send_full_frame(
             dest_callno=0,
@@ -499,6 +545,37 @@ class IAX2Session:
             frametype=IAX_TYPE_IAX,
             subclass=IAX_CMD_NEW,
             payload=payload,
+        )
+
+    def _send_authrep(self) -> None:
+        """Send AUTHREP with MD5(challenge + password).
+
+        Called after receiving AUTHREQ during call setup.
+        Per chan_iax2 auth flow:
+          - IE_MD5_RESPONSE = MD5(challenge_bytes + password)
+
+        The challenge can come from IE_CHALLENGE, IE_CALLTOKEN,
+        or as raw bytes in the AUTHREQ payload.
+        """
+        if self._call_auth_challenge is None:
+            logger.error("_send_authrep: no challenge stored")
+            return
+
+        md5_input = self._call_auth_challenge + self.password.encode("utf-8")
+        md5_hash = hashlib.md5(md5_input).digest()
+
+        payload = _make_ie(IE_MD5_RESPONSE, md5_hash)
+        self._send_full_frame(
+            dest_callno=self._dest_callno,
+            src_callno=self._callno,
+            frametype=IAX_TYPE_IAX,
+            subclass=IAX_CMD_AUTHREP,
+            payload=payload,
+        )
+        logger.debug(
+            "AUTHREP sent: challenge_hex=%s md5_hex=%s",
+            self._call_auth_challenge.hex(),
+            md5_hash.hex(),
         )
 
     # -- Inbound call helpers (Asterisk calls the registered phone) --
@@ -554,22 +631,46 @@ class IAX2Session:
         )
 
     def _send_ack(self, dest_callno: int, src_callno: int) -> None:
-        """Send ACK frame (C=1, no payload)."""
+        """Send ACK frame (C=0, no payload).
+
+        C=0 is critical — Asterisk's chan_iax2 marks C=1 IAX frames as
+        ``Subclass: Unknown`` and immediately hangs up.
+        """
         self._send_full_frame(
             dest_callno=dest_callno,
             src_callno=src_callno,
             frametype=IAX_TYPE_IAX,
             subclass=IAX_CMD_ACK,
-            c=1,
+            c=0,
         )
 
-    def _send_pong(self, dest_callno: int, src_callno: int) -> None:
+    def _send_pong(self, dest_callno: int, src_callno: int,
+                    ts: int | None = None) -> None:
+        """Send PONG, optionally echoing a received timestamp for RTT."""
         self._send_full_frame(
             dest_callno=dest_callno,
             src_callno=src_callno,
             frametype=IAX_TYPE_IAX,
             subclass=IAX_CMD_PONG,
+            ts=ts,
         )
+
+    def _send_poke_pong(self, dest_callno: int, ts: int) -> None:
+        """Send PONG for qualify POKE using dedicated callno + sequence.
+
+        Uses _poke_callno and _poke_oseqno so qualify frames never
+        pollute the per-call sequence state of user-initiated calls.
+        """
+        self._send_full_frame(
+            dest_callno=dest_callno,
+            src_callno=self._poke_callno,
+            frametype=IAX_TYPE_IAX,
+            subclass=IAX_CMD_PONG,
+            ts=ts,
+            oseqno=self._poke_oseqno,
+            iseqno=self._poke_iseqno,
+        )
+        self._poke_oseqno = (self._poke_oseqno + 1) & 0xFF
 
     def _send_full_frame(
         self,
@@ -579,14 +680,26 @@ class IAX2Session:
         payload: bytes = b"",
         src_callno: Optional[int] = None,
         c: int = 0,
+        ts: int | None = None,
+        oseqno: int | None = None,
+        iseqno: int | None = None,
     ) -> None:
-        """Build and send a full IAX2 frame (12-byte header + payload)."""
+        """Build and send a full IAX2 frame (12-byte header + payload).
+
+        If ts is provided, use it verbatim (for PONG/LAGRP RTT echo).
+        Otherwise generate a fresh timestamp.
+
+        oseqno / iseqno override the instance counters when provided
+        (used by qualify PONG which has its own per-callno sequence).
+        """
         src = self._callno if src_callno is None else src_callno
-        ts = int((time.monotonic() - self._start_ts) * 1000) & 0xFFFFFFFF
+        if ts is None:
+            ts = int((time.monotonic() - self._start_ts) * 1000) & 0xFFFFFFFF
 
         # Per RFC 5456 §4.2:
         # Word 0: F(bit15) + source call number(bits14-0)
-        # F=1 for full frames (required by RFC 5456 §4)
+        # NOTE: Asterisk (chan_iax2) uses F=1 for full frames (non-standard).
+        # We match Asterisk's convention for interoperability.
         first_word = 0x8000 | (src & 0x7FFF)
         # Word 1: R(bit15) + destination call number(bits14-0)
         # R=0 because this is NOT a retransmission
@@ -594,13 +707,16 @@ class IAX2Session:
         # c_subclass: C (bit 7) + subclass (bits 6-0)
         cs = ((c & 1) << 7) | (subclass & 0x7F)
 
+        use_oseq = self._oseqno if oseqno is None else oseqno
+        use_iseq = self._iseqno if iseqno is None else iseqno
+
         header = struct.pack(
             "!HHIBBBB",
             first_word,
             second_word,
             ts,
-            self._oseqno & 0xFF,
-            self._iseqno & 0xFF,
+            use_oseq & 0xFF,
+            use_iseq & 0xFF,
             frametype & 0xFF,
             cs & 0xFF,
         )
@@ -626,7 +742,7 @@ class IAX2Session:
         f = (type_field >> 15) & 1
 
         if f:
-            # F=1 → Full frame (RFC 5456 §4.2, bit 15 set)
+            # F=1 → Full frame (Asterisk convention, opposite of RFC 5456)
             self._on_full_frame(data)
         else:
             # F=0 → Mini frame (voice, 4-byte header)
@@ -667,14 +783,16 @@ class IAX2Session:
         c = (cs >> 7) & 1
         subclass = cs & 0x7F
 
-        # Track incoming sequence number
-        if c == 0:
-            self._iseqno = oseqno
-
-        # Dispatch by frame type
+        # Dispatch by frame type — sequence tracking per type
         if frametype == IAX_TYPE_IAX:
-            self._on_iax_control(subclass, src_callno, payload)
+            # Route sequence tracking through handler (IAX subtypes may
+            # use per-callno sequences like qualify POKE/PONG).
+            self._on_iax_control(subclass, src_callno, payload, ts=ts,
+                                 oseqno=oseqno, c=c)
         elif frametype == IAX_TYPE_CONTROL:
+            # Non-IAX frames always use the global sequence
+            if c == 0:
+                self._iseqno = oseqno
             self._on_control(subclass, src_callno)
         elif frametype == IAX_TYPE_VOICE:
             # Incoming voice full-frame (not mini) — voice audio from Asterisk
@@ -687,8 +805,21 @@ class IAX2Session:
             # Mirrors the ACK pattern in _on_mini_frame (line 601).
             self._send_ack(dest_callno=src_callno, src_callno=self._callno)
 
-    def _on_iax_control(self, subclass: int, src_callno: int, payload: bytes) -> None:
-        """Handle IAX control frames (registration, call setup)."""
+    def _on_iax_control(self, subclass: int, src_callno: int, payload: bytes,
+                         ts: int = 0, oseqno: int = 0, c: int = 0) -> None:
+        """Handle IAX control frames (registration, call setup).
+
+        ts: received timestamp — MUST be echoed for PING/PONG RTT.
+        oseqno / c: received sequence fields — used for per-call tracking.
+        """
+        # Track incoming sequence number per type
+        if c == 0:
+            if subclass == 0x1E:  # POKE — own sequence space
+                self._poke_iseqno = oseqno
+            elif subclass not in (IAX_CMD_PING, IAX_CMD_PONG):
+                # PING/PONG also on the POKE call — skip them too
+                self._iseqno = oseqno
+
         if subclass == IAX_CMD_REGACK:
             self._response_data = "REGACK"
             self._response_event.set()
@@ -706,6 +837,40 @@ class IAX2Session:
             logger.debug("NEWACK received, dest_callno=%d", self._dest_callno)
             self._response_data = "NEWACK"
             self._response_event.set()
+            # CRITICAL: ACK the ACCEPT so Asterisk knows we received it.
+            # Without this ACK, Asterisk keeps retransmitting ACCEPT and never
+            # proceeds to RINGING/ANSWER.
+            self._send_ack(dest_callno=self._dest_callno, src_callno=self._callno)
+
+        elif subclass == IAX_CMD_AUTHREQ:
+            # Asterisk challenges our NEW frame — auth=md5 requires AUTHREP.
+            # Flow: NEW → AUTHREQ(challenge) → AUTHREP(MD5) → ACCEPT
+            self._dest_callno = src_callno  # Asterisk's call number for this call
+            ies = _parse_ies(payload)
+
+            if IE_CALLTOKEN in ies:
+                challenge = ies[IE_CALLTOKEN]
+                logger.info(
+                    "AUTHREQ with CallToken: %d bytes — sending AUTHREP",
+                    len(challenge),
+                )
+            elif IE_CHALLENGE in ies:
+                challenge = ies[IE_CHALLENGE]
+                logger.info(
+                    "AUTHREQ with IE_CHALLENGE: %d bytes — sending AUTHREP",
+                    len(challenge),
+                )
+            else:
+                # Raw challenge (no IE wrapping) — common in chan_iax2
+                challenge = payload
+                logger.info(
+                    "AUTHREQ with raw challenge: %d bytes — sending AUTHREP",
+                    len(challenge),
+                )
+
+            self._call_auth_challenge = challenge
+            self._send_authrep()
+            # Do NOT set _response_event — continue waiting for ACCEPT
 
         elif subclass == IAX_CMD_NEW and self._state >= self.STATE_REGISTERED:
             """Inbound NEW: Asterisk is calling our registered phone."""
@@ -733,6 +898,7 @@ class IAX2Session:
             self._state = self.STATE_REGISTERED
             self._dest_callno = 0
             self._inbound_called_num = ""
+            self._call_auth_challenge = None  # Clear auth state
             self._response_data = "HANGUP"
             self._response_event.set()
             if self.on_disconnect:
@@ -742,7 +908,11 @@ class IAX2Session:
             pass  # Acknowledgement — no action needed
 
         elif subclass == IAX_CMD_PING:
-            self._send_pong(dest_callno=src_callno, src_callno=self._callno)
+            self._send_pong(dest_callno=src_callno, src_callno=self._callno, ts=ts)
+
+        elif subclass == 0x1E:  # POKE — Asterisk qualify/keepalive
+            logger.debug("POKE from Asterisk (callno=%d) — sending PONG", src_callno)
+            self._send_poke_pong(dest_callno=src_callno, ts=ts)
 
     def _on_control(self, subclass: int, src_callno: int) -> None:
         """Handle control frames (ringing, answer)."""
@@ -823,7 +993,7 @@ class IAX2Call:
     ) -> None:
         """Build and send a full IAX2 frame for this call."""
         ts = int((time.monotonic() - self._start_ts) * 1000) & 0xFFFFFFFF
-        # F=1 for full frames (RFC 5456 §4)
+        # F=1 for full frames (Asterisk convention, opposite of RFC 5456)
         first_word = 0x8000 | (self.callno & 0x7FFF)
         second_word = self.peer_callno & 0x7FFF
         cs = ((c & 1) << 7) | (subclass & 0x7F)
@@ -858,7 +1028,7 @@ class IAX2Call:
         ACKs internally.
         """
         ts = int((time.monotonic() - self._start_ts) * 1000) & 0xFFFFFFFF
-        first_word = 0x8000 | (self.callno & 0x7FFF)
+        first_word = 0x8000 | (self.callno & 0x7FFF)  # F=1 | src callno
         second_word = self.peer_callno & 0x7FFF
         cs = IAX_CMD_ACK & 0x7F  # C=0 | subclass=ACK
         oseq = self.oseqno & 0xFF          # capture before advancing
@@ -903,7 +1073,7 @@ class IAX2Call:
         """Send ANSWER control frame — mark the call as answered/active."""
         self._send_full_frame(IAX_TYPE_CONTROL, CONTROL_ANSWER)
         self.state = CALL_STATE_ACTIVE
-        logger.info("ANSWER sent for callno=%d → STATE_ACTIVE", self.callno)
+        logger.info("ANSWER sent for callno=%d -> STATE_ACTIVE", self.callno)
 
     def send_hangup(self) -> None:
         """Send HANGUP frame to terminate the call."""
@@ -1193,7 +1363,7 @@ class IAX2Server:
             if self._reg_response_data == "REGACK":
                 self._registered = True
                 logger.info(
-                    "IAX2 registered as '%s' (server mode) → %s:%d",
+                    "IAX2 registered as '%s' (server mode) -> %s:%d",
                     username, host, port,
                 )
                 return True
@@ -1255,7 +1425,7 @@ class IAX2Server:
             + _make_ie(IE_CALLTOKEN, b"")  # Empty CallToken signals support
         )
         ts = int((time.monotonic() - self._start_ts) * 1000) & 0xFFFFFFFF
-        first_word = 0x8000 | (self._reg_callno & 0x7FFF)
+        first_word = 0x8000 | (self._reg_callno & 0x7FFF)  # F=1 | src callno
         second_word = 0
         cs = IAX_CMD_REGREQ & 0x7F
 
@@ -1274,7 +1444,7 @@ class IAX2Server:
     def _send_regrel(self, addr: tuple[str, int]) -> None:
         """Send REGREL from the server socket."""
         ts = int((time.monotonic() - self._start_ts) * 1000) & 0xFFFFFFFF
-        first_word = 0x8000 | (self._reg_callno & 0x7FFF)
+        first_word = 0x8000 | (self._reg_callno & 0x7FFF)  # F=1 | src callno
         second_word = 0
         cs = IAX_CMD_REGREL & 0x7F
 
@@ -1312,7 +1482,7 @@ class IAX2Server:
             + _make_ie(IE_MD5_RESPONSE, md5_hash)
         )
         ts = int((time.monotonic() - self._start_ts) * 1000) & 0xFFFFFFFF
-        first_word = 0x8000 | (self._reg_callno & 0x7FFF)
+        first_word = 0x8000 | (self._reg_callno & 0x7FFF)  # F=1 | src callno
         second_word = 0
         cs = IAX_CMD_REGREQ & 0x7F
 
@@ -1340,7 +1510,7 @@ class IAX2Server:
         logger.debug("DG: %dB from %s:%d first=0x%04X f=%d", len(data), *addr, type_field, f)
 
         if f:
-            self._on_full_frame(data, addr)     # F=1 → Full frame (RFC 5456 §4)
+            self._on_full_frame(data, addr)     # F=1 → Full frame (Asterisk convention)
         else:
             self._on_mini_frame(data, addr)      # F=0 → Mini frame
 
@@ -1612,8 +1782,7 @@ class IAX2Server:
         # Per RFC 5456 §8.3, PONG MUST echo the received timestamp so
         # Asterisk can calculate round-trip time.  Generating a fresh
         # timestamp causes bogus RTT → Asterisk marks peer UNREACHABLE.
-        # first_word MUST have F=1 (bit 15) for full frames — Asterisk
-        # discards frames with F=0 as mini frames (RFC 5456 §4).
+        # first_word: F=1 for full frames (Asterisk convention).
         first_word = 0x8000 | (src_callno & 0x7FFF)
         # second_word: R=0 (not a retransmission) + dest call number.
         # src_callno may have F=1 from Asterisk — mask to 15 bits.
