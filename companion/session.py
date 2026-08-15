@@ -38,6 +38,7 @@ class CompanionSession:
         password: str = "",
         node: str = "",
         skip_registration: bool = True,
+        local_port: int | None = None,
     ) -> None:
         self._host = host
         self._port = port
@@ -45,6 +46,7 @@ class CompanionSession:
         self._password = password
         self._node = node
         self._skip_registration = skip_registration
+        self._local_port = local_port
 
         self._session: Optional[IAX2Session] = None
         self._registered = False
@@ -56,6 +58,9 @@ class CompanionSession:
         self.on_audio_rx: Optional[Callable[[bytes], Awaitable[None]]] = None
         # Callback: status change (is_registered, in_call, ptt_active, error)
         self.on_status: Optional[Callable[[dict], Awaitable[None]]] = None
+
+        self._loop: Optional[asyncio.AbstractEventLoop] = None
+        self._reconnecting: bool = False  # guard against concurrent reconnects
 
         # PTT state (toggled by DTMF *)
         self.ptt_active: bool = False
@@ -81,11 +86,16 @@ class CompanionSession:
             "Starting companion session -> %s:%s as '%s'",
             self._host, self._port, self._username,
         )
+        local_addr: tuple[str, int] | None = None
+        if self._local_port is not None:
+            local_addr = ("0.0.0.0", self._local_port)
+
         self._session = IAX2Session(
             host=self._host,
             port=self._port,
             username=self._username,
             password=self._password,
+            local_addr=local_addr,
         )
         self._session.on_audio_frame = self._on_audio_rx
         self._session.on_disconnect = self._on_disconnect
@@ -159,30 +169,35 @@ class CompanionSession:
 
     async def _reconnect(self) -> None:
         """Full reconnect: close and re-register."""
-        logger.info("Starting reconnection sequence...")
-        self._registered = False
-        self._in_call = False
+        if self._reconnecting:
+            return  # already reconnecting, don't spawn another
+        self._reconnecting = True
+        try:
+            logger.info("Starting reconnection sequence...")
+            self._registered = False
+            self._in_call = False
 
-        if self._session is not None:
-            try:
-                await self._session.close()
-            except Exception:
-                pass
-            self._session = None
+            if self._session is not None:
+                try:
+                    await self._session.close()
+                except Exception:
+                    pass
+                self._session = None
 
-        # Small delay before reconnect
-        await asyncio.sleep(2.0)
-        await self.start()
+            # Small delay before reconnect
+            await asyncio.sleep(2.0)
+            await self.start()
+        finally:
+            self._reconnecting = False
 
     # -- Call management --
 
     async def place_call(self, node: str = "") -> None:
         """Place an IAX2 call to the given ASL node.
 
-        If already in a call, logs a warning but still attempts the new call.
-        The caller should hang up first for reliable operation — Asterisk 22
-        (ASL3) may reject concurrent calls from the same static peer beyond
-        the 2nd one.
+        Automatically hangs up any existing call first for idempotency.
+        Asterisk 22 (ASL3) may reject concurrent calls from the same
+        static peer beyond the 2nd one, so a clean slate is essential.
         """
         target = node or self._node
         if not target:
@@ -192,9 +207,12 @@ class CompanionSession:
             logger.warning("Cannot call: not registered")
             return
 
+        # Idempotent hangup — ensures clean state before placing a new call
         if self._in_call:
-            logger.warning("Already in a call — place_call proceeding anyway; "
-                           "client should hang up first for reliability")
+            logger.info("Already in a call — hanging up first for clean state")
+            await self.hangup_call()
+            # Brief cooldown so Asterisk fully releases the channel
+            await asyncio.sleep(0.5)
 
         try:
             logger.info("Starting call to node %s", target)
@@ -204,7 +222,11 @@ class CompanionSession:
                 transport is not None,
                 self._session._state,
                 self._session._callno)
-            success = await self._session.start_call(target)
+            # Use LOCAL node number as caller ID — AllStar's app_rpt requires
+            # a numeric caller ID, otherwise it rejects with "Caller ID is not numeric"
+            # NOTE: target is the REMOTE node, self._node is our LOCAL node
+            caller_number = "".join(c for c in self._node if c.isdigit()) or "0"
+            success = await self._session.start_call(target, caller_number=caller_number)
             if success:
                 self._in_call = True
                 logger.info("Call to node %s established", target)
@@ -277,9 +299,21 @@ class CompanionSession:
         await self._emit_status()
 
     async def _on_inbound_call(self, called_num: str) -> None:
-        """Inbound call from Asterisk (via AMI Originate or direct)."""
+        """Inbound call from Asterisk (via AMI Originate or direct).
+
+        Hangs up any existing call first to avoid conflicting with
+        Asterisk's per-peer channel limit.
+        """
         logger.info("Inbound call from Asterisk: called=%s", called_num)
         if self._session is not None:
+            # Hang up any existing call first
+            if self._in_call:
+                logger.info("Inbound call while already in call — hanging up first")
+                await self._session.hangup_call()
+                self._in_call = False
+                self.ptt_active = False
+                await asyncio.sleep(0.3)
+
             self._session.accept_inbound()
             self._session.answer_inbound()
             self._in_call = True
@@ -300,7 +334,7 @@ class CompanionSession:
 
     async def _check_health(self) -> None:
         """Check session health and reconnect if needed."""
-        if not self._registered and self._session is not None:
+        if not self._registered and self._session is not None and not self._reconnecting:
             logger.warning("Registration lost — reconnecting...")
             asyncio.ensure_future(self._reconnect())
 
@@ -333,3 +367,10 @@ class CompanionSession:
             "call_active": self._in_call,
             "ptt": self.ptt_active,
         }
+
+    def get_full_status(self, audio_stats: dict = None) -> dict:
+        """Return full status including audio stats."""
+        status = self.get_status()
+        if audio_stats:
+            status["audio"] = audio_stats
+        return status

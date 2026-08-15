@@ -24,6 +24,8 @@ try:
 except ImportError:
     sd = None  # type: ignore[assignment]
 
+from companion.jitter_buffer import JitterBuffer, AudioFrame
+
 logger = logging.getLogger("companion.audio")
 
 # Audio constants
@@ -179,6 +181,16 @@ class AudioEngine:
         self._lock = threading.Lock()
         self._rx_queue: list[bytes] = []
 
+        # Jitter buffer for RX
+        self._jitter_buffer = JitterBuffer(
+            target_delay_ms=60,   # 60ms target delay
+            max_delay_ms=200,     # Max 200ms buffer
+            min_delay_ms=20,      # Min 20ms
+            plc_enabled=True,     # Enable Packet Loss Concealment
+            max_plc_frames=3,     # Max 3 consecutive PLC frames
+        )
+        self._frame_counter: int = 0
+
         # Callbacks
         self.on_tx_audio: Optional[Callable[[bytes], None]] = None
         self.on_levels: Optional[Callable[[float, list[float]], None]] = None
@@ -223,15 +235,20 @@ class AudioEngine:
 
         # Output stream (speaker) — callback pulls RX audio
         try:
+            # Get device info to determine channel count
+            device_info = sd.query_devices(output_id)
+            output_channels = min(device_info['max_output_channels'], 2)  # Max 2 (stereo)
+            
             self._output_stream = sd.OutputStream(
                 samplerate=RATE,
                 blocksize=FRAMES_PER_BUFFER,
                 device=output_id,
-                channels=1,
+                channels=output_channels,
                 dtype=DTYPE,
                 callback=self._output_callback,
             )
             self._output_stream.start()
+            logger.info("Output stream opened: %d channels", output_channels)
         except Exception as exc:
             logger.warning("Failed to open output stream: %s", exc)
             self._output_stream = None
@@ -270,11 +287,33 @@ class AudioEngine:
     # -- RX: playback (called from session when audio arrives) --
 
     def play_ulaw(self, ulaw_payload: bytes) -> None:
-        """Queue received ulaw audio for speaker playback."""
+        """Queue received ulaw audio for speaker playback.
+        
+        Now uses jitter buffer for reordering, PLC, and adaptive delay.
+        Uses arrival time for jitter estimation (simpler than reconstructing
+        IAX2 timestamps from 16-bit mini frame values).
+        
+        Parameters
+        ----------
+        ulaw_payload : bytes
+            ulaw-encoded audio frame (typically 160 bytes = 20ms)
+        """
         if not self._running or self._output_stream is None:
             return
-        with self._lock:
-            self._rx_queue.append(ulaw_payload)
+        
+        # Create audio frame with arrival time as timestamp
+        import time
+        self._frame_counter += 1
+        arrival_ms = int(time.monotonic() * 1000)
+        frame = AudioFrame(
+            timestamp_ms=arrival_ms,
+            payload=ulaw_payload,
+            received_at=time.monotonic(),
+            sequence=self._frame_counter,
+        )
+        
+        # Add to jitter buffer
+        self._jitter_buffer.push(frame)
 
     # -- TX: capture (called from input callback) --
 
@@ -323,21 +362,27 @@ class AudioEngine:
         status: sd.CallbackFlags,
     ) -> None:
         """Called by sounddevice when speaker needs data.
-
-        Pulls ulaw from RX queue, converts to PCM int16, fills outdata.
+        
+        Pulls ulaw from jitter buffer, converts to PCM int16, fills outdata.
+        Handles both mono and stereo output devices.
         """
         if status:
             logger.debug("Output callback status: %s", status)
 
-        ulaw_payload: Optional[bytes] = None
-        with self._lock:
-            if self._rx_queue:
-                ulaw_payload = self._rx_queue.pop(0)
+        # Get next frame from jitter buffer
+        ulaw_payload: Optional[bytes] = self._jitter_buffer.pop()
 
         if ulaw_payload is not None and len(ulaw_payload) == frames:
-            # Convert ulaw -> PCM int16
+            # Convert ulaw -> PCM int16 (mono)
             pcm_bytes = ulaw2lin(ulaw_payload)
-            outdata[:] = np.frombuffer(pcm_bytes, dtype=np.int16).reshape(-1, 1)
+            mono_data = np.frombuffer(pcm_bytes, dtype=np.int16).reshape(-1, 1)
+            
+            # Duplicate to stereo if output has 2 channels
+            if outdata.shape[1] == 2:
+                outdata[:, 0] = mono_data[:, 0]  # Left
+                outdata[:, 1] = mono_data[:, 0]  # Right
+            else:
+                outdata[:] = mono_data
         else:
             # No data — silent frame
             outdata.fill(0)
@@ -419,3 +464,31 @@ class AudioEngine:
 
         logger.warning("Device '%s' not found — using default", name)
         return 0
+
+    def get_jitter_stats(self) -> dict:
+        """Return jitter buffer statistics for monitoring."""
+        return self._jitter_buffer.get_stats()
+
+    def get_audio_stats(self) -> dict:
+        """Return audio engine statistics."""
+        return {
+            "running": self._running,
+            "input_stream": self._input_stream is not None,
+            "output_stream": self._output_stream is not None,
+            "jitter_buffer": self.get_jitter_stats(),
+        }
+
+    def log_jitter_stats(self) -> None:
+        """Log jitter buffer statistics for debugging."""
+        stats = self.get_jitter_stats()
+        logger.info(
+            "JitterBuffer stats: received=%d, played=%d, dropped=%d, plc=%d, "
+            "buffer_size=%d, target_delay=%dms, jitter=%.1fms",
+            stats["frames_received"],
+            stats["frames_played"],
+            stats["frames_dropped"],
+            stats["frames_plc"],
+            stats["buffer_size"],
+            stats["target_delay_ms"],
+            stats["current_jitter_ms"],
+        )

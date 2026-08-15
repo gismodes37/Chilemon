@@ -72,6 +72,22 @@ class WSServer:
             return
 
         self._app = web.Application()
+
+        # CORS middleware — permite fetch desde cualquier origen (localhost-only)
+        # Necesario porque el dashboard se sirve via HTTPS y el companion via HTTP
+        @web.middleware
+        async def cors_middleware(request: Any, handler: Any) -> Any:
+            try:
+                resp = await handler(request)
+                resp.headers["Access-Control-Allow-Origin"] = "*"
+                resp.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
+                resp.headers["Access-Control-Allow-Headers"] = "Content-Type"
+                return resp
+            except Exception:
+                raise
+
+        self._app.middlewares.append(cors_middleware)
+
         self._app.router.add_get("/ws", self._handle_ws)
         self._app.router.add_get("/health", self._handle_health)
 
