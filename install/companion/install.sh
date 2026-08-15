@@ -112,17 +112,65 @@ echo "  2. Start the service: sudo systemctl start $SERVICE_NAME"
 echo "  3. Check status:      sudo systemctl status $SERVICE_NAME"
 echo "  4. View logs:         journalctl -u $SERVICE_NAME -f"
 echo ""
-echo "Asterisk IAX2 peer config required in /etc/asterisk/iax.conf:"
-echo ""
-echo "  [companion-app]"
-echo "  type=friend"
-echo "  context=radio-companion"
-echo "  host=dynamic"
-echo "  secret=YOUR_SECRET"
-echo "  calltokenoptional=127.0.0.1"
-echo ""
-echo "Extensions context in /etc/asterisk/extensions.conf:"
-echo ""
-echo "  [radio-companion]"
-echo "  exten => _X!,1,Rpt(\${EXTEN})"
-echo "  same => n,Hangup()"
+
+# --- Inject [companion-app] peer into /etc/asterisk/iax.conf ---
+IAX_CONF="/etc/asterisk/iax.conf"
+if [ -f "$IAX_CONF" ]; then
+    if grep -q "^\[companion-app\]" "$IAX_CONF"; then
+        log_info "Peer [companion-app] already exists in $IAX_CONF — skipping"
+    else
+        log_info "Injecting [companion-app] peer into $IAX_CONF"
+        sudo tee -a "$IAX_CONF" > /dev/null <<'PEEREOF'
+
+[companion-app]
+type=friend
+host=dynamic
+context=radio-companion
+secret=chilemon2026
+disallow=all
+allow=ulaw
+qualify=yes
+qualifyfreqok=60000
+qualifyfreqnotok=10000
+maxms=5000
+requirecalltoken=no
+calltokenoptional=127.0.0.1
+PEEREOF
+        log_info "Done — run 'asterisk -rx \"core reload\"' to apply"
+    fi
+else
+    log_warn "$IAX_CONF not found — add [companion-app] peer manually"
+    echo ""
+    echo "  [companion-app]"
+    echo "  type=friend"
+    echo "  context=radio-companion"
+    echo "  host=dynamic"
+    echo "  secret=chilemon2026"
+    echo "  disallow=all"
+    echo "  allow=ulaw"
+    echo "  qualify=yes"
+    echo "  qualifyfreqok=60000"
+    echo "  qualifyfreqnotok=10000"
+    echo "  maxms=5000"
+    echo "  requirecalltoken=no"
+    echo "  calltokenoptional=127.0.0.1"
+fi
+
+# --- Inject [radio-companion] context into /etc/asterisk/extensions.conf ---
+EXT_CONF="/etc/asterisk/extensions.conf"
+if [ -f "$EXT_CONF" ]; then
+    if grep -q "^\[radio-companion\]" "$EXT_CONF"; then
+        log_info "Context [radio-companion] already exists in $EXT_CONF — skipping"
+    else
+        log_info "Injecting [radio-companion] context into $EXT_CONF"
+        sudo tee -a "$EXT_CONF" > /dev/null <<'CTXEOF'
+
+[radio-companion]
+exten => _X!,1,Rpt(${EXTEN})
+ same => n,Hangup()
+CTXEOF
+        log_info "Done"
+    fi
+else
+    log_warn "$EXT_CONF not found — add [radio-companion] context manually"
+fi

@@ -2,19 +2,22 @@
 # Copy this file to ~/.chilemon/config.toml and edit.
 
 [asterisk]
-host = "127.0.0.1"
+host = "192.168.0.116"
 port = 4569
+# local_port = 4569   # Bind to a fixed local port (requires admin on Windows for <1024).
+                       # When set, Asterisk can qualify/reach the companion on this port.
+                       # Default (commented out) = ephemeral port assigned by OS.
 
 [peer]
 username = "companion-app"
-password = "CHANGE_ME"
-skip_registration = true     # true for static peer in iax.conf; false for dynamic auth
+password = "chilemon2026"
+skip_registration = true     # true = static peer in iax.conf; no REGISTER needed
 
 [audio]
-input_device = ""       # empty = default device
-output_device = ""      # empty = default device
-sample_rate = 8000      # ulaw is 8 kHz
-frames_per_buffer = 160 # 20ms at 8 kHz
+input_device = "1"       # Micrófono (High Definition Audio)
+output_device = "5"      # Auriculares (JQ-BT)
+sample_rate = 8000       # ulaw is 8 kHz
+frames_per_buffer = 160  # 20ms at 8 kHz
 
 [ws]
 bind_host = "127.0.0.1"
