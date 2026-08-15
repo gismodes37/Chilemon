@@ -27,10 +27,9 @@ $vizJsVer  = file_exists($vizJsPath) ? (string)filemtime($vizJsPath) : (string)A
 <script src="<?= rtrim(BASE_URL, '/') ?>/assets/js/audio-visualizer.js?v=<?= $vizJsVer ?>"></script>
 
 <?php
-$pttJsPath = dirname(__DIR__, 2) . '/assets/js/ptt-widget.js';
-$pttJsVer  = file_exists($pttJsPath) ? (string)filemtime($pttJsPath) : (string)APP_VERSION;
+// Cache-bust con time() mientras estamos en desarrollo activo
 ?>
-<script src="<?= rtrim(BASE_URL, '/') ?>/assets/js/ptt-widget.js?v=<?= $pttJsVer ?>"></script>
+<script src="<?= rtrim(BASE_URL, '/') ?>/assets/js/ptt-widget.js?v=<?= time() ?>"></script>
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {

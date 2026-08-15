@@ -24,11 +24,9 @@ class PTTWidget {
     /**
      * @param {Object} options
      * @param {number} [options.wsPort=9093]  Companion app WS port
-     * @param {number} [options.statusInterval=5000]  Status poll ms
      */
     constructor(options = {}) {
         this.wsPort = options.wsPort || 9093;
-        this.statusInterval = options.statusInterval || 5000;
 
         /** @type {WebSocket|null} */
         this.ws = null;
@@ -39,7 +37,6 @@ class PTTWidget {
         this.maxReconnectAttempts = 20;
         this.reconnectBaseDelay = 1000;
         this.reconnectTimer = null;
-        this.statusPollTimer = null;
 
         // Volume display (from companion metadata)
         this.volumeSamples = [];
@@ -74,9 +71,10 @@ class PTTWidget {
     init() {
         this._createDOM();
         this._bindGlobalEvents();
-        this._startStatusPolling();
         this._initVisualizer();
-        // Do NOT auto-connect — wait for Connect button
+        // Auto-connect: WS a localhost funciona aunque el dashboard esté via HTTPS
+        // El onclose + _scheduleReconnect maneja la reconexión automática
+        this._openWebSocket();
     }
 
     /** Wire up the spectrum visualizer if canvas exists. */
@@ -93,7 +91,6 @@ class PTTWidget {
     /** Tear down: close WS, stop timers, unbind. */
     destroy() {
         this._clearReconnect();
-        this._stopStatusPolling();
         this._closeWebSocket();
         this._unbindGlobalEvents();
         if (this._visualizer) {
@@ -183,46 +180,6 @@ class PTTWidget {
         if (this.reconnectTimer) {
             clearTimeout(this.reconnectTimer);
             this.reconnectTimer = null;
-        }
-    }
-
-    // ---------------------------------------------------------------
-    //  Status polling (HTTP fallback)
-    // ---------------------------------------------------------------
-
-    _startStatusPolling() {
-        this._stopStatusPolling();
-        this.statusPollTimer = setInterval(() => {
-            this._pollStatus();
-        }, this.statusInterval);
-    }
-
-    _stopStatusPolling() {
-        if (this.statusPollTimer) {
-            clearInterval(this.statusPollTimer);
-            this.statusPollTimer = null;
-        }
-    }
-
-    async _pollStatus() {
-        try {
-            const resp = await fetch('http://127.0.0.1:' + this.wsPort + '/health');
-            if (!resp.ok) {
-                if (this.connected) {
-                    this._setStatus('error', 'Companion unreachable');
-                }
-                return;
-            }
-            const data = await resp.json();
-            if (data.status === 'ok') {
-                if (!this.connected) {
-                    this._openWebSocket();
-                }
-            }
-        } catch (_) {
-            if (this.connected) {
-                this._setStatus('error', 'Companion unreachable');
-            }
         }
     }
 
@@ -318,6 +275,26 @@ class PTTWidget {
     sendDtmf(digit) {
         if (!this.connected) return;
         this._send({ type: 'dtmf', digit: String(digit) });
+    }
+
+    // ---------------------------------------------------------------
+    //  Call — Place / Hangup via companion IAX2
+    // ---------------------------------------------------------------
+
+    /** Place an IAX2 call to a node through the companion app. */
+    placeCall(node) {
+        console.log("[PLACECALL] called with node:", node, "connected:", this.connected);
+        if (!this.connected) return;
+        console.log("[PLACECALL] sending WS message");
+        this._send({ type: 'call', node: String(node) });
+        this._setStatus('connected', 'Llamando...');
+    }
+
+    /** Hang up the current call through the companion app. */
+    hangupCall() {
+        if (!this.connected) return;
+        this._send({ type: 'call', action: 'hangup' });
+        this._setStatus('connected', 'Companion Connected');
     }
 
     // ---------------------------------------------------------------

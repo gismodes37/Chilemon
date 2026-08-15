@@ -689,6 +689,7 @@ function afterNodeActionLive() {
  * Llamado desde onclick="connectToNode()" en el formulario del header.
  */
 async function connectToNode() {
+  console.log("[CONNECT] Initiating call...");
   const input = document.getElementById("node-number");
   const node = input ? (input.value || "").trim() : "";
 
@@ -697,23 +698,28 @@ async function connectToNode() {
     return;
   }
 
-  // Botón de Conectar en el panel de control (selector CSS del layout actual)
-  const button = document.querySelector(".control-panel .btn.btn-success");
+  console.log("[CONNECT] Node:", node, "PTTWidget:", !!window.pttWidget, "connected:", window.pttWidget && window.pttWidget.connected, "placeCall:", typeof (window.pttWidget && window.pttWidget.placeCall));
 
+  // ALWAYS link the node first via PHP API (rpt fun *3<node>)
+  // This is the same mechanism as favorites — it links at the app_rpt level.
+  // The companion WS call alone does NOT link nodes; it only establishes audio.
   try {
-    setButtonLoading(button, true, "Conectando...");
     await postForm("api/connect.php", { node });
-
-    // Limpiar el campo después de enviar exitosamente
-    if (input) input.value = "";
-    afterNodeActionLive();
   } catch (e) {
     if (e.message !== "Unauthorized") {
       alert(`Error al conectar: ${e.message}`);
     }
-    // Restaurar botón si hubo error (en éxito la página se recarga sola)
-    setButtonLoading(button, false);
+    return;
   }
+
+  // After linking, place audio call via companion if available
+  if (window.pttWidget && window.pttWidget.connected) {
+    console.log("[CONNECT] Node linked via API, placing audio call via companion WS");
+    window.pttWidget.placeCall(node);
+  }
+
+  if (input) input.value = "";
+  afterNodeActionLive();
 }
 
 /**
@@ -746,6 +752,12 @@ async function disconnectFromNode(nodeId) {
   const node = (nodeId || "").toString().trim();
   if (!node) return;
 
+  // Hang up companion audio call first (if active)
+  if (window.pttWidget && window.pttWidget.connected && window.pttWidget.callActive) {
+    window.pttWidget.hangupCall();
+  }
+
+  // Unlink the node via PHP API (rpt fun *1<node>)
   try {
     await postForm("api/disconnect.php", { node });
     afterNodeActionLive();

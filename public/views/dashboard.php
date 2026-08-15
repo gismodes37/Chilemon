@@ -153,18 +153,20 @@ $systemInfo = $systemInfo ?? [
                     <button class="btn btn-outline-primary" onclick="window.open('https://www.qsl.net/ca2iig/', '_blank')">
                         <i class="bi bi-globe"></i> Web Site Desarrollador
                     </button>
+
                     <?php if (defined('HUB_URL') && HUB_URL !== ''): ?>
                     <?php $mapUrl = HUB_MODE ? rtrim(BASE_URL, '/') . '/map.php' : rtrim(HUB_URL, '/') . '/map.php'; ?>
                     <button class="btn btn-outline-success" onclick="window.open('<?= $mapUrl ?>', '<?= HUB_MODE ? '_self' : '_blank' ?>')">
                         <i class="bi bi-map"></i> ChileMon Map
                     </button>
+                    
                     <?php endif; ?>
                     <button class="btn btn-outline-info" id="btn-audio-settings"
                         title="Configuración de audio">
                         <i class="bi bi-sliders"></i> Audio
                     </button>
                     <button class="btn btn-outline-secondary" id="btn-companion-download"
-                        onclick="window.open('https://github.com/gismodes37/Chilemon/releases/latest', '_blank')"
+                        onclick="downloadCompanion()"
                         title="Descargar Companion App (audio nativo)">
                         <i class="bi bi-download"></i> Companion App
                     </button>
@@ -234,8 +236,10 @@ $systemInfo = $systemInfo ?? [
             <div class="col-md-4 text-end">
                 <div class="btn-group">
                     <button class="btn btn-sm btn-outline-info" onclick="refreshSystemInfo()">
-                        <i class="bi bi-arrow-clockwise"></i> Actualizar
+                        <i class="bi bi-arrow-clockwise"></i> Refrescar
                     </button>
+                </div>
+                <div class="btn-group">    
                     <button class="btn btn-sm btn-outline-info" onclick="toggleTheme()">
                         <i class="bi <?= $darkMode ? 'bi-sun' : 'bi-moon-stars' ?>"></i>
                     </button>
@@ -1122,6 +1126,27 @@ $systemInfo = $systemInfo ?? [
 </div>
 
 <script>
+function downloadCompanion() {
+    // Descargar config.toml pre-configurado con la IP de la Pi
+    const link = document.createElement('a');
+    link.href = 'api/companion-download.php';
+    link.download = 'chilemon-companion-config.toml';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // Mostrar instrucciones
+    alert(
+        '📥 Config descargado!\n\n' +
+        'Pasos:\n' +
+        '1. Descargá el Companion desde GitHub:\n' +
+        '   https://github.com/gismodes37/Chilemon/releases/latest\n\n' +
+        '2. Copiá config.toml a la carpeta del Companion\n\n' +
+        '3. Ejecutá chilemon-companion.exe\n\n' +
+        '¡Conexión automática!'
+    );
+}
+
 function confirmarReinicio(servicio, action) {
     document.getElementById('modal-servicio-nombre').textContent = servicio;
     
