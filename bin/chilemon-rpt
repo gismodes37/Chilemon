@@ -58,8 +58,13 @@ case "$CMD" in
         cd /opt/chilemon && echo "LOCAL:$(git rev-parse HEAD)" && echo "REMOTE:$(git rev-parse origin/main)" && echo "SUMMARY:$(git log --oneline HEAD..origin/main 2>/dev/null || echo 'up-to-date')"
         ;;
     git-pull)
-        # Stash cambios locales si existen, hace pull, reporta resultado
-        cd /opt/chilemon && git stash push -m "chilemon-auto-stash-$(date +%s)" 2>/dev/null; git pull origin main 2>&1; echo "STASHED:$?"
+        # Stash cambios tracked, limpiar untracked que conflictean, pull, reporta
+        cd /opt/chilemon \
+            && git stash push -m "chilemon-auto-stash-$(date +%s)" 2>/dev/null \
+            && git clean -fd 2>/dev/null \
+            && git pull origin main 2>&1 \
+            && git stash pop 2>/dev/null; \
+        echo "STASHED:$?"
         ;;
     sys-restart-webrtc)
         # Reinicia el servicio WebRTC Audio Bridge
