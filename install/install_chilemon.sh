@@ -35,7 +35,7 @@ DEFAULT_NODE_PROTO="https"
 ASL3_MODULES_ADDED=0
 INSTALL_MODE="new"
 
-TOTAL_STEPS=13
+TOTAL_STEPS=14
 
 
 # ------------------------------------------------------------------------------
@@ -905,6 +905,39 @@ EOF
 }
 
 
+configure_git_permissions() {
+    # Ensure www-data can run git-pull from the dashboard update button.
+    # This requires: (1) git identity, (2) group write access to the repo.
+    info "Configurando git para www-data (actualizaciones del dashboard)"
+
+    # 1. Create /var/www/.gitconfig if it doesn't exist or is unwritable
+    local gitconfig="/var/www/.gitconfig"
+    if [[ ! -f "$gitconfig" ]] || ! sudo -u www-data test -w "$gitconfig" 2>/dev/null; then
+        touch "$gitconfig"
+        chown www-data:www-data "$gitconfig"
+        chmod 644 "$gitconfig"
+    fi
+
+    # 2. Set git identity for www-data (needed for merge commits)
+    sudo -u www-data git config --global user.name "ChileMon" 2>/dev/null || \
+        warn "No se pudo configurar git user.name para www-data"
+    sudo -u www-data git config --global user.email "chilemon@localhost" 2>/dev/null || \
+        warn "No se pudo configurar git user.email para www-data"
+
+    ok "Git identity configurado para www-data"
+
+    # 3. Ensure repo is writable by www-data group (for git stash, merge, clean)
+    if [[ -d "$REPO_DIR/.git" ]]; then
+        chown -R "$(stat -c '%U' "$REPO_DIR/.git/HEAD" 2>/dev/null || echo stg):www-data" "$REPO_DIR"
+        find "$REPO_DIR" -type d -exec chmod g+s {} + 2>/dev/null
+        chmod -R g+w "$REPO_DIR" 2>/dev/null
+        ok "Permisos de escritura git aplicados a $REPO_DIR (grupo: www-data)"
+    else
+        warn "No se encontró $REPO_DIR/.git — se omite ajuste de permisos"
+    fi
+}
+
+
 main() {
     require_root
 
@@ -1055,7 +1088,10 @@ main() {
     chmod -R 775 "$DATA_DIR" "$LOG_DIR" "$BACKUP_DIR"
     ok "Carpetas preparadas y permisos aplicados"
 
-    step "5" "Generando configuración local"
+    step "5" "Configurando permisos git para actualizaciones desde el dashboard"
+    configure_git_permissions
+
+    step "6" "Generando configuración local"
     if [[ "$INSTALL_MODE" == "update" ]]; then
         info "Modo actualización — configuración existente preservada"
         ok "Archivo de configuración mantenido: $LOCAL_CONFIG"
@@ -1072,34 +1108,34 @@ main() {
             "$hub_url"
     fi
 
-    step "6" "Configurando módulos de Asterisk para ASL3"
+    step "7" "Configurando módulos de Asterisk para ASL3"
     configure_asl3_modules
 
-    step "7" "Configurando Asterisk para WebRTC"
+    step "8" "Configurando Asterisk para WebRTC"
     configure_webrtc_asterisk
 
-    step "8" "Instalando wrapper y sudoers"
+    step "9" "Instalando wrapper y sudoers"
     write_wrapper_if_missing
     write_sudoers
 
-    step "9" "Configurando Apache"
+    step "10" "Configurando Apache"
     write_apache_config
 
-    step "10" "Habilitando proxy WebSocket para Apache"
+    step "11" "Habilitando proxy WebSocket para Apache"
     enable_apache_websocket
 
-    step "11" "Validando PHP e inicializando ChileMon"
+    step "12" "Validando PHP e inicializando ChileMon"
     validate_php_modules
     run_php_installer
 
-    step "12" "Instalando puente WebRTC"
+    step "13" "Instalando puente WebRTC"
     install_webrtc_bridge
 
     if [[ "$INSTALL_MODE" == "new" ]]; then
-        step "13" "Creando usuario administrador de ChileMon"
+        step "14" "Creando usuario administrador de ChileMon"
         run_php_user_creation
     else
-        step "13" "Verificación de la instalación"
+        step "14" "Verificación de la instalación"
         run_verification
     fi
 
