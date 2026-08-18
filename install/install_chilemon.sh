@@ -30,6 +30,7 @@ MANAGER_CONF="/etc/asterisk/manager.conf"
 ASTERISK_IAX_CONF="/etc/asterisk/iax.conf"
 ASTERISK_RPT_CONF="/etc/asterisk/rpt.conf"
 INSTALL_IAX_SNIPPET="$REPO_DIR/install/asterisk/iax.conf"
+INSTALL_IAX_COMPANION="$REPO_DIR/install/asterisk/iax-companion.conf"
 INSTALL_RPT_DOCS="$REPO_DIR/install/asterisk/rpt.conf"
 DEFAULT_NODE_PROTO="https"
 ASL3_MODULES_ADDED=0
@@ -534,22 +535,29 @@ configure_webrtc_asterisk() {
                 warn "IMPORTANTE: Cambie CHANGEME_PHONE_SECRET en $ASTERISK_IAX_CONF"
             fi
 
-            # CRITICAL: Ensure calltokenoptional=127.0.0.1 exists in [general]
-            # Without it in [general], ASL3 drops REGREQ frames that lack
-            # IE_CALLTOKEN — the bridge never registers, peer stays UNKNOWN,
-            # and no IAX2 call can be established (RX/TX completely dead).
-            # NOTE: grep the [general] section only — the [webrtc-bridge] section
-            # also has calltokenoptional which would false-positive a whole-file grep.
+            # CRITICAL: Ensure calltokenoptional exists in [general]
+            # Without it in [general], ASL3 drops frames that lack
+            # IE_CALLTOKEN — peers can't connect, calls fail.
+            # Use 0.0.0.0/0 for private LAN (allows any IP).
+            # For restricted access, change to specific subnet like 192.168.0.0/24.
+            # NOTE: grep the [general] section only — other sections
+            # also have calltokenoptional which would false-positive a whole-file grep.
             local general_has_ct
-            general_has_ct=$(awk '/^\[general\]/{found=1} found && /calltokenoptional=127\.0\.0\.1/{print "yes"; exit} /^\[/{if(found && !/general/)exit}' "$ASTERISK_IAX_CONF")
+            general_has_ct=$(awk '/^\[general\]/{found=1} found && /calltokenoptional/{print "yes"; exit} /^\[/{if(found && !/general/)exit}' "$ASTERISK_IAX_CONF")
             if [[ "$general_has_ct" != "yes" ]]; then
                 backup_if_exists "$ASTERISK_IAX_CONF"
                 # Insert after requirecalltoken=no in [general] section
                 if grep -q 'requirecalltoken=no' "$ASTERISK_IAX_CONF"; then
-                    sed -i '/^requirecalltoken=no/a calltokenoptional=127.0.0.1' "$ASTERISK_IAX_CONF"
-                    ok "calltokenoptional=127.0.0.1 agregado a [general] de iax.conf"
+                    sed -i '/^requirecalltoken=no/a calltokenoptional=0.0.0.0/0' "$ASTERISK_IAX_CONF"
+                    ok "calltokenoptional=0.0.0.0/0 agregado a [general] de iax.conf ( LAN completa )"
                 else
                     warn "No se encontró requirecalltoken=no en iax.conf — calltokenoptional no agregado"
+                fi
+            else
+                # Update existing value from 127.0.0.1 to 0.0.0.0/0 if needed
+                if grep -q 'calltokenoptional=127\.0\.0\.1' "$ASTERISK_IAX_CONF"; then
+                    sed -i 's/calltokenoptional=127\.0\.0\.1/calltokenoptional=0.0.0.0\/0/g' "$ASTERISK_IAX_CONF"
+                    ok "calltokenoptional actualizado de 127.0.0.1 a 0.0.0.0/0 ( LAN completa )"
                 fi
             fi
         else
@@ -557,6 +565,21 @@ configure_webrtc_asterisk() {
         fi
     else
         warn "Snippet IAX2 no encontrado en $INSTALL_IAX_SNIPPET"
+    fi
+
+    # Step 1b: Append companion-app peer snippet to iax.conf
+    if [[ -f "$INSTALL_IAX_COMPANION" ]]; then
+        if grep -q '^\[companion-app\]' "$ASTERISK_IAX_CONF"; then
+            ok "Sección [companion-app] ya existe en $ASTERISK_IAX_CONF — se omite"
+        else
+            backup_if_exists "$ASTERISK_IAX_CONF"
+            echo "" >> "$ASTERISK_IAX_CONF"
+            cat "$INSTALL_IAX_COMPANION" >> "$ASTERISK_IAX_CONF"
+            ok "Snippet IAX2 ([companion-app]) agregado a $ASTERISK_IAX_CONF"
+            warn "IMPORTANTE: Cambie CHANGEME_COMPANION_SECRET en $ASTERISK_IAX_CONF"
+        fi
+    else
+        warn "Snippet companion-app no encontrado en $INSTALL_IAX_COMPANION"
     fi
 
     # Step 2: Add phonelogin directives to rpt.conf node block
