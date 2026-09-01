@@ -81,20 +81,30 @@ IAX_CMD_TXACC = 0x12   # Transmit Accept — Asterisk accepted our ACCEPT
 CONTROL_RINGING = 0x03
 CONTROL_ANSWER = 0x04
 
-# -- Information Element types --
-IE_USERNAME = 0x01
-IE_PASSWORD = 0x02
-IE_MD5_RESPONSE = 0x0E   # MD5 authentication response
-IE_CAUSE = 0x04
-IE_CALLING_NUMBER = 0x02  # RFC 5456 §8.7 — calling number (caller ID number)
-IE_CALLING_NAME = 0x03    # RFC 5456 §8.7 — calling name (caller ID name)
-IE_DATAFORMAT = 0x1D
-IE_CODEC = 0x1E
-IE_CALLED_NUMBER = 0x01  # RFC 5456 §8.7
-IE_FORMAT = 0x09         # RFC 5456 §8.7 — codec format bitmask
-IE_CALLTOKEN = 0x2A      # CallToken IE for ASL3 auth challenge
-IE_CHALLENGE = 0x17      # Challenge IE in AUTHREQ (raw challenge bytes)
-IE_VERSION = 0x2B
+# -- Information Element types (RFC 5456, IANA registry) --
+IE_CALLED_NUMBER = 0x01   # Number/extension being called
+IE_CALLING_NUMBER = 0x02  # Calling number
+IE_CALLING_ANI = 0x03     # Calling ANI for billing
+IE_CALLING_NAME = 0x04    # Name of caller
+IE_CALLED_CONTEXT = 0x05  # Context for number
+IE_USERNAME = 0x06        # Username for authentication
+IE_PASSWORD = 0x07        # Password for authentication
+IE_CAPABILITY = 0x08      # Actual CODEC capability
+IE_FORMAT = 0x09          # Desired CODEC format
+IE_LANGUAGE = 0x0A        # Desired language
+IE_VERSION = 0x0B         # Protocol version
+IE_AUTHMETHODS = 0x0E     # Authentication method(s) bitmask
+IE_CHALLENGE = 0x0F       # Challenge data for MD5/RSA
+IE_MD5_RESULT = 0x10      # MD5 challenge result
+IE_RSA_RESULT = 0x11      # RSA challenge result
+IE_CAUSE = 0x16           # Cause
+IE_DATETIME = 0x1F        # Date/Time
+IE_CALLINGPRES = 0x26     # Calling presentation
+IE_CALLINGTON = 0x27      # Calling type of number
+IE_CALLINGTNS = 0x28      # Calling transit network select
+IE_CAUSECODE = 0x2A       # Hangup cause code
+IE_CODEC_PREFS = 0x2D     # CODEC Negotiation
+IE_CALLTOKEN = 0x36       # CallToken for ASL3 auth
 
 # -- Codec IDs --
 CODEC_ULAW = 0x04  # g711u / PCM ulaw
@@ -534,7 +544,8 @@ class IAX2Session:
 
     def _send_new(self, called_number: str, caller_number: str = "") -> None:
         payload = (
-            _make_ie(IE_CALLED_NUMBER, called_number)
+            _make_ie(IE_VERSION, struct.pack("!H", 2))  # RFC 5456 §6.2.2 — MUST be first
+            + _make_ie(IE_CALLED_NUMBER, called_number)
             + _make_ie(IE_CALLING_NUMBER, caller_number)
             + _make_ie(IE_FORMAT, struct.pack("!I", CODEC_ULAW))
             + _make_ie(IE_CALLTOKEN, b"")  # Signal CallToken support to ASL3
@@ -552,7 +563,7 @@ class IAX2Session:
 
         Called after receiving AUTHREQ during call setup.
         Per chan_iax2 auth flow:
-          - IE_MD5_RESPONSE = MD5(challenge_bytes + password)
+          - IE_MD5_RESULT = MD5(challenge_bytes + password)
 
         The challenge can come from IE_CHALLENGE, IE_CALLTOKEN,
         or as raw bytes in the AUTHREQ payload.
@@ -564,7 +575,7 @@ class IAX2Session:
         md5_input = self._call_auth_challenge + self.password.encode("utf-8")
         md5_hash = hashlib.md5(md5_input).digest()
 
-        payload = _make_ie(IE_MD5_RESPONSE, md5_hash)
+        payload = _make_ie(IE_MD5_RESULT, md5_hash)
         self._send_full_frame(
             dest_callno=self._dest_callno,
             src_callno=self._callno,
@@ -1464,7 +1475,7 @@ class IAX2Server:
         Per chan_iax2 CallToken auth flow:
           - IE_USERNAME
           - IE_CALLTOKEN (echo back the challenge)
-          - IE_MD5_RESPONSE = MD5(CallToken_bytes + password)
+          - IE_MD5_RESULT = MD5(CallToken_bytes + password)
 
         NO plaintext IE_PASSWORD — the MD5 replaces it.
         """
@@ -1479,7 +1490,7 @@ class IAX2Server:
         payload = (
             _make_ie(IE_USERNAME, self._reg_username)
             + _make_ie(IE_CALLTOKEN, self._reg_calltoken)
-            + _make_ie(IE_MD5_RESPONSE, md5_hash)
+            + _make_ie(IE_MD5_RESULT, md5_hash)
         )
         ts = int((time.monotonic() - self._start_ts) * 1000) & 0xFFFFFFFF
         first_word = 0x8000 | (self._reg_callno & 0x7FFF)  # F=1 | src callno

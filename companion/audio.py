@@ -36,68 +36,35 @@ ULAW_INPUT_SCALE = 1 / 32768.0  # s16 -> float for RMS
 
 # ---------------------------------------------------------------------------
 # G.711 μ-law encode/decode (replaces deprecated audioop)
+# Based on ITU-T G.711 standard for right-justified 14-bit PCM.
+# Decode: y = (-1)^s * [(33 + 2*m) * 2^e - 33]
+# Encode: biased = abs(sample) + 33, find segment, extract mantissa.
 # ---------------------------------------------------------------------------
 
-# μ-law lookup table: 8-bit ulaw -> int16 PCM
-_ULAW_DECODE_TABLE: list[int] = []
-# Seed the table
-_BIAS = 0x84  # bias for linear code
-for _mag in range(128):
-    _mant = _mag << 4
-    _seg = (_mag >> 4) & 0x07
-    if _seg == 0:
-        _decoded = _mant << 2
-    elif _seg == 1:
-        _decoded = (_mant << 3) + 0x100
-    elif _seg == 2:
-        _decoded = (_mant << 4) + 0x200
-    elif _seg == 3:
-        _decoded = (_mant << 5) + 0x400
-    elif _seg == 4:
-        _decoded = (_mant << 6) + 0x800
-    elif _seg == 5:
-        _decoded = (_mant << 7) + 0x1000
-    elif _seg == 6:
-        _decoded = (_mant << 8) + 0x2000
-    else:  # seg == 7
-        _decoded = (_mant << 9) + 0x4000
-    _ULAW_DECODE_TABLE.append(_decoded)
+_BIAS = 33  # Standard G.711 µ-law bias for right-justified 14-bit PCM
 
-# μ-law encode table (int16 PCM segment -> exponent)
-_ULAW_ENCODE_SEG: list[int] = [
-    0, 0, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3,
-    4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
-    5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-    5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-    6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
-    6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
-    6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
-    6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
-    7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
-    7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
-    7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
-    7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
-    7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
-    7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
-    7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
-    7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
-]
+# Decode table: 256 entries for all possible µ-law byte values
+_ULAW_DECODE_TABLE: list[int] = []
+for _ulaw_byte in range(256):
+    _val = ~_ulaw_byte & 0xFF  # invert (µ-law ones-complement)
+    _sign = (_val >> 7) & 1
+    _exponent = (_val >> 4) & 7
+    _mantissa = _val & 0x0F
+    _decoded = ((_mantissa * 2 + _BIAS) << _exponent) - _BIAS
+    if _sign:
+        _decoded = -_decoded
+    _ULAW_DECODE_TABLE.append(_decoded)
 
 
 def ulaw2lin(ulaw_data: bytes) -> bytes:
     """Decode μ-law bytes to 16-bit linear PCM (little-endian).
 
     Replaces audioop.ulaw2lin(data, 2).
+    Standard formula: y = (-1)^s * [(33 + 2*m) * 2^e - 33]
     """
     pcm = bytearray(len(ulaw_data) * 2)
     for i, ulaw_byte in enumerate(ulaw_data):
-        ulaw_val = ~ulaw_byte & 0xFF  # invert (μ-law uses ones-complement)
-        sign = ulaw_val & 0x80
-        magnitude = ulaw_val & 0x7F
-        decoded = _ULAW_DECODE_TABLE[magnitude]
-        if sign:
-            decoded = -decoded
-        pcm[i * 2:i * 2 + 2] = struct.pack("<h", decoded)
+        pcm[i * 2:i * 2 + 2] = struct.pack("<h", _ULAW_DECODE_TABLE[ulaw_byte])
     return bytes(pcm)
 
 
@@ -105,46 +72,31 @@ def lin2ulaw(pcm_data: bytes) -> bytes:
     """Encode 16-bit linear PCM (little-endian) to μ-law bytes.
 
     Replaces audioop.lin2ulaw(data, 2).
+    Uses bit_length for segment detection — correct for all 14-bit values.
     """
     ulaw = bytearray(len(pcm_data) // 2)
     for i in range(0, len(pcm_data), 2):
         sample = struct.unpack("<h", pcm_data[i:i + 2])[0]
 
-        # Get sign and magnitude
+        # Get sign and absolute value
         if sample >= 0:
             sign = 0x00
-            abs_sample = sample
+            biased = sample + _BIAS
         else:
             sign = 0x80
-            abs_sample = -sample
+            biased = -sample + _BIAS
 
-        # Clamp to 13-bit range (0-8159)
-        if abs_sample > 8159:
-            abs_sample = 8159
+        # Clip to max biased value for segment 7 (4096-8191)
+        if biased > 8191:
+            biased = 8191
 
-        # Compand: determine exponent (segment) and mantissa
-        # abs_sample is a 13-bit signed value (s12)
-        # Normalize to 13-bit: shift until top 4 bits fit
-        comp = abs_sample + _BIAS
-        seg = _ULAW_ENCODE_SEG[abs_sample >> 4]
-        if seg == 0:
-            mant = (comp >> 2) & 0x0F
-        elif seg == 1:
-            mant = (comp >> 3) & 0x0F
-        elif seg == 2:
-            mant = (comp >> 4) & 0x0F
-        elif seg == 3:
-            mant = (comp >> 5) & 0x0F
-        elif seg == 4:
-            mant = (comp >> 6) & 0x0F
-        elif seg == 5:
-            mant = (comp >> 7) & 0x0F
-        elif seg == 6:
-            mant = (comp >> 8) & 0x0F
-        else:  # seg == 7
-            mant = (comp >> 9) & 0x0F
+        # Segment = bit_length(biased) - 6, clamped to 0..7
+        seg = max(0, min(7, biased.bit_length() - 6))
 
-        # Combine: sign | segment | mantissa, then invert (μ-law ones-complement)
+        # Mantissa = 4 bits just below the leading 1
+        mant = (biased >> (seg + 1)) & 0x0F
+
+        # Combine: sign | segment | mantissa, then invert (µ-law ones-complement)
         ulaw_val = sign | (seg << 4) | mant
         ulaw[i // 2] = ~ulaw_val & 0xFF
 
