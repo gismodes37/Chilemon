@@ -76,6 +76,10 @@ IAX_CMD_REGACK = 0x0F
 IAX_CMD_REGREJ = 0x10
 IAX_CMD_REGREL = 0x11
 IAX_CMD_TXACC = 0x12   # Transmit Accept — Asterisk accepted our ACCEPT
+# Asterisk extension (not in RFC 5456): challenge/response used to prove the
+# caller can receive at its source address. chan_iax2/iax2.h defines
+# IAX_COMMAND_CALLTOKEN = 40. NOTE: this is NOT REGAUTH (0x0E = 14).
+IAX_CMD_CALLTOKEN = 0x28
 
 # -- Control subclasses (IAX_TYPE_CONTROL, RFC 5456 §8.3) --
 CONTROL_RINGING = 0x03
@@ -238,8 +242,35 @@ class IAX2Session:
         # Call authentication state (AUTHREQ → AUTHREP flow)
         self._call_auth_challenge: Optional[bytes] = None
 
+        # Whether the full VOICE frame declaring the codec has been sent.
+        # chan_iax2 keeps voiceformat=0 until it sees one; while it is 0,
+        # every mini frame triggers iax2_vnak() and the call dies.
+        self._voice_format_sent: bool = False
+
+        # Monotonic 32-bit RX timestamp. Mini frames carry only 16 bits, so
+        # the full VOICE frame anchors the timeline and each mini frame
+        # contributes a forward delta. Per-call: cleared in start_call.
+        self._rx_ts32: Optional[int] = None
+
+        # TX media timestamp counter (ms). The sound device delivers two
+        # buffers inside the same wall-clock millisecond, so a monotonic
+        # clock repeats ts values and Asterisk's jitter buffer discards the
+        # duplicate as a replay (~46% loss observed in the *0 echo). The
+        # timeline therefore advances by the payload duration alone:
+        # len//8 ms for 8 kHz ulaw (160 bytes = 20 ms). Per-call: reset
+        # in start_call alongside _voice_format_sent.
+        self._tx_media_ts: int = 0
+
+        # Last NEW target — lets a CallToken challenge re-send the identical
+        # NEW without the caller having to supply the numbers again.
+        self._called_number: str = ""
+        self._caller_number: str = ""
+
         # -- Public callbacks --
-        self.on_audio_frame: Optional[Callable[[bytes], Awaitable[None]]] = None
+        # RX audio callback. Carries the frame's IAX2 timestamp (unwrapped
+        # to a monotonic 32-bit value) — the jitter buffer orders and times
+        # playout by it.
+        self.on_audio_frame: Optional[Callable[[bytes, int], Awaitable[None]]] = None
         self.on_disconnect: Optional[Callable[[], Awaitable[None]]] = None
         self.on_inbound_call: Optional[Callable[[str], Awaitable[None]]] = None
 
@@ -399,6 +430,14 @@ class IAX2Session:
         self._callno = next_callno
         self._dest_callno = 0
         self._call_auth_challenge = None  # Clear stale auth state
+        # Each call re-negotiates voiceformat on Asterisk's side, so the
+        # full VOICE frame announcing the codec must be sent again.
+        self._voice_format_sent = False
+        # The RX unwrap anchor belongs to the previous call's timeline.
+        self._rx_ts32 = None
+        # New call = new media timeline (Asterisk re-anchors on the first
+        # full VOICE frame of each call).
+        self._tx_media_ts = 0
         self._state = self.STATE_CALLING
 
         # --- NEW ---
@@ -488,6 +527,8 @@ class IAX2Session:
             frametype=IAX_TYPE_DTMF,
             subclass=d,
         )
+        # DTMF is a full frame chan_iax2 counts towards iseqno.
+        self._oseqno = (self._oseqno + 1) & 0xFF
         logger.debug("DTMF sent: %s", digit)
         return True
 
@@ -499,6 +540,13 @@ class IAX2Session:
     def send_voice(self, ulaw_payload: bytes) -> bool:
         """Send ulaw audio as a mini voice frame.
 
+        The FIRST voice frame of a call is a full frame carrying the codec
+        bitfield: chan_iax2 keeps ``pvt->voiceformat = 0`` until it receives
+        one, and while it is 0 every mini frame hits
+        ``ast_debug(1, "Received mini frame before first full voice frame")``
+        followed by ``iax2_vnak()``, so the call dies in a VNAK storm. That
+        full frame carries this first audio chunk too, so nothing is lost.
+
         Parameters
         ----------
         ulaw_payload : bytes
@@ -509,12 +557,36 @@ class IAX2Session:
         if not self.in_call:
             return False
 
-        ts_raw = int((time.monotonic() - self._start_ts) * 1000)
-        ts_low = ts_raw & 0xFFFF
+        if not self._voice_format_sent:
+            self._voice_format_sent = True
+            # Anchor the media timeline: the full VOICE frame carries ts=0
+            # and every mini frame that follows steps by payload duration.
+            frame_ts = self._tx_media_ts
+            self._tx_media_ts += len(ulaw_payload) // 8
+            self._send_full_frame(
+                dest_callno=self._dest_callno,
+                frametype=IAX_TYPE_VOICE,
+                subclass=CODEC_ULAW,  # AST_FORMAT_ULAW = 1ULL << 2
+                payload=ulaw_payload,
+                c=0,
+                ts=frame_ts,
+            )
+            # chan_iax2 increments iseqno on this full frame.
+            self._oseqno = (self._oseqno + 1) & 0xFF
+            return True
 
-        # Mini frame: F=1 (0x8000) + destination call number (15 bits)
-        type_field = 0x8000 | (self._dest_callno & 0x7FFF)
+        # Media counter, not the wall clock: two audio buffers can land in
+        # the same millisecond and a repeated ts is dropped by Asterisk's
+        # jitter buffer as a duplicate replay.
+        ts_low = self._tx_media_ts & 0xFFFF
+        self._tx_media_ts += len(ulaw_payload) // 8
+
+        # Mini frame (RFC 5456 §8.1.2): the F bit MUST be 0 and the 15-bit
+        # field carries the SOURCE call number. chan_iax2 builds it exactly
+        # this way — `mh->callno = htons(fr->callno)` with no 0x8000 flag.
+        type_field = self._callno & 0x7FFF
         mini = struct.pack("!HH", type_field, ts_low)
+        logger.debug("TX mini frame: ts=%d len=%d", ts_low, len(ulaw_payload))
         self._transport_send(mini + ulaw_payload)
         return True
 
@@ -542,13 +614,36 @@ class IAX2Session:
             subclass=IAX_CMD_REGREL,
         )
 
-    def _send_new(self, called_number: str, caller_number: str = "") -> None:
+    def _send_new(
+        self,
+        called_number: str,
+        caller_number: str = "",
+        calltoken: bytes | None = None,
+    ) -> None:
+        """Send a NEW frame establishing a call.
+
+        *calltoken* is the token echoed back from an Asterisk CallToken
+        challenge. The first NEW sends an empty IE to advertise CallToken
+        support (chan_iax2 handle_call_token Case 1); a challenge then
+        requires re-sending this same NEW with the token filled in (Case 2).
+
+        IE_USERNAME is mandatory: without it Asterisk cannot run
+        find_user()/check_access() and the call would never land in the
+        peer's configured context.
+        """
+        # Remember the target so a CallToken challenge can re-send an
+        # identical NEW without waiting for the caller to supply it again.
+        self._called_number = called_number
+        self._caller_number = caller_number
+
+        token = b"" if calltoken is None else calltoken
         payload = (
             _make_ie(IE_VERSION, struct.pack("!H", 2))  # RFC 5456 §6.2.2 — MUST be first
             + _make_ie(IE_CALLED_NUMBER, called_number)
             + _make_ie(IE_CALLING_NUMBER, caller_number)
+            + _make_ie(IE_USERNAME, self.username)
             + _make_ie(IE_FORMAT, struct.pack("!I", CODEC_ULAW))
-            + _make_ie(IE_CALLTOKEN, b"")  # Signal CallToken support to ASL3
+            + _make_ie(IE_CALLTOKEN, token)  # empty = "I support CallTokens"
         )
         self._send_full_frame(
             dest_callno=0,
@@ -562,20 +657,28 @@ class IAX2Session:
         """Send AUTHREP with MD5(challenge + password).
 
         Called after receiving AUTHREQ during call setup.
-        Per chan_iax2 auth flow:
-          - IE_MD5_RESULT = MD5(challenge_bytes + password)
 
-        The challenge can come from IE_CHALLENGE, IE_CALLTOKEN,
-        or as raw bytes in the AUTHREQ payload.
+        chan_iax2 authenticate_verify() computes the digest and then formats
+        it as a 32-character ASCII hex string before comparing:
+
+            for (x = 0; x < 16; x++)
+                sprintf(requeststr + (x << 1), "%02hhx", digest[x]);
+            if (!strcasecmp(requeststr, md5secret)) ...
+
+        so IE_MD5_RESULT MUST carry that hex string. Sending the raw 16-byte
+        digest can never match and Asterisk re-challenges until the call dies.
+
+        The challenge comes from IE_CHALLENGE, IE_CALLTOKEN, or the raw
+        AUTHREQ payload.
         """
         if self._call_auth_challenge is None:
             logger.error("_send_authrep: no challenge stored")
             return
 
         md5_input = self._call_auth_challenge + self.password.encode("utf-8")
-        md5_hash = hashlib.md5(md5_input).digest()
+        md5_hex = hashlib.md5(md5_input).hexdigest()
 
-        payload = _make_ie(IE_MD5_RESULT, md5_hash)
+        payload = _make_ie(IE_MD5_RESULT, md5_hex)
         self._send_full_frame(
             dest_callno=self._dest_callno,
             src_callno=self._callno,
@@ -583,10 +686,14 @@ class IAX2Session:
             subclass=IAX_CMD_AUTHREP,
             payload=payload,
         )
+        # AUTHREP is an ordinary full frame: chan_iax2 increments iseqno on
+        # it, so our counter must advance too. A stale value makes every
+        # later frame look out-of-order (acked-and-dropped, or VNAK).
+        self._oseqno = (self._oseqno + 1) & 0xFF
         logger.debug(
-            "AUTHREP sent: challenge_hex=%s md5_hex=%s",
+            "AUTHREP sent: challenge_hex=%s md5=%s",
             self._call_auth_challenge.hex(),
-            md5_hash.hex(),
+            md5_hex,
         )
 
     # -- Inbound call helpers (Asterisk calls the registered phone) --
@@ -665,6 +772,10 @@ class IAX2Session:
             subclass=IAX_CMD_PONG,
             ts=ts,
         )
+        # In-call PONG is a full frame chan_iax2 counts (only ACK/INVAL/
+        # TX* are exempt), so advance the counter. Qualify POKE has its own
+        # sequence space and goes through _send_poke_pong instead.
+        self._oseqno = (self._oseqno + 1) & 0xFF
 
     def _send_poke_pong(self, dest_callno: int, ts: int) -> None:
         """Send PONG for qualify POKE using dedicated callno + sequence.
@@ -759,23 +870,45 @@ class IAX2Session:
             # F=0 → Mini frame (voice, 4-byte header)
             self._on_mini_frame(data)
 
+    def _unwrap_rx_ts(self, ts16: int) -> int:
+        """Expand a mini frame's 16-bit timestamp into a monotonic 32-bit one.
+
+        chan_iax2 puts ``ts & 0xFFFF`` in mini frames, so past 65.5 s of a
+        call the value wraps back towards 0. The full VOICE frame carries
+        the full 32-bit timestamp and anchors the timeline; every mini
+        frame then contributes only its forward delta.
+        """
+        if self._rx_ts32 is None:
+            # Joined mid-call with no full frame yet — anchor here.
+            self._rx_ts32 = ts16
+            return ts16
+
+        delta = (ts16 - (self._rx_ts32 & 0xFFFF)) & 0xFFFF
+        if delta <= 0x8000:
+            self._rx_ts32 += delta
+        else:
+            # Negative step: reordering, not a wrap.
+            self._rx_ts32 -= 0x10000 - delta
+        return self._rx_ts32
+
     def _on_mini_frame(self, data: bytes) -> None:
         """Handle incoming mini frame (voice from Asterisk)."""
         # Mini header is 4 bytes
         if len(data) < 4:
             return
 
-        type_field, _ts_low = struct.unpack("!HH", data[:4])
+        type_field, ts_low = struct.unpack("!HH", data[:4])
         callno = type_field & 0x7FFF
+        ts_ms = self._unwrap_rx_ts(ts_low)
 
         logger.debug(
-            "RX mini frame: callno=%d len=%d",
-            callno, len(data),
+            "RX mini frame: callno=%d ts=%d len=%d",
+            callno, ts_low, len(data),
         )
 
         voice_payload = data[4:]
         if voice_payload and self.on_audio_frame:
-            asyncio.ensure_future(self.on_audio_frame(voice_payload))
+            asyncio.ensure_future(self.on_audio_frame(voice_payload, ts_ms))
 
         # ACK the mini frame's destination call number
         self._send_ack(dest_callno=callno, src_callno=self._callno)
@@ -809,8 +942,15 @@ class IAX2Session:
             # Incoming voice full-frame (not mini) — voice audio from Asterisk
             if c == 1:
                 pass  # Retransmission or ACK-only, no payload
-            elif payload and self.on_audio_frame:
-                asyncio.ensure_future(self.on_audio_frame(payload))
+            else:
+                # Full frames carry the 32-bit timestamp that anchors the
+                # 16-bit mini frame timeline.
+                self._rx_ts32 = ts
+                if payload and self.on_audio_frame:
+                    logger.debug(
+                        "RX full VOICE: ts=%d len=%d", ts, len(payload),
+                    )
+                    asyncio.ensure_future(self.on_audio_frame(payload, ts))
             # ACK every voice full frame so Asterisk keeps sending audio.
             # Without this, Asterisk retransmits a few times then hangs up.
             # Mirrors the ACK pattern in _on_mini_frame (line 601).
@@ -838,6 +978,36 @@ class IAX2Session:
         elif subclass == IAX_CMD_REGREJ:
             self._response_data = "REGREJ"
             self._response_event.set()
+
+        elif subclass == IAX_CMD_CALLTOKEN:
+            # Asterisk CallToken challenge — chan_iax2 handle_call_token Case 1.
+            # The token is sha1(source address + timestamp + a private Asterisk
+            # secret), so it can ONLY be echoed back verbatim; it cannot be
+            # recomputed and it is not an MD5 of the password.
+            ies = _parse_ies(payload)
+            token = ies.get(IE_CALLTOKEN, b"")
+            if not token:
+                logger.warning("CALLTOKEN challenge carries no token — ignoring")
+            elif self._state < self.STATE_CALLING:
+                logger.warning(
+                    "CALLTOKEN challenge outside call setup — ignoring "
+                    "(CallToken for registration is not implemented)"
+                )
+            else:
+                logger.info(
+                    "CALLTOKEN challenge (%d bytes) — re-sending NEW with token",
+                    len(token),
+                )
+                # chan_iax2's resend_with_token() resets its sequence numbers
+                # and re-sends the identical NEW; mirror that so Asterisk
+                # treats this as a fresh dialog rather than a duplicate.
+                self._oseqno = 0
+                self._send_new(
+                    self._called_number,
+                    self._caller_number,
+                    calltoken=token,
+                )
+                self._oseqno = (self._oseqno + 1) & 0xFF
 
         elif subclass == IAX_CMD_ACCEPT:
             if self._ignore_retransmit and self._response_data == "NEWACK":
@@ -988,6 +1158,13 @@ class IAX2Call:
         self.oseqno: int = 0
         self.iseqno: int = 0
 
+        # TX media timestamp counter (ms) — advances by payload duration
+        # (len//8 for 8 kHz ulaw) instead of the wall clock, so back-to-back
+        # buffers in the same millisecond never repeat a ts (Asterisk's
+        # jitter buffer drops repeats as duplicate replays). Mirrors
+        # IAX2Session._tx_media_ts.
+        self._tx_media_ts: int = 0
+
         # -- Public callbacks (set by server.py) --
         self.on_voice: Optional[Callable[[bytes], Awaitable[None]]] = None
         self.on_hangup: Optional[Callable[["IAX2Call"], Awaitable[None]]] = None
@@ -1123,9 +1300,11 @@ class IAX2Call:
         """Send ulaw audio as a mini voice frame to the peer."""
         if self.state == CALL_STATE_HUNGUP:
             return
-        ts_raw = int((time.monotonic() - self._start_ts) * 1000)
-        ts_low = ts_raw & 0xFFFF
-        type_field = 0x8000 | (self.peer_callno & 0x7FFF)
+        # Media counter, not the wall clock (see _tx_media_ts).
+        ts_low = self._tx_media_ts & 0xFFFF
+        self._tx_media_ts += len(ulaw_payload) // 8
+        # Mini frame (RFC 5456 §8.1.2): F=0 and the SOURCE call number.
+        type_field = self.callno & 0x7FFF
         mini = struct.pack("!HH", type_field, ts_low)
         self._transport.sendto(mini + ulaw_payload, self.peer_addr)
 
@@ -1483,9 +1662,11 @@ class IAX2Server:
             logger.error("_send_regreq_with_calltoken: no CallToken stored")
             return
 
-        # MD5(CallToken_bytes + password)
+        # MD5(CallToken_bytes + password). Asterisk compares this against a
+        # 32-char hex string (register_verify: sprintf "%02hhx"), so send the
+        # hex form — never the raw 16-byte digest.
         md5_input = self._reg_calltoken + self._reg_password.encode("utf-8")
-        md5_hash = hashlib.md5(md5_input).digest()
+        md5_hash = hashlib.md5(md5_input).hexdigest()
 
         payload = (
             _make_ie(IE_USERNAME, self._reg_username)

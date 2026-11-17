@@ -55,7 +55,7 @@ class CompanionSession:
         self._monitor_task: Optional[asyncio.Task[None]] = None
 
         # Callback: received audio (ulaw bytes)
-        self.on_audio_rx: Optional[Callable[[bytes], Awaitable[None]]] = None
+        self.on_audio_rx: Optional[Callable[[bytes, int], Awaitable[None]]] = None
         # Callback: status change (is_registered, in_call, ptt_active, error)
         self.on_status: Optional[Callable[[dict], Awaitable[None]]] = None
 
@@ -285,11 +285,15 @@ class CompanionSession:
             return self._session.send_voice(ulaw_payload)
         return False
 
-    async def _on_audio_rx(self, ulaw_payload: bytes) -> None:
-        """Received audio from Asterisk — forward to audio.py callback."""
+    async def _on_audio_rx(self, ulaw_payload: bytes, ts_ms: int) -> None:
+        """Received audio from Asterisk — forward to audio.py callback.
+
+        *ts_ms* is the frame's unwrapped IAX2 timestamp; the jitter buffer
+        needs it to order and time playout.
+        """
         self._last_audio_time = time.monotonic()
         if self.on_audio_rx:
-            await self.on_audio_rx(ulaw_payload)
+            await self.on_audio_rx(ulaw_payload, ts_ms)
 
     async def _on_disconnect(self) -> None:
         """Remote disconnect from Asterisk."""

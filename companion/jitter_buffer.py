@@ -121,51 +121,49 @@ class JitterBuffer:
     
     def pop(self) -> Optional[bytes]:
         """Get the next frame to play.
-        
-        Returns ulaw payload or None if no frame ready.
-        Called from the audio playback thread.
+
+        Returns the earliest-timestamped buffered frame, or concealment
+        audio when the buffer has run dry. Called from the audio playback
+        thread.
+
+        The step between consecutive timestamps is deliberately NOT assumed
+        to be FRAME_DURATION_MS. Asterisk stamps the echo from its own
+        receive clock, which mirrors our bursty Windows audio callback:
+        the live *0 echo measured steps of 20 ms and 40 ms interleaved. An
+        exact ``last + 20 ms`` walk misses those frames, the buffer fills
+        to its maximum and _trim_buffer discards the rest.
         """
         with self._lock:
             if self._first_timestamp is None:
                 return None
-            
-            # Calculate expected timestamp based on time elapsed
-            elapsed_ms = (time.monotonic() - self._play_start_time) * 1000
-            expected_ts = self._first_timestamp + int(elapsed_ms)
-            
-            # Find the frame we should play next
-            next_ts = (self._last_played_timestamp or self._first_timestamp) + FRAME_DURATION_MS
-            
-            # Check if we have the next frame
-            if next_ts in self._buffer:
-                frame = self._buffer.pop(next_ts)
-                self._last_played_timestamp = next_ts
+
+            if self._buffer:
+                ts = min(self._buffer)
+                frame = self._buffer.pop(ts)
+                self._last_played_timestamp = ts
                 self._last_good_frame = frame
                 self._plc_count = 0
                 self._frames_played += 1
                 return frame.payload
-            
-            # Frame missing - try PLC if enabled
+
+            # Buffer underrun — conceal with the last good frame.
+            if self._plc_count == 0:
+                logger.debug("PLC: buffer empty, generating concealment")
+
             if self._plc_enabled and self._last_good_frame is not None:
                 if self._plc_count < self._max_plc_frames:
-                    # Generate PLC frame
                     plc_payload = self._generate_plc()
                     self._plc_count += 1
                     self._frames_plc += 1
-                    self._last_played_timestamp = next_ts
-                    
-                    if self._plc_count == 1:
-                        logger.debug("PLC: frame %d missing, generating concealment", next_ts)
-                    
                     return plc_payload
-                else:
-                    # Too many consecutive missing frames - return silence
-                    logger.warning("PLC: %d consecutive missing frames, returning silence", self._plc_count)
-                    self._last_played_timestamp = next_ts
-                    return b'\x00' * BYTES_PER_FRAME
-            
-            # No PLC available, return silence
-            self._last_played_timestamp = next_ts
+
+                # Too many consecutive missing frames — return silence.
+                logger.warning(
+                    "PLC: %d consecutive missing frames, returning silence",
+                    self._plc_count,
+                )
+                return b'\x00' * BYTES_PER_FRAME
+
             return b'\x00' * BYTES_PER_FRAME
     
     def _update_jitter(self, frame: AudioFrame) -> None:

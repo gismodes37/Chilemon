@@ -238,32 +238,35 @@ class AudioEngine:
 
     # -- RX: playback (called from session when audio arrives) --
 
-    def play_ulaw(self, ulaw_payload: bytes) -> None:
+    def play_ulaw(self, ulaw_payload: bytes, ts_ms: int) -> None:
         """Queue received ulaw audio for speaker playback.
-        
-        Now uses jitter buffer for reordering, PLC, and adaptive delay.
-        Uses arrival time for jitter estimation (simpler than reconstructing
-        IAX2 timestamps from 16-bit mini frame values).
-        
+
+        Uses the jitter buffer for reordering, PLC, and adaptive delay.
+
         Parameters
         ----------
         ulaw_payload : bytes
-            ulaw-encoded audio frame (typically 160 bytes = 20ms)
+            ulaw-encoded audio frame (typically 160 bytes = 20ms).
+        ts_ms : int
+            The frame's IAX2 timestamp, already unwrapped to a monotonic
+            32-bit value by IAX2Session. The buffer keys and orders playout
+            by it: arrival time cannot be used because Asterisk's steps are
+            irregular (20/40 ms measured) and two frames landing in the same
+            millisecond would be discarded as duplicates.
         """
         if not self._running or self._output_stream is None:
             return
-        
-        # Create audio frame with arrival time as timestamp
+
         import time
+
         self._frame_counter += 1
-        arrival_ms = int(time.monotonic() * 1000)
         frame = AudioFrame(
-            timestamp_ms=arrival_ms,
+            timestamp_ms=ts_ms,
             payload=ulaw_payload,
             received_at=time.monotonic(),
             sequence=self._frame_counter,
         )
-        
+
         # Add to jitter buffer
         self._jitter_buffer.push(frame)
 

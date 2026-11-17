@@ -33,7 +33,9 @@ def test_compute_levels_max_volume() -> None:
     """Maximum ulaw (0x00) should produce high RMS."""
     ulaw_max = bytes([0x00] * 160)
     rms, spectrum = AudioEngine._compute_levels(ulaw_max)
-    assert rms > 0.5  # max volume should be clearly audible
+    # G.711 mu-law decodes to at most +/-8031, normalized by 32768 -> ~0.245.
+    # (An assertion of > 0.5 can never pass on this scale.)
+    assert rms > 0.2  # max volume is well above silence (<= 0.1)
     assert len(spectrum) == 4
 
 

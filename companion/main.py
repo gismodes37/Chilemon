@@ -124,9 +124,9 @@ class CompanionApp:
         self.ws_server.on_call = self.session.place_call
         self.ws_server.on_hangup = self.session.hangup_call
 
-    async def _on_session_audio_rx(self, ulaw_payload: bytes) -> None:
+    async def _on_session_audio_rx(self, ulaw_payload: bytes, ts_ms: int) -> None:
         """Forward received audio from IAX2 to speaker."""
-        self.audio.play_ulaw(ulaw_payload)
+        self.audio.play_ulaw(ulaw_payload, ts_ms)
 
     async def _on_session_status(self, status: dict) -> None:
         """Forward session status changes to browser via WS."""
