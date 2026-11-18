@@ -90,6 +90,9 @@ Thumbs.db
 *.sql
 *.dump
 
+# credenciales de sincronización Engram (contiene token)
+engram-sync.ps1
+
 # archivos de prueba temporal
 tmp_*
 test.php
