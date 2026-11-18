@@ -1,8 +1,12 @@
 <?php
 declare(strict_types=1);
 
-session_start();
 require_once __DIR__ . '/../../config/app.php';
+require_once ROOT_PATH . '/app/Auth/Auth.php';
+
+use App\Auth\Auth;
+
+Auth::startSession();
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -10,14 +14,6 @@ if (!isset($_SESSION['user_id'])) {
   http_response_code(401);
   echo json_encode(['success' => false, 'error' => 'Unauthorized']);
   exit;
-}
-
-// CSRF opcional (si envías csrf_token desde JS, lo validamos)
-function csrf_ok(): bool {
-  $posted = (string)($_POST['csrf_token'] ?? '');
-  $sess   = (string)($_SESSION['csrf_token'] ?? '');
-  if ($posted === '' || $sess === '') return true; // no rompas si no lo usan aún
-  return hash_equals($sess, $posted);
 }
 
 $userId = (int)$_SESSION['user_id'];
@@ -76,8 +72,9 @@ try {
     exit;
   }
 
-  // POST
-  if (!csrf_ok()) {
+  // POST — CSRF obligatorio (timing-safe, rota el token tras validar)
+  $csrf = (string)($_POST['csrf_token'] ?? '');
+  if (!Auth::validateCsrf($csrf)) {
     http_response_code(403);
     echo json_encode(['success' => false, 'error' => 'CSRF inválido']);
     exit;

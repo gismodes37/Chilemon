@@ -163,26 +163,33 @@ Lista de decisiones y workarounds que no eran obvios y que costaron tiempo descu
 
 12. **Trampa al escribir JSON temporales.** Un one-liner Python con `open(p, 'wb')` antes de leer truncó dos archivos de resultados. Siempre leer bytes primero, validar, y recién después escribir.
 
+13. **Git ordenado en 5 work-units.** Sobre `main`, desde la base `1fd5349`: `6266fac` (codec µ-law + tests), `0c53cc3` (badge `UdpRxProbe` + controller + test), `2b7d1f9` (`favorites.php`), `68bc422` (`.gitignore` + `header.php`) y `cf904b0` (esta historia). Sin push.
+
+14. **Revisión nativa abandonada dos veces por fallo del transporte.** La transacción `review-cea984d6145a4a14` quedó en `collect/provider_refuter_required` y la `review-e809445edd95ec63` en `collect/reviewer_results_required`: los subagents de revisión devolvían `ECONNRESET` sin contenido. Ambas se abandonaron con `actor=CA2IIG`, `reason=operator_disposition`; quedaron cuarentenadas, **no aprobadas**. Regla respetada: no tocar git con la transacción abierta.
+
+15. **CSRF opcional detectado por la revisión.** La lente `review-risk` sí entregó un resultado válido y finding `R1-csrf-optional-bypass` (WARNING, determinístico) en `public/api/favorites.php`: `csrf_ok()` devolvía `true` cuando el token enviado o el de sesión estaba vacío, permitiendo un POST cross-site sin token. Corregido usando `Auth::validateCsrf()` (obligatorio, timing-safe, con rotación) y `Auth::startSession()` para endurecer la cookie. Test de regresión agregado en `tests/Auth/AuthTest.php`.
+
+16. **PHP disponible vía Docker.** No hay `php.exe` en el host, pero la imagen `chilemon-chilemon:latest` trae PHP 8.2.30. La suite se corre con `docker run --rm -v "<repo>:/app" -w /app chilemon-chilemon:latest php phpunit.phar`.
+
 ---
 
 ## 5. Estado al cierre de este registro
 
 - **Funcionando y medido:** señal TX y RX, 5/5 pruebas de TX, calibración UDP, codec validado contra CPython, badge con actividad de entrada detectada.
 - **Sin validación de oído:** eco `*0` y tonos en el repetidor con el PID `24936` (fix µ-law cargado).
-- **Sin commitear:** fix µ-law, badge `UdpRxProbe`, `favorites.php`, `.gitignore` y `header.php`. Slice 1 (`1fd5349`) commiteado pero **no pusheado**.
-- **Bloqueado:** transacción de revisión nativa en `collect/provider_refuter_required`.
+- **Git ordenado:** 5 work-units en `main` desde `1fd5349`, más el fix CSRF pendiente de commitear. Todo **no pusheado**. `public/api/log-call.php` excluido deliberadamente.
+- **Revisión nativa:** ambas transacciones abandonadas y cuarentenadas, no aprobadas. Finding de `review-risk` corregido y cubierto por test.
+- **Verificación:** suite PHP 71 tests / 124 assertiones, 0 errores (4 skipped, 6 incomplete preexistentes); pytest companion 37/37.
 - **Autorización pendiente del usuario:** push al repositorio para actualizar la Pi.
 
 ---
 
 ## 6. Próximos pasos
 
-1. Prueba de oído en horario diurno: eco `*0` y 5 tonos en el repetidor.
-2. Re-consultar el STATUS exacto del linaje de revisión; si el refuter sigue sin capturarse, presentar un único resultado *Needs your decision* sin tocar git.
-3. Cerrada la revisión, commitear en unidades de trabajo: codec µ-law, badge, `favorites.php` y ajustes de `.gitignore`/`header.php`.
-4. Ejecutar `gentle-ai review assess --committed-only` por unidad y seguir el ciclo nativo si corresponde.
-5. Con autorización explícita, hacer push y repetir pruebas de campo en la Pi.
-6. Mejorar la legibilidad del badge de actividad de entrada (follow-up reportado por el usuario).
+1. Commitear el fix CSRF como work-unit separado (`favorites.php`, `AuthTest.php`, `ApplyUpdateTest.php`, esta historia).
+2. Prueba de oído en horario diurno: eco `*0` y 5 tonos en el repetidor.
+3. Con autorización explícita, hacer push y repetir pruebas de campo en la Pi.
+4. Mejorar la legibilidad del badge de actividad de entrada (follow-up reportado por el usuario).
 
 ---
 
@@ -192,3 +199,4 @@ Lista de decisiones y workarounds que no eran obvios y que costaron tiempo descu
 - **La especificación orienta; la implementación manda.** IAX2 en `chan_iax2` no se comporta como RFC 5456.
 - **Los bugs de escala son silenciosos.** No crashean, no fallan los tests viejos, simplemente suenan mal. Por eso hacen falta pruebas con valores de referencia externos, no solo tests internos.
 - **Un avance se consolida cuando se documenta.** Esta historia existe para que nadie tenga que reconstruirla desde cero cuando el frente de audio vuelva a tocarse.
+- **El transporte de revisión agotó su recorrido.** Dos linajes abandonados por fallos del runtime de OpenCode, no del repo. Ante un tercer ciclo con el mismo defecto, la decisión del operador fue cerrar con verificación local (suite PHP en Docker + pytest) en lugar de trabar git otra vez.

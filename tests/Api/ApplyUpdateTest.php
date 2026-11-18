@@ -31,7 +31,7 @@ final class ApplyUpdateTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->savedSession = $_SESSION;
+        $this->savedSession = $_SESSION ?? [];
     }
 
     protected function tearDown(): void

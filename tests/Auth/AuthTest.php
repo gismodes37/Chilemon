@@ -18,7 +18,7 @@ final class AuthTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->savedSession = $_SESSION;
+        $this->savedSession = $_SESSION ?? [];
     }
 
     protected function tearDown(): void
@@ -50,6 +50,13 @@ final class AuthTest extends TestCase
     {
         Auth::csrfToken(); // ensure a token is present in session
         $this->assertFalse(Auth::validateCsrf('this-is-not-the-correct-token'));
+    }
+
+    #[Test]
+    public function validateCsrfRejectsEmptyPostedToken(): void
+    {
+        Auth::csrfToken(); // ensure a token is present in session
+        $this->assertFalse(Auth::validateCsrf(''));
     }
 
     // ---------------------------------------------------------------
