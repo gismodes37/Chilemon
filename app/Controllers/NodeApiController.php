@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use App\Services\AslRptService;
+use App\Services\UdpRxProbe;
 use App\Asterisk\NodeTracker;
 use Throwable;
 
@@ -22,6 +23,14 @@ class NodeApiController
 
             // v0.2.x — Parsear indicadores de actividad RX/TX
             $activity = AslRptService::parseActivity($rawStats);
+
+            // app_rpt's own RX flags are dead on this node ("Signal on input"
+            // stays NO, RPT_RXKEYED never fires), so complement them with the
+            // kernel UDP packet rate: voice arrives at 72-82 pkt/s while
+            // keepalives sit at ~1 pkt/s. Never throws.
+            if (empty($activity['rx'])) {
+                $activity['rx'] = (new UdpRxProbe())->isRxActive();
+            }
 
             $visibleLookup = array_fill_keys($visibleNodes, true);
             $directLookup  = array_fill_keys($directNodes, true);
