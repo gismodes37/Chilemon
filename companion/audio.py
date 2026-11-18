@@ -42,8 +42,12 @@ ULAW_INPUT_SCALE = 1 / 32768.0  # s16 -> float for RMS
 # ---------------------------------------------------------------------------
 
 _BIAS = 33  # Standard G.711 µ-law bias for right-justified 14-bit PCM
+_SEGMENT_ENDS = (0x3F, 0x7F, 0xFF, 0x1FF, 0x3FF, 0x7FF, 0xFFF, 0x1FFF)
 
-# Decode table: 256 entries for all possible µ-law byte values
+# Decode table: 256 entries for all possible µ-law byte values.
+# G.711 produces 14-bit right-justified PCM; 16-bit linear audio requires a
+# two-bit left shift (CPython audioop.c _st_ulaw2linear16: +/-32124 at full
+# scale). Emitting the 14-bit value directly made playback 4x too quiet.
 _ULAW_DECODE_TABLE: list[int] = []
 for _ulaw_byte in range(256):
     _val = ~_ulaw_byte & 0xFF  # invert (µ-law ones-complement)
@@ -53,7 +57,7 @@ for _ulaw_byte in range(256):
     _decoded = ((_mantissa * 2 + _BIAS) << _exponent) - _BIAS
     if _sign:
         _decoded = -_decoded
-    _ULAW_DECODE_TABLE.append(_decoded)
+    _ULAW_DECODE_TABLE.append(_decoded << 2)
 
 
 def ulaw2lin(ulaw_data: bytes) -> bytes:
@@ -69,36 +73,32 @@ def ulaw2lin(ulaw_data: bytes) -> bytes:
 
 
 def lin2ulaw(pcm_data: bytes) -> bytes:
-    """Encode 16-bit linear PCM (little-endian) to μ-law bytes.
+    """Encode 16-bit linear PCM (little-endian) to standard G.711 μ-law.
 
-    Replaces audioop.lin2ulaw(data, 2).
-    Uses bit_length for segment detection — correct for all 14-bit values.
+    CPython audioop.c converts a 16-bit sample with ``val >> 18`` (the
+    GETSAMPLE32 scale factor is 1<<16) before applying the 14-bit encoder.
+    Skipping that shift made every sample ~4x too loud on the wire and
+    saturated at 25% of full scale, which is audible as clipping/distortion.
     """
     ulaw = bytearray(len(pcm_data) // 2)
     for i in range(0, len(pcm_data), 2):
         sample = struct.unpack("<h", pcm_data[i:i + 2])[0]
 
-        # Get sign and absolute value
-        if sample >= 0:
-            sign = 0x00
-            biased = sample + _BIAS
-        else:
-            sign = 0x80
-            biased = -sample + _BIAS
+        pcm14 = sample >> 2  # 16-bit int16 -> right-justified 14-bit G.711
+        magnitude = abs(pcm14)
+        mask = 0x7F if pcm14 < 0 else 0xFF
 
-        # Clip to max biased value for segment 7 (4096-8191)
-        if biased > 8191:
-            biased = 8191
+        magnitude = min(magnitude, 32635) + _BIAS
+        seg = next(
+            (idx for idx, end in enumerate(_SEGMENT_ENDS) if magnitude <= end),
+            len(_SEGMENT_ENDS),
+        )
+        if seg >= len(_SEGMENT_ENDS):
+            ulaw[i // 2] = 0x7F ^ mask
+            continue
 
-        # Segment = bit_length(biased) - 6, clamped to 0..7
-        seg = max(0, min(7, biased.bit_length() - 6))
-
-        # Mantissa = 4 bits just below the leading 1
-        mant = (biased >> (seg + 1)) & 0x0F
-
-        # Combine: sign | segment | mantissa, then invert (µ-law ones-complement)
-        ulaw_val = sign | (seg << 4) | mant
-        ulaw[i // 2] = ~ulaw_val & 0xFF
+        mantissa = (magnitude >> (seg + 1)) & 0x0F
+        ulaw[i // 2] = ((seg << 4) | mantissa) ^ mask
 
     return bytes(ulaw)
 
