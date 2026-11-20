@@ -617,7 +617,13 @@ configure_webrtc_asterisk() {
     # Step 1b: Append companion-app peer snippet to iax.conf
     if [[ -f "$INSTALL_IAX_COMPANION" ]]; then
         if grep -q '^\[companion-app\]' "$ASTERISK_IAX_CONF"; then
-            ok "Sección [companion-app] ya existe en $ASTERISK_IAX_CONF — se omite"
+            if [[ -n "$companion_secret" ]]; then
+                backup_if_exists "$ASTERISK_IAX_CONF"
+                sed -i "/^\[companion-app\]/,/^\[/{s|^secret=.*|secret=${companion_secret}|; s|^permit=.*|permit=${lan_acl}|;}" "$ASTERISK_IAX_CONF"
+                ok "Peer [companion-app] sincronizado con secreto y ACL vigentes"
+            else
+                warn "No se pudo leer iax_companion_secret; peer [companion-app] queda sin sincronizar"
+            fi
         else
             if [[ -z "$companion_secret" ]]; then
                 companion_secret="$(generate_random_secret 24)"
