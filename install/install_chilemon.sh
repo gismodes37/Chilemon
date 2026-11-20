@@ -765,6 +765,23 @@ validate_installation() {
 # ------------------------------------------------------------------------------
 # WebRTC Audio Bridge installation
 # ------------------------------------------------------------------------------
+ensure_webrtc_service_user() {
+    local service_user="chilemon"
+
+    if ! id -u "$service_user" &>/dev/null; then
+        useradd --system --no-create-home --home-dir /nonexistent \
+            --shell /usr/sbin/nologin "$service_user"
+        ok "Usuario de servicio $service_user creado sin shell ni login"
+    else
+        ok "Usuario de servicio $service_user ya existe"
+    fi
+
+    # logs/ queda en root:www-data 770; el grupo da escritura al bridge sin
+    # necesidad de otorgar escritura sobre el código fuente.
+    usermod -aG www-data "$service_user" 2>/dev/null || \
+        warn "No se pudo agregar $service_user al grupo www-data"
+}
+
 install_webrtc_bridge() {
     info "Instalando puente WebRTC para PTT desde el navegador"
     info "Esto permite hablar por radio SIN equipos externos 🇨🇱"
@@ -830,7 +847,9 @@ install_webrtc_bridge() {
         warn "Dependencias críticas faltantes — WebRTC bridge puede no funcionar"
     fi
 
-    # Step C: Install systemd unit
+    # Step C: Create the unprivileged service user, then install the unit
+    ensure_webrtc_service_user
+
     if [[ ! -f "$SERVICE_SRC" ]]; then
         warn "No se encuentra $SERVICE_SRC — se omite unidad systemd"
     else
@@ -904,35 +923,35 @@ EOF
 
 
 configure_git_permissions() {
-    # Ensure www-data can run git-pull from the dashboard update button.
-    # This requires: (1) git identity, (2) group write access to the repo.
-    info "Configurando git para www-data (actualizaciones del dashboard)"
+    # Updates run as root through the sudo wrapper, so www-data does NOT need
+    # write access to the source tree. The previous whole-repo group write let
+    # any web-level foothold edit code executed as root (privilege escalation).
+    info "Endureciendo permisos del repositorio y directorios de ejecución"
 
-    # 1. Create /var/www/.gitconfig if it doesn't exist or is unwritable
-    local gitconfig="/var/www/.gitconfig"
-    if [[ ! -f "$gitconfig" ]] || ! sudo -u www-data test -w "$gitconfig" 2>/dev/null; then
-        touch "$gitconfig"
-        chown www-data:www-data "$gitconfig"
-        chmod 644 "$gitconfig"
+    local repo_owner
+    repo_owner="$(stat -c '%U' "$REPO_DIR/.git/HEAD" 2>/dev/null || echo root)"
+
+    # Restore source ownership to its deploy user and drop group write/setgid.
+    chown -R "${repo_owner}:${repo_owner}" "$REPO_DIR" 2>/dev/null || \
+        warn "No se pudo normalizar el dueño de $REPO_DIR"
+    chmod -R g-w "$REPO_DIR" 2>/dev/null || true
+    find "$REPO_DIR" -type d -exec chmod g-s {} + 2>/dev/null || true
+
+    # Only runtime directories need to be writable by the web user.
+    local runtime_dir
+    for runtime_dir in data logs backups; do
+        mkdir -p "$REPO_DIR/$runtime_dir"
+        chown root:www-data "$REPO_DIR/$runtime_dir"
+        chmod 770 "$REPO_DIR/$runtime_dir"
+    done
+
+    # SQLite needs group write on the database file and its WAL sidecars.
+    if [[ -f "$REPO_DIR/data/chilemon.sqlite" ]]; then
+        chown root:www-data "$REPO_DIR/data/chilemon.sqlite"
+        chmod 660 "$REPO_DIR/data/chilemon.sqlite"
     fi
 
-    # 2. Set git identity for www-data (needed for merge commits)
-    sudo -u www-data git config --global user.name "ChileMon" 2>/dev/null || \
-        warn "No se pudo configurar git user.name para www-data"
-    sudo -u www-data git config --global user.email "chilemon@localhost" 2>/dev/null || \
-        warn "No se pudo configurar git user.email para www-data"
-
-    ok "Git identity configurado para www-data"
-
-    # 3. Ensure repo is writable by www-data group (for git stash, merge, clean)
-    if [[ -d "$REPO_DIR/.git" ]]; then
-        chown -R "$(stat -c '%U' "$REPO_DIR/.git/HEAD" 2>/dev/null || echo stg):www-data" "$REPO_DIR"
-        find "$REPO_DIR" -type d -exec chmod g+s {} + 2>/dev/null
-        chmod -R g+w "$REPO_DIR" 2>/dev/null
-        ok "Permisos de escritura git aplicados a $REPO_DIR (grupo: www-data)"
-    else
-        warn "No se encontró $REPO_DIR/.git — se omite ajuste de permisos"
-    fi
+    ok "Permisos endurecidos: código no escribible por www-data; escritura solo en data/, logs/, backups/"
 }
 
 

@@ -139,6 +139,19 @@ main() {
 
     step "3 de ${TOTAL_STEPS}" "Instalando unidad systemd"
 
+    # The bridge binds only unprivileged ports (9091/9092), so it runs as a
+    # dedicated system user with no login shell instead of root.
+    if ! id -u chilemon &>/dev/null; then
+        useradd --system --no-create-home --home-dir /nonexistent \
+            --shell /usr/sbin/nologin chilemon
+        ok "Usuario de servicio chilemon creado sin shell ni login"
+    fi
+    usermod -aG www-data chilemon 2>/dev/null || \
+        warn "No se pudo agregar chilemon al grupo www-data"
+    mkdir -p "$REPO_DIR/logs"
+    chown root:www-data "$REPO_DIR/logs"
+    chmod 770 "$REPO_DIR/logs"
+
     if [[ ! -f "$SERVICE_SRC" ]]; then
         echo "[ERROR] No se encuentra $SERVICE_SRC"
         exit 1

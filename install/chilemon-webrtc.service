@@ -6,8 +6,8 @@ Wants=asterisk.target
 
 [Service]
 Type=simple
-User=root
-Group=root
+User=chilemon
+Group=chilemon
 WorkingDirectory=/opt/chilemon
 EnvironmentFile=-/etc/default/chilemon-webrtc
 ExecStart=/usr/bin/python3 -m app.Services.WebRTCBridge.server
@@ -20,8 +20,6 @@ PrivateTmp=yes
 ProtectHome=yes
 ProtectSystem=full
 ReadWritePaths=/opt/chilemon/logs
-CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_NET_RAW
-AmbientCapabilities=CAP_NET_BIND_SERVICE
 
 [Install]
 WantedBy=multi-user.target
