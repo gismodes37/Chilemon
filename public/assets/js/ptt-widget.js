@@ -40,9 +40,6 @@ class PTTWidget {
         // True when the WS handshake failed (companion process not running).
         this._wsFailed = false;
 
-        // Callers waiting for the companion to confirm an active IAX2 channel.
-        this._callWaiters = [];
-
         // Volume display (from companion metadata)
         this.volumeSamples = [];
         this.maxVolumeSamples = 10;
@@ -134,7 +131,6 @@ class PTTWidget {
             this.connected = false;
             this.pttActive = false;
             this.callActive = false;
-            this._settleCallWaiters(false);
             // A refused handshake means the companion process is not running.
             // Surface that explicitly instead of a generic "Disconnected".
             const msg = this._wsFailed
@@ -224,7 +220,6 @@ class PTTWidget {
                 break;
             case 'error':
                 this._setStatus('error', msg.message || 'Companion error');
-                this._settleCallWaiters(false);
                 break;
             default:
                 break;
@@ -234,7 +229,6 @@ class PTTWidget {
     _handleStatus(msg) {
         this.callActive = msg.call_active === true;
         this.pttActive = msg.ptt === true;
-        if (this.callActive) this._settleCallWaiters(true);
 
         if (this.callActive) {
             this._setStatus('connected', 'Call active');
@@ -300,33 +294,6 @@ class PTTWidget {
     // ---------------------------------------------------------------
     //  Call — Place / Hangup via companion IAX2
     // ---------------------------------------------------------------
-
-    /**
-     * Place a call and resolve when the companion confirms the IAX2 channel
-     * is active. Resolves false when the companion is unreachable or slow.
-     * The caller can still link the node in that case.
-     */
-    waitForCall(node, timeoutMs = 4000) {
-        if (!this.connected) return Promise.resolve(false);
-        if (this.callActive) return Promise.resolve(true);
-
-        return new Promise((resolve) => {
-            let timer;
-            const waiter = (ok) => {
-                clearTimeout(timer);
-                this._callWaiters = this._callWaiters.filter((w) => w !== waiter);
-                resolve(ok);
-            };
-            this._callWaiters.push(waiter);
-            timer = setTimeout(() => waiter(false), timeoutMs);
-            this.placeCall(node);
-        });
-    }
-
-    /** Settle all pending call waiters with the same result. */
-    _settleCallWaiters(ok) {
-        for (const waiter of this._callWaiters.slice()) waiter(ok);
-    }
 
     /** Place an IAX2 call to a node through the companion app. */
     placeCall(node) {

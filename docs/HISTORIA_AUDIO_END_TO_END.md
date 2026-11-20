@@ -255,17 +255,31 @@ Para probar el comportamiento nuevo del badge sin el efecto colateral del fix vi
 
 Si se pushea antes del paso 1, el `git pull` trae todos los commits de una vez y no queda nada pendiente de detectar. El endpoint tiene rate limit de 30 requests por minuto.
 
-### 3.15 El canal de audio se abre antes de linkear (2026-11-20)
+### 3.15 El canal de audio se abre antes de linkear (2026-11-20) — REVERTIDO
 
 El operador notó que por conexión rápida se escucha la telemetría de ASL («conectado al nodo… tu nodo es…») pero por favoritos no, aunque ambas rutas apuntan al mismo nodo y la transmisión funciona.
 
-**Causa:** no es un problema de audio sino de orden temporal. `app_rpt` emite el anuncio **en el instante** en que `rpt fun *3<node>` linkea. El helper `linkAndCallNode()` hacía primero `postForm("api/connect.php")` y recién después `placeCall()`. Si el canal IAX2 del companion todavía no estaba dentro del bridge del nodo local cuando se emitía el anuncio, éste ya pasó y no se escucha — aunque después haya audio y PTT. El mismo canal abierto de antes da la telemetría, y el abierto después solo da audio.
+Se probó invertir el orden de `linkAndCallNode()` (abrir el canal IAX2 antes del link) con `waitForCall()` esperando `call_active: true`. **Esto se revirtió**: tras el cambio el operador perdió audio en ambos sentidos y el visualizador quedó plano. La telemetría es un detalle de UX; el audio es la función principal.
+
+**Lección:** el orden link → call está validado en campo y no se debe tocar para perseguir la telemetría. El origen de ese texto sigue abierto.
+
+### 3.16 Los callbacks de PortAudio se frenan y no se recuperan solos (2026-11-20)
+
+Con el cambio anterior revertido, el diagnóstico del audio perdido salió del log del companion:
+
+```
+17:45:00 received=123570, played=123558, buffer_size=2
+17:46:00 received=126379, played=126368, buffer_size=0
+18:01:00 received=128694, played=126368, dropped=2295, buffer_size=10
+```
+
+Tras el hangup de las 17:45:56, la siguiente llamada sigue **recibiendo** frames IAX2 pero `played` no vuelve a avanzar: el buffer se llena y `dropped` crece. El callback de salida dejó de dispararse. El de entrada también (por eso el visualizador quedó plano): ambos comparten el hilo de callbacks de PortAudio. Los objetos de stream siguen existiendo, así que `is_running` y `get_audio_stats()` seguían reportando todo sano — el monitor no tenía forma de detectarlo. Reiniciar el companion devolvió el audio de inmediato, confirmando el diagnóstico.
 
 **Fix aplicado:**
-- `ptt-widget.js` — nuevo `waitForCall(node, timeoutMs = 4000)`: llama a `placeCall()` y resuelve cuando el companion confirma `call_active: true` por WS. Resuelve `false` en error, desconexión o timeout; los waiters se asientan una sola vez.
-- `dashboard.js` — `linkAndCallNode()` invierte el orden: espera al canal activo **antes** del `POST` a `connect.php`. Si el companion no confirma, linkea igual y deja un `console.warn` (el link sigue funcionando, no se bloquea la radio por un WS caído).
+- `audio.py` — `check_health()` compara `time.monotonic()` contra el último disparo de cada callback; si supera `AUDIO_CALLBACK_STALL_S = 3 s`, hace `stop()` + `start()` para reabrir los streams contra el dispositivo default actual. Los timestamps se siembran al abrir y se actualizan al entrar a cada callback.
+- `main.py` — nuevo `_audio_health_loop()` cada 2 s, con su tarea cancelada en `stop()`.
 
-**Verificación:** `tests/js/dashboard-connect.test.js` pasa a 4 casos (agrega fallback sin companion y afirma que `placeCall` ocurre antes que `postForm` en las tres rutas); nuevo `tests/js/ptt-widget-call.test.js` con 4 casos (confirmación, timeout, canal ya activo, companion desconectado). Resultados: `4 passed`, `4 passed`, más `update modal behavior: 3 passed`. `node --check` y `git diff --check` limpios.
+**Verificación:** nuevo `tests/companion/audio_health_test.py` con 5 casos (streams frescos, stall de salida, stall de entrada, motor detenido, streams nunca abiertos). Suite Python completa: `53 passed`. Los tests JS vuelven a `3 + 3 passed` al revertir el cambio de orden. `node --check` y `git diff --check` limpios.
 
 ## 4. Puntos que hubo que salvar
 

@@ -32,11 +32,6 @@ function makeContext(calls) {
     connected: true,
     callActive: false,
     pttActive: false,
-    waitForCall(node) {
-      calls.push(['waitForCall', String(node)]);
-      this.placeCall(node);
-      return Promise.resolve(true);
-    },
     placeCall(node) { calls.push(['placeCall', String(node)]); },
     unkeyPtt() {},
     hangupCall() {},
@@ -76,13 +71,6 @@ function assertLinkedAndCalled(calls, label) {
   const placeCalls = calls.filter((c) => c[0] === 'placeCall');
   assert.equal(placeCalls.length, 1, `${label}: companion placeCall() was NOT invoked`);
   assert.equal(placeCalls[0][1], NODE, `${label}: wrong node in companion call`);
-
-  const postIndex = calls.findIndex((c) => c[0] === 'postForm');
-  const callIndex = calls.findIndex((c) => c[0] === 'placeCall');
-  assert.ok(
-    callIndex >= 0 && callIndex < postIndex,
-    `${label}: audio channel must open before the node is linked`,
-  );
 
   assert.equal(
     calls.filter((c) => c[0] === 'afterNodeActionLive').length,
@@ -124,26 +112,11 @@ async function testFavoritesConnect() {
   assertLinkedAndCalled(calls, 'favorites');
 }
 
-async function testLinkStillHappensWithoutCompanion() {
-  const calls = [];
-  const ctx = loadDashboard(calls);
-  ctx.window.pttWidget = null;
-  await ctx.connectToSpecificNode(NODE);
-
-  assert.equal(
-    calls.filter((c) => c[0] === 'postForm' && c[1] === 'api/connect.php').length,
-    1,
-    'node must still be linked when the companion is unavailable',
-  );
-  assert.equal(calls.filter((c) => c[0] === 'placeCall').length, 0);
-}
-
 (async () => {
   await testQuickConnect();
   await testNodeTableConnect();
   await testFavoritesConnect();
-  await testLinkStillHappensWithoutCompanion();
-  console.log('dashboard connect paths: 4 passed');
+  console.log('dashboard connect paths: 3 passed');
 })().catch((err) => {
   console.error(err.message);
   process.exitCode = 1;

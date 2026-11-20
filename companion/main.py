@@ -179,8 +179,9 @@ class CompanionApp:
         # Start IAX2 session (registration, etc.)
         await self.session.start()
 
-        # Start periodic stats logging
+        # Start periodic stats logging and audio liveness checks
         self._stats_task = asyncio.create_task(self._stats_loop())
+        self._audio_health_task = asyncio.create_task(self._audio_health_loop())
 
         logger.info("All components started — ready")
 
@@ -240,7 +241,15 @@ class CompanionApp:
                 await self._stats_task
             except asyncio.CancelledError:
                 pass
-        
+
+        # Cancel audio health task
+        if hasattr(self, '_audio_health_task') and self._audio_health_task is not None:
+            self._audio_health_task.cancel()
+            try:
+                await self._audio_health_task
+            except asyncio.CancelledError:
+                pass
+
         await self.session.stop()
         self.audio.stop()
         await self.ws_server.stop()
@@ -257,6 +266,23 @@ class CompanionApp:
                 break
             except Exception as exc:
                 logger.error("Stats loop error: %s", exc)
+
+    async def _audio_health_loop(self) -> None:
+        """Reopen audio streams if PortAudio stops delivering callbacks.
+
+        A sleeping Bluetooth device can halt both callbacks without closing
+        the streams. Without this check the UI shows 'connected' while no
+        audio moves in either direction and the visualizer stays flat.
+        """
+        while True:
+            try:
+                await asyncio.sleep(2)
+                if self.audio:
+                    self.audio.check_health()
+            except asyncio.CancelledError:
+                break
+            except Exception as exc:
+                logger.error("Audio health loop error: %s", exc)
 
     async def _save_config(self, pi_ip: str, pi_port: int) -> None:
         """Save updated Pi IP to config file for next startup."""

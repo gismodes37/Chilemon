@@ -15,6 +15,7 @@ import logging
 import math
 import struct
 import threading
+import time
 from typing import Callable, Optional
 
 import numpy as np
@@ -33,6 +34,12 @@ RATE = 8000  # ulaw is 8 kHz
 FRAMES_PER_BUFFER = 160  # 20 ms at 8000 Hz
 DTYPE = "int16"  # 16-bit PCM
 ULAW_INPUT_SCALE = 1 / 32768.0  # s16 -> float for RMS
+
+# PortAudio can silently stop delivering callbacks on Windows when a Bluetooth
+# device sleeps. The stream objects remain non-None, so is_running cannot
+# detect it. A stalled callback also stops the other one: both share the same
+# callback thread, which is why mic levels and playback die together.
+AUDIO_CALLBACK_STALL_S = 3.0
 
 # ---------------------------------------------------------------------------
 # G.711 μ-law encode/decode (replaces deprecated audioop)
@@ -128,6 +135,8 @@ class AudioEngine:
         self._running = False
         self._input_stream: Optional[sd.InputStream] = None
         self._output_stream: Optional[sd.OutputStream] = None
+        self._last_input_callback = 0.0
+        self._last_output_callback = 0.0
 
         # Thread safety for RX queue
         self._lock = threading.Lock()
@@ -209,6 +218,12 @@ class AudioEngine:
             logger.warning("No audio streams opened — audio is disabled")
             self._running = False
 
+        # Seed liveness timestamps so the health check does not flag a fresh
+        # start as stalled before the first callback fires.
+        now = time.monotonic()
+        self._last_input_callback = now
+        self._last_output_callback = now
+
     def stop(self) -> None:
         """Stop and close audio streams."""
         self._running = False
@@ -234,6 +249,43 @@ class AudioEngine:
     def reset(self) -> None:
         """Discard buffered RX audio so nothing plays after a hangup."""
         self._jitter_buffer.reset()
+
+    def check_health(self) -> bool:
+        """Reopen streams when PortAudio callbacks stop firing.
+
+        Called periodically from the main loop. A device disappearing can
+        stop callbacks without closing the stream objects, which leaves the
+        engine looking healthy while no audio moves in either direction.
+        Returns True when a restart was attempted.
+
+        Returns
+        -------
+        bool
+            True if the streams were restarted, False when still healthy.
+        """
+        if not self._running:
+            return False
+
+        now = time.monotonic()
+        input_stalled = (
+            self._input_stream is not None
+            and now - self._last_input_callback > AUDIO_CALLBACK_STALL_S
+        )
+        output_stalled = (
+            self._output_stream is not None
+            and now - self._last_output_callback > AUDIO_CALLBACK_STALL_S
+        )
+        if not (input_stalled or output_stalled):
+            return False
+
+        logger.warning(
+            "Audio callbacks stalled (input=%s, output=%s) - reopening streams",
+            input_stalled,
+            output_stalled,
+        )
+        self.stop()
+        self.start()
+        return True
 
     @property
     def is_running(self) -> bool:
@@ -297,6 +349,8 @@ class AudioEngine:
 
         Converts PCM int16 -> ulaw and fires on_tx_audio.
         """
+        self._last_input_callback = time.monotonic()
+
         if status:
             logger.debug("Input callback status: %s", status)
 
@@ -325,6 +379,8 @@ class AudioEngine:
         Pulls ulaw from jitter buffer, converts to PCM int16, fills outdata.
         Handles both mono and stereo output devices.
         """
+        self._last_output_callback = time.monotonic()
+
         if status:
             logger.debug("Output callback status: %s", status)
 

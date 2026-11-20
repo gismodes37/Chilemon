@@ -684,22 +684,19 @@ function afterNodeActionLive() {
  * ============================================================= */
 
 /**
- * Open the companion's audio channel AND link the node at app_rpt level.
+ * Link a node at the app_rpt level AND open its audio channel.
  *
- * Order matters: app_rpt emits the connection telemetry at link time. The
- * IAX2 channel must already be inside the local node's audio bridge or the
- * announcement is missed. Every connect entry point goes through here.
+ * The PHP API only links the node; it does not open the companion's IAX2
+ * channel. Every connect entry point must go through this helper, otherwise
+ * the dashboard shows activity while no audio reaches the repeater.
  */
 async function linkAndCallNode(node) {
-  const widget = window.pttWidget;
-  if (widget && widget.connected) {
-    const ready = await widget.waitForCall(node);
-    if (!ready) {
-      console.warn("[CONNECT] Companion call not confirmed — linking anyway");
-    }
+  await postForm("api/connect.php", { node });
+
+  if (window.pttWidget && window.pttWidget.connected) {
+    window.pttWidget.placeCall(node);
   }
 
-  await postForm("api/connect.php", { node });
   afterNodeActionLive();
 }
 
