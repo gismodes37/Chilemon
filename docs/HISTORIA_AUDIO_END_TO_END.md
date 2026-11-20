@@ -171,13 +171,15 @@ Lista de decisiones y workarounds que no eran obvios y que costaron tiempo descu
 
 16. **PHP disponible vía Docker.** No hay `php.exe` en el host, pero la imagen `chilemon-chilemon:latest` trae PHP 8.2.30. La suite se corre con `docker run --rm -v "<repo>:/app" -w /app chilemon-chilemon:latest php phpunit.phar`.
 
+17. **Companion apagado = Connect mudo (20/11/2026).** El widget abre `ws://127.0.0.1:9093/ws`, pero el companion es un proceso Python que debe estar corriendo en la PC; verificado: no había listener en 9093 ni proceso Python, por eso "Connect" no conectaba y el PTT quedaba inerte. Se agregaron `companion/start-companion.bat` y `companion/stop-companion.bat` para activarlo a necesidad, y el widget ahora muestra "Companion no detectado - ejecutalo en la PC" en vez de un "Disconnected" genérico, con backoff tope de 10 s para reconciliar rápido cuando el proceso aparece. El manual de descarga del dashboard también indica cómo activarlo y detenerlo. Verificado en vivo: el companion levantó el WS en `127.0.0.1:9093`, alcanzó la Pi en `192.168.0.116:4569` e inició audio (input=2, output=4).
+
 ---
 
 ## 5. Estado al cierre de este registro
 
 - **Funcionando y medido:** señal TX y RX, 5/5 pruebas de TX, calibración UDP, codec validado contra CPython, badge con actividad de entrada detectada.
 - **Sin validación de oído:** eco `*0` y tonos en el repetidor con el PID `24936` (fix µ-law cargado).
-- **Git ordenado y pusheado:** 6 work-units en `main` desde `1fd5349`, con HEAD `7667100`. Push autorizado por el usuario el 20/11/2026: `f617cd4..7667100 main -> main`. Remoto y local sincronizados. `public/api/log-call.php` excluido deliberadamente.
+- **Git ordenado y pusheado:** 6 work-units en `main` desde `1fd5349` más el commit de docs `c8eda14`, con HEAD `c8eda14`. Push autorizado por el usuario el 20/11/2026: `f617cd4..7667100 main -> main` y `7667100..c8eda14 main -> main`. Remoto y local sincronizados. `public/api/log-call.php` excluido deliberadamente. Los cambios del hito 17 quedan sin commitear.
 - **Revisión nativa:** ambas transacciones abandonadas y cuarentenadas, no aprobadas. Finding de `review-risk` corregido y cubierto por test.
 - **Verificación:** suite PHP 71 tests / 124 assertiones, 0 errores (4 skipped, 6 incomplete preexistentes); pytest companion 37/37.
 - **Pendiente:** pruebas de oído en la Pi y follow-up opcional del badge.

@@ -37,6 +37,8 @@ class PTTWidget {
         this.maxReconnectAttempts = 20;
         this.reconnectBaseDelay = 1000;
         this.reconnectTimer = null;
+        // True when the WS handshake failed (companion process not running).
+        this._wsFailed = false;
 
         // Volume display (from companion metadata)
         this.volumeSamples = [];
@@ -109,6 +111,7 @@ class PTTWidget {
     /** Open WebSocket to companion app (no auth token needed — localhost). */
     _openWebSocket() {
         this._closeWebSocket();
+        this._wsFailed = false;
 
         const url = `ws://127.0.0.1:${this.wsPort}/ws`;
 
@@ -116,6 +119,7 @@ class PTTWidget {
         this.ws.onopen = () => {
             this.connected = true;
             this.reconnectAttempts = 0;
+            this._wsFailed = false;
             this._setStatus('connected', 'Companion Connected');
             if (this.connectBtn) {
                 this.connectBtn.style.display = 'none';
@@ -127,18 +131,24 @@ class PTTWidget {
             this.connected = false;
             this.pttActive = false;
             this.callActive = false;
-            this._setStatus('disconnected', 'Disconnected');
+            // A refused handshake means the companion process is not running.
+            // Surface that explicitly instead of a generic "Disconnected".
+            const msg = this._wsFailed
+                ? 'Companion no detectado'
+                : 'Disconnected';
+            this._setStatus(this._wsFailed ? 'error' : 'disconnected', msg);
             if (this.connectBtn) {
                 this.connectBtn.style.display = '';
                 this.connectBtn.disabled = false;
-                this.connectBtn.textContent = 'Connect';
+                this.connectBtn.textContent = 'Reintentar';
             }
             this._updateUI();
             this._scheduleReconnect();
         };
 
         this.ws.onerror = () => {
-            // onclose fires after onerror
+            // onclose fires right after onerror; flag it for the status message.
+            this._wsFailed = true;
         };
 
         this.ws.onmessage = (event) => {
@@ -165,10 +175,14 @@ class PTTWidget {
 
     _scheduleReconnect() {
         if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-            this._setStatus('error', 'Max reconnect attempts');
+            this._setStatus('error', 'Companion no detectado');
             return;
         }
-        const delay = this.reconnectBaseDelay * Math.pow(2, this.reconnectAttempts);
+        // Cap the backoff so a companion started later is picked up within 10s.
+        const delay = Math.min(
+            this.reconnectBaseDelay * Math.pow(2, this.reconnectAttempts),
+            10000
+        );
         this.reconnectAttempts++;
         this._clearReconnect();
         this.reconnectTimer = setTimeout(() => {
@@ -390,10 +404,13 @@ class PTTWidget {
         this.volumeContainer = this.widget.querySelector('#ptt-volume-bar');
         this.connectBtn = this.widget.querySelector('#ptt-connect-btn');
 
-        // Connect button
+        // Connect button — reset backoff so a manual click retries immediately
         this.connectBtn.addEventListener('click', () => {
             this.connectBtn.disabled = true;
-            this.connectBtn.textContent = 'Connecting...';
+            this.connectBtn.textContent = 'Buscando...';
+            this.reconnectAttempts = 0;
+            this._clearReconnect();
+            this._setStatus('disconnected', 'Buscando Companion...');
             this._openWebSocket();
         });
 

@@ -1142,8 +1142,11 @@ function downloadCompanion() {
         '1. Descargá el Companion desde GitHub:\n' +
         '   https://github.com/gismodes37/Chilemon/releases/latest\n\n' +
         '2. Copiá config.toml a la carpeta del Companion\n\n' +
-        '3. Ejecutá chilemon-companion.exe\n\n' +
-        '¡Conexión automática!'
+        '3. Activalo cuando lo necesites: start-companion.bat\n' +
+        '   (o chilemon-companion.exe si usás el paquete).\n\n' +
+        '4. En el dashboard apretá Connect y después conectá un nodo.\n\n' +
+        'Para detenerlo: stop-companion.bat o cerrá la ventana.\n\n' +
+        '¡Listo para PTT!'
     );
 }
 
