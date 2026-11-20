@@ -143,6 +143,56 @@ Mediciones que lo confirmaron: `SAMPLES=0` en 30 s de monitor WS; un probe direc
 
 Corrección: config local con substrings de nombre (`"Auriculares con micr"`, `"Auriculares (3- ERAZER XF22"`) y reinicio del companion. Arranque verificado con `input=Auriculares con micr (1)` y monitor con `SAMPLES=297 PEAK=0.04093`. La plantilla `companion/config.toml` del repo se actualizó igual para que una instalación nueva no repita el fallo.
 
+### 3.9 Validación final de TX por RF (2026-11-20)
+
+Cierre del hito 3.8. El operador reportó: *"exito, exito ya te paso los resultados pero acabo de tener una conversacion via chilemon fuerte y clara :)"*.
+
+**Causa del falso «sin TX»:** las tres pruebas previas del dashboard se hicieron con la llamada todavía en `*0`, que es `Echo()` local de `app_echo` en Asterisk. El retorno claro, el visualizer y la actividad de RX eran reales, pero nunca salían a la red. Al colgar el eco y abrir una llamada real a `54614` (`15:51:17`, `dest_callno=13278`), aparecieron los frames de voz salientes (`TX mini frame len=160`) y el RX de la red.
+
+**Dos hipótesis descartadas con evidencia:**
+
+1. *«El DTMF no llega desde el widget»* — falso. El companion registró `DTMF sent: *` a las 15:58:34, 15:58:35, 15:58:36 y 15:58:39, y el log de la Pi confirma `DTMF end '*' received on IAX2/companion-app-13278` con su emulación de 100 ms.
+2. *«El comando de key es `*99`»* — falso. La documentación oficial de AllStarLink define el flag `S` de `rpt(61916|S)` (`install/asterisk/extensions-companion.conf:13`) como *Simplex Dumb Phone Control*: el transmisor arranca apagado, `*` lo prende y `*` o `#` lo apaga. El `*99` del `rpt.conf` del repo pertenece al modo `P` y no aplica. Como `*` es toggle, cuatro DTMF seguidos se cancelaban en pares.
+
+**Prueba decisiva en la Pi:**
+
+```
+sudo asterisk -rx "rpt show variables 61916" | grep -i key
+   RPT_TXKEYED=1
+   RPT_ETXKEYED=0
+   RPT_RXKEYED=0
+```
+
+`RPT_TXKEYED=1` es la misma variable usada como criterio en las 5/5 pruebas del hito 3.5. El muestreo posterior a las 16:10 dio `RPT_TXKEYED=0` durante toda la ventana porque no había PTT presionado en ese momento: estado idle, no una contradicción.
+
+**Comandos correctos en esta versión de ASL3:** `rpt show node <n>` y `rpt status <n>` no existen; el válido es `rpt show variables <n>`. El log de Asterisk vive en `/var/log/asterisk/messages.log` (sin la extensión `.log` no existe).
+
+**Gap de UX detectado al cierre:** `connectToNode()` (formulario del header) enlaza el nodo por API **y** llama a `window.pttWidget.placeCall(node)`. En cambio `connectToSpecificNode()` (tabla y favoritos) solo enlazaba por API, dejando al usuario con el link armado pero sin canal de audio. Se alineó con el mismo flujo.
+
+**Resultado:** audio bidireccional real por la red, confirmado de oído por el operador.
+
+### 3.10 Sumbido al desconectar: unkey y drenaje de audio (2026-11-20)
+
+Síntoma reportado: *"me desconecte del nodo y quedo un sumbido constante ????"*.
+
+**Diagnóstico por eliminación:**
+1. `rpt show variables 61916` dio `RPT_TXKEYED=1` → el transmisor quedó keyado.
+2. Se envió DTMF `#` por un canal IAX2 nuevo (fuerza apagado en modo `S`) → `RPT_TXKEYED=0`, pero el sumbido continuó.
+3. Se detuvo el companion (PID 26716, puerto 9093 cerrado) → el sumbido cesó de inmediato.
+
+La causa final era local: `disconnectFromNode()` colgaba el canal sin mandar el DTMF de unkey, y el buffer de RX seguía drenando audio después del hangup. El log mostró `PLC: 3 consecutive missing frames, returning silence` de forma continua hasta que se mató el proceso. Los dos `*` seguidos de las 16:18:26/28 se cancelaban por ser toggle.
+
+**Fix aplicado en cinco puntas del flujo:**
+- `companion/session.py:240` — `hangup_call()` envía `#` antes de cerrar el canal IAX2 (no depende del estado del toggle).
+- `companion/audio.py:234` — nuevo `reset()` que limpia el jitter buffer.
+- `companion/main.py:125,131` — `on_hangup` pasa por `_hangup()`, que hace `session.hangup_call()` y luego `audio.reset()`.
+- `public/assets/js/dashboard.js:761` — `disconnectFromNode()` llama a `unkeyPtt()` antes de `hangupCall()`.
+- `public/assets/js/ptt-widget.js:308` — `hangupCall()` limpia `pttActive` y el visualizador.
+
+`unkeyPtt()` ya tenía guarda `if (!this.pttActive) return`, así que no keyea el transmisor si no estaba activo.
+
+**Verificación:** `python -m pytest tests/companion -q` → 41 passed (37 previos + 4 regresiones nuevas en `tests/companion/hangup_test.py`). Sintaxis Python y JS OK; `git diff --check` limpio. Falta la validación de oído con el operador: desconectar con PTT activo y confirmar que no queda sumbido.
+
 ## 4. Puntos que hubo que salvar
 
 Lista de decisiones y workarounds que no eran obvios y que costaron tiempo descubrir:
@@ -186,24 +236,26 @@ Lista de decisiones y workarounds que no eran obvios y que costaron tiempo descu
 ## 5. Estado al cierre de este registro
 
 - **Funcionando y medido:** señal TX y RX, 5/5 pruebas de TX, calibración UDP, codec validado contra CPython, badge con actividad de entrada detectada.
-- **Sin validación de oído:** eco `*0` y tonos en el repetidor con el PID `24936` (fix µ-law cargado).
-- **Git ordenado y pusheado:** 6 work-units en `main` desde `1fd5349` más el commit de docs `c8eda14`, con HEAD `c8eda14`. Push autorizado por el usuario el 20/11/2026: `f617cd4..7667100 main -> main` y `7667100..c8eda14 main -> main`. Remoto y local sincronizados. `public/api/log-call.php` excluido deliberadamente. Los cambios del hito 17 se commitearon y pushearon el 20/11/2026 en `6571d9a` (`c8eda14..6571d9a main -> main`): launcher del companion y feedback de conexión del widget.
-- **Revisión nativa:** ambas transacciones abandonadas y cuarentenadas, no aprobadas. Finding de `review-risk` corregido y cubierto por test.
+- **Validado de oído (20/11/2026):** eco `*0` y, decisivamente, conversación bidireccional fuerte y clara por la red con la llamada en `54614`. `RPT_TXKEYED=1` y DTMF `*` recibido desde `IAX2/companion-app` en el log de la Pi.
+- **Git ordenado y pusheado:** 6 work-units en `main` desde `1fd5349` más el commit de docs `c8eda14`. Push autorizado por el usuario el 20/11/2026: `f617cd4..7667100 main -> main` y `7667100..c8eda14 main -> main`. Los cambios del hito 17 se pushearon en `6571d9a` (`c8eda14..6571d9a main -> main`). La configuración por nombre de devices se pusheó en `eea201c` (`e063bfa..eea201c main -> main`).
+- **Sin commitear al cierre de este registro:** el doc de este hito y el fix de `connectToSpecificNode()` en `public/assets/js/dashboard.js`. `public/api/log-call.php` excluido deliberadamente.
+- **Revisión nativa:** ambas transacciones abandonadas y cuarentenadas, no aprobadas. Finding de `review-risk` corregido y cubierto por test. El slice `eea201c` se evaluó como `medium` / `under_budget`, sin transacción nativa iniciada.
 - **Verificación:** suite PHP 71 tests / 124 assertiones, 0 errores (4 skipped, 6 incomplete preexistentes); pytest companion 37/37.
-- **Pendiente:** pruebas de oído en la Pi y follow-up opcional del badge.
+- **Pendiente:** reproducir el flujo completo por tabla/favoritos con el fix de `connectToSpecificNode()`, y el follow-up opcional del badge.
 
 ---
 
 ## 6. Próximos pasos
 
-1. Prueba de oído en horario diurno: eco `*0` y 5 tonos en el repetidor.
+1. Validar en el dashboard que «Conectar» desde la tabla y desde favoritos abra también el canal de audio del companion (fix ya aplicado, faltaba la comprobación de oído en ese camino).
 2. Mejorar la legibilidad del badge de actividad de entrada (follow-up reportado por el usuario).
 
 ---
 
 ## 7. Lecciones que quedan
 
-- **Medir antes de teorizar.** El PLC parecía el culpable hasta que los contadores dijeron `dropped=0`. El codec parecía correcto hasta que se comparó byte a byte con CPython.
+- **Medir antes de teorizar.** El PLC parecía el culpable hasta que los contadores dijeron `dropped=0`. El codec parecía correcto hasta que se comparó byte a byte con CPython. Dos hipótesis sobre el PTT (WS caído, DTMF `*99`) cayeron con el log en la mano.
+- **Un eco no es una transmisión.** `Echo()` de Asterisk devuelve la voz sin tocar el transmisor: todo lo que se mide en `*0` es local. Un eco perfecto puede disfrazar un TX que nunca ocurre.
 - **La especificación orienta; la implementación manda.** IAX2 en `chan_iax2` no se comporta como RFC 5456.
 - **Los bugs de escala son silenciosos.** No crashean, no fallan los tests viejos, simplemente suenan mal. Por eso hacen falta pruebas con valores de referencia externos, no solo tests internos.
 - **Un índice de audio no es una identidad.** En Windows los devices MME se reenumeran: configurar por nombre evita que el mic correcto deje de existir entre dos arranques.

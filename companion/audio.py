@@ -231,6 +231,10 @@ class AudioEngine:
 
         logger.info("Audio stopped")
 
+    def reset(self) -> None:
+        """Discard buffered RX audio so nothing plays after a hangup."""
+        self._jitter_buffer.reset()
+
     @property
     def is_running(self) -> bool:
         """Whether audio streams are active."""

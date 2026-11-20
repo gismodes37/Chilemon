@@ -122,11 +122,16 @@ class CompanionApp:
         self.ws_server.on_dtmf = self.session.send_dtmf
         self.ws_server.on_status_request = self._get_full_status
         self.ws_server.on_call = self.session.place_call
-        self.ws_server.on_hangup = self.session.hangup_call
+        self.ws_server.on_hangup = self._hangup
 
     async def _on_session_audio_rx(self, ulaw_payload: bytes, ts_ms: int) -> None:
         """Forward received audio from IAX2 to speaker."""
         self.audio.play_ulaw(ulaw_payload, ts_ms)
+
+    async def _hangup(self) -> None:
+        """Unkey and hang up the call, then drop buffered RX audio."""
+        await self.session.hangup_call()
+        self.audio.reset()
 
     async def _on_session_status(self, status: dict) -> None:
         """Forward session status changes to browser via WS."""

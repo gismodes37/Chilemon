@@ -734,6 +734,11 @@ async function connectToSpecificNode(nodeId) {
 
   try {
     await postForm("api/connect.php", { node });
+    // After linking, place audio call via companion if available.
+    // Matches connectToNode(): the API link alone does not open the audio channel.
+    if (window.pttWidget && window.pttWidget.connected) {
+      window.pttWidget.placeCall(node);
+    }
     afterNodeActionLive();
   } catch (e) {
     if (e.message !== "Unauthorized") {
@@ -752,8 +757,10 @@ async function disconnectFromNode(nodeId) {
   const node = (nodeId || "").toString().trim();
   if (!node) return;
 
-  // Hang up companion audio call first (if active)
+  // Unkey before hanging up: in mode S the transmitter needs '*' or '#'
+  // to turn off, and closing the IAX2 channel alone does not do it.
   if (window.pttWidget && window.pttWidget.connected && window.pttWidget.callActive) {
+    window.pttWidget.unkeyPtt();
     window.pttWidget.hangupCall();
   }
 

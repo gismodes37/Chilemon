@@ -308,6 +308,8 @@ class PTTWidget {
     hangupCall() {
         if (!this.connected) return;
         this._send({ type: 'call', action: 'hangup' });
+        this.pttActive = false;
+        if (this._visualizer) this._visualizer.setTransmitting(false);
         this._setStatus('connected', 'Companion Connected');
     }
 

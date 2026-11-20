@@ -238,8 +238,13 @@ class CompanionSession:
         await self._emit_status()
 
     async def hangup_call(self) -> None:
-        """Hang up the current call."""
+        """Hang up the current call, forcing the transmitter off first."""
         if self._session is not None and self._in_call:
+            # Mode S keys with '*' (toggle) and unkeys with '*' or '#'.
+            # '#' forces the transmitter off regardless of toggle state and
+            # must reach app_rpt before the IAX2 channel disappears.
+            if self._session.send_dtmf("#"):
+                await asyncio.sleep(0.2)
             await self._session.hangup_call()
             self._in_call = False
             self.ptt_active = False
