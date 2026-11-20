@@ -230,6 +230,19 @@ El link PHP funciona en los tres casos, por eso el dashboard registraba activida
 
 **Verificación:** nuevo test sin dependencias `tests/js/dashboard-connect.test.js` (corre con `node` puro, carga `dashboard.js` en un `vm` con stubs y ejercita las tres rutas). Resultado: `dashboard connect paths: 3 passed`. `node --check` y `git diff --check` limpios.
 
+### 3.13 El modal de actualización ya no se abre solo (2026-11-20)
+
+El operador confirmó que la actualización automática funciona, pero se quejó de que la ventana de confirmación aparece sin intervención: lo esperado es que solo parpadee el botón «Actualización Disponible» y que el modal se abra al hacer clic.
+
+**Causa:** `checkForUpdate()` hacía dos cosas a la vez — actualizar el badge y llamar a `showUpdateModal(json)`. Como el mismo código lo invocaban el `onclick` del badge y el polling (`setTimeout` inicial + `setInterval` de 5 min), cada chequeo de fondo robaba la pantalla.
+
+**Fix aplicado:**
+- `dashboard.js` — `checkForUpdate(openModalOnResult)` abre el modal solo cuando recibe `true`.
+- `startUpdatePolling()` — el chequeo inicial y el intervalo pasan `false` explícitamente.
+- `header.php` — el `onclick` del badge pasa `true`.
+
+**Verificación:** nuevo test `tests/js/dashboard-update.test.js` (3 casos: polling no abre modal y mantiene el pulse, click sí abre, timers de polling no abren). Resultado: `update modal behavior: 3 passed`. El test de conexión sigue en `3 passed`. `node --check` y `git diff --check` limpios. No hay CLI de PHP instalada en la PC; el cambio en `header.php` es solo el valor del atributo `onclick`.
+
 ## 4. Puntos que hubo que salvar
 
 Lista de decisiones y workarounds que no eran obvios y que costaron tiempo descubrir:

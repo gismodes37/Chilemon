@@ -1402,11 +1402,12 @@ function setupAudioSettings() {
 let updatePollingInterval = null;
 
 /**
- * Checks for updates via GET /api/check-update.php.
- * Updates the badge state and opens the confirmation modal
- * when an update is available.
+ * Checks for updates via GET /api/check-update.php and updates the badge.
+ *
+ * @param {boolean} openModalOnResult - true only for an explicit badge click.
+ *   Background polling must only pulse the badge, never steal the screen.
  */
-function checkForUpdate() {
+function checkForUpdate(openModalOnResult) {
   const badge = document.getElementById("update-status-badge");
   const icon  = document.getElementById("update-badge-icon");
   if (!badge) return; // badge only renders for admin
@@ -1432,7 +1433,9 @@ function checkForUpdate() {
         if (icon) icon.className = "bi bi-git";
         badge.setAttribute("title", "¡Actualización disponible! Hacé clic para ver detalles.");
 
-        showUpdateModal(json);
+        if (openModalOnResult) {
+          showUpdateModal(json);
+        }
       } else {
         // No update — info state
         badge.classList.remove("btn-outline-secondary", "btn-outline-warning", "btn-update-available");
@@ -1603,10 +1606,10 @@ function startUpdatePolling() {
   if (!document.getElementById("update-status-badge")) return;
   if (updatePollingInterval) return;
 
-  // First check after a short delay
-  setTimeout(checkForUpdate, 2000);
+  // Polling only updates the badge; the modal opens on explicit click.
+  setTimeout(function () { checkForUpdate(false); }, 2000);
 
-  updatePollingInterval = setInterval(checkForUpdate, 300000);
+  updatePollingInterval = setInterval(function () { checkForUpdate(false); }, 300000);
 }
 
 /* =============================================================

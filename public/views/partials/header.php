@@ -114,7 +114,7 @@ $headerStyle = $headerImgUrl
               <button type="button"
                       id="update-status-badge"
                       class="btn btn-sm btn-outline-info"
-                      onclick="window.checkForUpdate()"
+                      onclick="window.checkForUpdate(true)"
                       title="Verificar actualizaciones en GitHub">
                 <i class="bi bi-check-circle" id="update-badge-icon"></i>
                 <span id="update-badge-text">Actualización Disponible</span>
