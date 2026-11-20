@@ -135,6 +135,14 @@ Companion reiniciado el 2026-11-17 a las 20:38 como PID `24936` con el codec cor
 
 ---
 
+### 3.8 Pruebas de oído: micrófono equivocado por índice inestable (2026-11-20)
+
+Al repetir el eco `*0`, el companion respondía y el PTT enviaba DTMF `*`, pero no entraba ni un frame de voz (`received=0`) y el monitor de nivel no recibía mensajes `audio_level`. La causa no fue el codec ni el Asterisk: `~/.chilemon/config.toml` fijaba `input_device = "2"`, y los índices MME de Windows se reenumeran entre procesos — en una consulta el `2` era el mic de los auriculares Erazor y en la siguiente era el de la FaceCam. El companion había abierto el físico equivocado.
+
+Mediciones que lo confirmaron: `SAMPLES=0` en 30 s de monitor WS; un probe directo sobre el device `2` sí disparaba callbacks; el listado de devices mostró el mismo índice apuntando a dos nombres distintos.
+
+Corrección: config local con substrings de nombre (`"Auriculares con micr"`, `"Auriculares (3- ERAZER XF22"`) y reinicio del companion. Arranque verificado con `input=Auriculares con micr (1)` y monitor con `SAMPLES=297 PEAK=0.04093`. La plantilla `companion/config.toml` del repo se actualizó igual para que una instalación nueva no repita el fallo.
+
 ## 4. Puntos que hubo que salvar
 
 Lista de decisiones y workarounds que no eran obvios y que costaron tiempo descubrir:
@@ -198,5 +206,6 @@ Lista de decisiones y workarounds que no eran obvios y que costaron tiempo descu
 - **Medir antes de teorizar.** El PLC parecía el culpable hasta que los contadores dijeron `dropped=0`. El codec parecía correcto hasta que se comparó byte a byte con CPython.
 - **La especificación orienta; la implementación manda.** IAX2 en `chan_iax2` no se comporta como RFC 5456.
 - **Los bugs de escala son silenciosos.** No crashean, no fallan los tests viejos, simplemente suenan mal. Por eso hacen falta pruebas con valores de referencia externos, no solo tests internos.
+- **Un índice de audio no es una identidad.** En Windows los devices MME se reenumeran: configurar por nombre evita que el mic correcto deje de existir entre dos arranques.
 - **Un avance se consolida cuando se documenta.** Esta historia existe para que nadie tenga que reconstruirla desde cero cuando el frente de audio vuelva a tocarse.
 - **El transporte de revisión agotó su recorrido.** Dos linajes abandonados por fallos del runtime de OpenCode, no del repo. Ante un tercer ciclo con el mismo defecto, la decisión del operador fue cerrar con verificación local (suite PHP en Docker + pytest) en lugar de trabar git otra vez.

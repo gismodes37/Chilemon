@@ -14,8 +14,12 @@ password = "chilemon2026"
 skip_registration = true     # true = static peer in iax.conf; no REGISTER needed
 
 [audio]
-input_device = "1"       # Micrófono (High Definition Audio)
-output_device = "5"      # Auriculares (JQ-BT)
+# Use a device NAME substring, not a numeric index. On Windows the MME indices
+# are re-enumerated between runs: index "2" was the headset mic in one process
+# and the FaceCam mic in the next, which silently kills TX audio.
+# List devices with: python -c "import sounddevice as sd; print(sd.query_devices())"
+input_device = "Auriculares con micrófono"       # headset mic (TX)
+output_device = "Auriculares (3- ERAZER XF22"    # headset speakers (RX)
 sample_rate = 8000       # ulaw is 8 kHz
 frames_per_buffer = 160  # 20ms at 8 kHz
 
