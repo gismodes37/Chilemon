@@ -10,7 +10,9 @@ port = 4569
 
 [peer]
 username = "companion-app"
-password = "chilemon2026"
+# No shared secret is shipped: set this to iax_companion_secret from the Pi's
+# config/local.php, or download an auto-generated config.toml from the dashboard.
+password = ""
 skip_registration = true     # true = static peer in iax.conf; no REGISTER needed
 
 [audio]

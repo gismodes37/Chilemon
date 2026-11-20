@@ -52,7 +52,7 @@ def _session() -> tuple[IAX2Session, _CapturedTransport]:
         host="192.168.0.116",
         port=4569,
         username="companion-app",
-        password="chilemon2026",
+        password="unit-test-secret",
     )
     transport = _CapturedTransport()
     sess._transport = transport  # type: ignore[assignment]

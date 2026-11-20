@@ -314,7 +314,10 @@ class CompanionApp:
                 f.write("[peer]\n")
                 f.write('username = "companion-app"\n')
                 peer_config = config.get("peer", {})
-                f.write(f'password = "{peer_config.get("password", "chilemon2026")}"\n')
+                # Never invent a credential: discovery only learns the Pi IP.
+                # A missing password must stay empty and fail at connect time.
+                password = str(peer_config.get("password", "")).replace('"', '\\"')
+                f.write(f'password = "{password}"\n')
                 f.write("skip_registration = true\n\n")
                 
                 f.write("[audio]\n")
@@ -331,7 +334,10 @@ class CompanionApp:
                 log_config = config.get("logging", {})
                 f.write(f'level = "{log_config.get("level", "INFO")}"\n')
                 f.write('file = ""\n')
-            
+
+            # The file contains the IAX2 peer secret: owner-only permissions.
+            os.chmod(config_path, 0o600)
+
             logger.info("Saved updated config to %s", config_path)
         except Exception as e:
             logger.error("Failed to save config: %s", e)

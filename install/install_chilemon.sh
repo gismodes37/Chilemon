@@ -273,6 +273,52 @@ escape_php_string() {
     printf '%s' "$value"
 }
 
+generate_random_secret() {
+    local length="${1:-24}"
+    if command -v openssl &>/dev/null; then
+        openssl rand -hex "$length"
+    else
+        od -An -tx1 -N"$length" /dev/urandom | tr -d ' \n'
+    fi
+}
+
+detect_lan_cidr() {
+    local iface cidr
+    iface="$(ip -4 route show default 2>/dev/null \
+        | awk '{for(i=1;i<=NF;i++) if($i=="dev"){print $(i+1); exit}}')"
+    [[ -n "$iface" ]] || return 1
+    cidr="$(ip -4 route show dev "$iface" 2>/dev/null \
+        | awk '$1 ~ /\// {print $1; exit}')"
+    [[ -n "$cidr" ]] || return 1
+    printf '%s' "$cidr"
+}
+
+cidr_to_asterisk_acl() {
+    local cidr="$1"
+    local network="${cidr%/*}"
+    local prefix="${cidr#*/}"
+    local full=$(( (0xFFFFFFFF << (32 - prefix)) & 0xFFFFFFFF ))
+    printf '%s/%d.%d.%d.%d' "$network" \
+        $(( (full >> 24) & 255 )) $(( (full >> 16) & 255 )) \
+        $(( (full >> 8) & 255 )) $(( full & 255 ))
+}
+
+# Update mode preserves config/local.php. If an older install predates the
+# companion secret, add a generated one before Asterisk consumes it.
+ensure_companion_secret_in_config() {
+    [[ -f "$LOCAL_CONFIG" ]] || return 0
+    if grep -q "'iax_companion_secret'" "$LOCAL_CONFIG"; then
+        return 0
+    fi
+
+    local secret
+    secret="$(generate_random_secret 24)"
+    sed -i "/^];/i\\    'iax_companion_secret' => '${secret}'," "$LOCAL_CONFIG"
+    chown root:www-data "$LOCAL_CONFIG"
+    chmod 640 "$LOCAL_CONFIG"
+    ok "Secreto IAX2 generado y agregado a $LOCAL_CONFIG"
+}
+
 write_local_config() {
     local local_node="$1"
     local server_host="$2"
@@ -287,11 +333,22 @@ write_local_config() {
     mkdir -p "$(dirname "$LOCAL_CONFIG")"
     backup_if_exists "$LOCAL_CONFIG"
 
+    # Single source of truth for the IAX2 companion peer password. Reuse it on
+    # re-runs so an existing companion config.toml keeps working.
+    local iax_companion_secret=""
+    if [[ -f "$LOCAL_CONFIG" ]]; then
+        iax_companion_secret="$(php -r "\$c = require '$LOCAL_CONFIG'; echo \$c['iax_companion_secret'] ?? '';" 2>/dev/null || true)"
+    fi
+    if [[ -z "$iax_companion_secret" ]]; then
+        iax_companion_secret="$(generate_random_secret 24)"
+    fi
+
     local safe_local_node safe_server_host safe_header_tagline
     local safe_ami_host safe_ami_user safe_ami_pass
     local safe_repo_dir safe_db_path safe_wrapper_path
-    local safe_hub_url
+    local safe_hub_url safe_iax_companion_secret
 
+    safe_iax_companion_secret="$(escape_php_string "$iax_companion_secret")"
     safe_local_node="$(escape_php_string "$local_node")"
     safe_server_host="$(escape_php_string "$server_host")"
     safe_header_tagline="$(escape_php_string "$header_tagline")"
@@ -342,10 +399,16 @@ return [
     // el dashboard mostrará un banner para registrar este nodo
     // en el mapa comunitario (https://github.com/gismodes37/Chilemon-Hub).
     'hub_url' => '${safe_hub_url}',
+
+    // IAX2 companion peer secret. Generated at install time and shared with
+    // the dashboard's config.toml download and /etc/asterisk/iax.conf.
+    'iax_companion_secret' => '${safe_iax_companion_secret}',
 ];
 PHP
 
-    ok "Configuración local generada en $LOCAL_CONFIG"
+    chown root:www-data "$LOCAL_CONFIG"
+    chmod 640 "$LOCAL_CONFIG"
+    ok "Configuración local generada en $LOCAL_CONFIG (root:www-data 0640)"
 }
 
 write_wrapper_if_missing() {
@@ -496,6 +559,22 @@ configure_asl3_modules() {
 configure_webrtc_asterisk() {
     info "Configurando Asterisk para WebRTC Audio Bridge"
 
+    # Scope every IAX2 peer to the detected LAN. A previous release widened
+    # calltokenoptional to 0.0.0.0/0, which let any host reach the radio peer.
+    local lan_cidr lan_acl companion_secret
+    if lan_cidr="$(detect_lan_cidr)"; then
+        lan_acl="$(cidr_to_asterisk_acl "$lan_cidr")"
+    else
+        warn "No se pudo detectar la subred LAN — IAX2 queda restringido a loopback"
+        lan_cidr="127.0.0.1/32"
+        lan_acl="127.0.0.1/255.255.255.255"
+    fi
+
+    companion_secret=""
+    if [[ -f "$LOCAL_CONFIG" ]]; then
+        companion_secret="$(php -r "\$c = require '$LOCAL_CONFIG'; echo \$c['iax_companion_secret'] ?? '';" 2>/dev/null || true)"
+    fi
+
     # Step 1: Append IAX2 snippet to iax.conf
     if [[ -f "$INSTALL_IAX_SNIPPET" ]]; then
         if [[ -f "$ASTERISK_IAX_CONF" ]]; then
@@ -510,30 +589,23 @@ configure_webrtc_asterisk() {
                 warn "IMPORTANTE: Cambie CHANGEME_PHONE_SECRET en $ASTERISK_IAX_CONF"
             fi
 
-            # CRITICAL: Ensure calltokenoptional exists in [general]
-            # Without it in [general], ASL3 drops frames that lack
-            # IE_CALLTOKEN — peers can't connect, calls fail.
-            # Use 0.0.0.0/0 for private LAN (allows any IP).
-            # For restricted access, change to specific subnet like 192.168.0.0/24.
-            # NOTE: grep the [general] section only — other sections
-            # also have calltokenoptional which would false-positive a whole-file grep.
+            # Ensure [general] has calltokenoptional scoped to the LAN only.
+            # Without it ASL3 drops frames lacking IE_CALLTOKEN, but 0.0.0.0/0
+            # exposed the radio peer to every host that could reach UDP 4569.
             local general_has_ct
             general_has_ct=$(awk '/^\[general\]/{found=1} found && /calltokenoptional/{print "yes"; exit} /^\[/{if(found && !/general/)exit}' "$ASTERISK_IAX_CONF")
             if [[ "$general_has_ct" != "yes" ]]; then
                 backup_if_exists "$ASTERISK_IAX_CONF"
-                # Insert after requirecalltoken=no in [general] section
                 if grep -q 'requirecalltoken=no' "$ASTERISK_IAX_CONF"; then
-                    sed -i '/^requirecalltoken=no/a calltokenoptional=0.0.0.0/0' "$ASTERISK_IAX_CONF"
-                    ok "calltokenoptional=0.0.0.0/0 agregado a [general] de iax.conf ( LAN completa )"
+                    sed -i "/^requirecalltoken=no/a calltokenoptional=${lan_cidr}" "$ASTERISK_IAX_CONF"
+                    ok "calltokenoptional=${lan_cidr} agregado a [general] de iax.conf"
                 else
                     warn "No se encontró requirecalltoken=no en iax.conf — calltokenoptional no agregado"
                 fi
-            else
-                # Update existing value from 127.0.0.1 to 0.0.0.0/0 if needed
-                if grep -q 'calltokenoptional=127\.0\.0\.1' "$ASTERISK_IAX_CONF"; then
-                    sed -i 's/calltokenoptional=127\.0\.0\.1/calltokenoptional=0.0.0.0\/0/g' "$ASTERISK_IAX_CONF"
-                    ok "calltokenoptional actualizado de 127.0.0.1 a 0.0.0.0/0 ( LAN completa )"
-                fi
+            elif ! grep -q "calltokenoptional=${lan_cidr}" "$ASTERISK_IAX_CONF"; then
+                # Replace a previously widened or stale value.
+                sed -i -E "s/^calltokenoptional=.*/calltokenoptional=${lan_cidr}/" "$ASTERISK_IAX_CONF"
+                ok "calltokenoptional limitado a ${lan_cidr}"
             fi
         else
             warn "$ASTERISK_IAX_CONF no existe — se omite snippet IAX2"
@@ -547,11 +619,16 @@ configure_webrtc_asterisk() {
         if grep -q '^\[companion-app\]' "$ASTERISK_IAX_CONF"; then
             ok "Sección [companion-app] ya existe en $ASTERISK_IAX_CONF — se omite"
         else
+            if [[ -z "$companion_secret" ]]; then
+                companion_secret="$(generate_random_secret 24)"
+                warn "Secreto IAX2 generado: agreguelo a config/local.php => iax_companion_secret"
+            fi
             backup_if_exists "$ASTERISK_IAX_CONF"
             echo "" >> "$ASTERISK_IAX_CONF"
-            cat "$INSTALL_IAX_COMPANION" >> "$ASTERISK_IAX_CONF"
-            ok "Snippet IAX2 ([companion-app]) agregado a $ASTERISK_IAX_CONF"
-            warn "IMPORTANTE: Cambie CHANGEME_COMPANION_SECRET en $ASTERISK_IAX_CONF"
+            sed -e "s|__COMPANION_SECRET__|${companion_secret}|g" \
+                -e "s|__IAX_LAN_ACL__|${lan_acl}|g" \
+                "$INSTALL_IAX_COMPANION" >> "$ASTERISK_IAX_CONF"
+            ok "Peer [companion-app] agregado con secreto generado y ACL ${lan_acl}"
         fi
     else
         warn "Snippet companion-app no encontrado en $INSTALL_IAX_COMPANION"
@@ -937,6 +1014,13 @@ configure_git_permissions() {
     chmod -R g-w "$REPO_DIR" 2>/dev/null || true
     find "$REPO_DIR" -type d -exec chmod g-s {} + 2>/dev/null || true
 
+    # config/local.php holds the generated secrets: readable by www-data,
+    # never writable by it, and restored after the repo-wide ownership reset.
+    if [[ -f "$LOCAL_CONFIG" ]]; then
+        chown root:www-data "$LOCAL_CONFIG"
+        chmod 640 "$LOCAL_CONFIG"
+    fi
+
     # Only runtime directories need to be writable by the web user.
     local runtime_dir
     for runtime_dir in data logs backups; do
@@ -1111,6 +1195,7 @@ main() {
     step "6" "Generando configuración local"
     if [[ "$INSTALL_MODE" == "update" ]]; then
         info "Modo actualización — configuración existente preservada"
+        ensure_companion_secret_in_config
         ok "Archivo de configuración mantenido: $LOCAL_CONFIG"
     else
         write_local_config \
