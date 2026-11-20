@@ -215,6 +215,21 @@ Output stream opened: 2 channels
 
 **Resultado:** una instalación nueva funciona con cualquier micrófono sin tocar la config; el usuario puede fijar un dispositivo explícito si lo necesita.
 
+### 3.12 Favoritos no abrían el canal de audio (2026-11-20)
+
+El operador validó que la **conexión rápida** sale a la red (escuchó telemetría de ASL) y que la **desconexión** cierra limpio, sin zumbido. Pero al conectar desde **Favoritos** el dashboard mostraba actividad y no salía audio al keyear PTT; repetir el procedimiento tras cerrar sesión daba el mismo resultado.
+
+**Causa:** existían tres rutas de conexión en `dashboard.js` y solo dos abrían el canal IAX2 del companion:
+- `connectToNode()` (conexión rápida) → `api/connect.php` + `pttWidget.placeCall()`.
+- `connectToSpecificNode()` (tabla de nodos) → `api/connect.php` + `pttWidget.placeCall()`.
+- El botón de favoritos en `_favBindRowEvents()` → **solo** `api/connect.php`.
+
+El link PHP funciona en los tres casos, por eso el dashboard registraba actividad; sin `placeCall()` no se abría el canal de audio y el PTT no tenía por dónde transmitir.
+
+**Fix aplicado:** nuevo helper `linkAndCallNode(node)` que hace link + `placeCall()` + refresh. Las tres rutas lo usan, así ningún entry point puede quedar a medias. Se quitó el `afterNodeActionLive()` duplicado que el handler de favoritos ejecutaba además del helper.
+
+**Verificación:** nuevo test sin dependencias `tests/js/dashboard-connect.test.js` (corre con `node` puro, carga `dashboard.js` en un `vm` con stubs y ejercita las tres rutas). Resultado: `dashboard connect paths: 3 passed`. `node --check` y `git diff --check` limpios.
+
 ## 4. Puntos que hubo que salvar
 
 Lista de decisiones y workarounds que no eran obvios y que costaron tiempo descubrir:

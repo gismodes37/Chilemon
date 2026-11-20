@@ -684,6 +684,23 @@ function afterNodeActionLive() {
  * ============================================================= */
 
 /**
+ * Link a node at the app_rpt level AND open its audio channel.
+ *
+ * The PHP API only links the node; it does not open the companion's IAX2
+ * channel. Every connect entry point must go through this helper, otherwise
+ * the dashboard shows activity while no audio reaches the repeater.
+ */
+async function linkAndCallNode(node) {
+  await postForm("api/connect.php", { node });
+
+  if (window.pttWidget && window.pttWidget.connected) {
+    window.pttWidget.placeCall(node);
+  }
+
+  afterNodeActionLive();
+}
+
+/**
  * Conecta al nodo ingresado en el campo #node-number del panel.
  * Muestra spinner en el botón durante la petición.
  * Llamado desde onclick="connectToNode()" en el formulario del header.
@@ -700,11 +717,8 @@ async function connectToNode() {
 
   console.log("[CONNECT] Node:", node, "PTTWidget:", !!window.pttWidget, "connected:", window.pttWidget && window.pttWidget.connected, "placeCall:", typeof (window.pttWidget && window.pttWidget.placeCall));
 
-  // ALWAYS link the node first via PHP API (rpt fun *3<node>)
-  // This is the same mechanism as favorites — it links at the app_rpt level.
-  // The companion WS call alone does NOT link nodes; it only establishes audio.
   try {
-    await postForm("api/connect.php", { node });
+    await linkAndCallNode(node);
   } catch (e) {
     if (e.message !== "Unauthorized") {
       alert(`Error al conectar: ${e.message}`);
@@ -712,19 +726,13 @@ async function connectToNode() {
     return;
   }
 
-  // After linking, place audio call via companion if available
-  if (window.pttWidget && window.pttWidget.connected) {
-    console.log("[CONNECT] Node linked via API, placing audio call via companion WS");
-    window.pttWidget.placeCall(node);
-  }
-
   if (input) input.value = "";
-  afterNodeActionLive();
 }
 
 /**
  * Conecta a un nodo específico dado su ID.
- * Usado desde botones de la tabla de nodos o desde favoritos.
+ * Usado desde botones de la tabla de nodos. Los favoritos usan el mismo
+ * helper a través del modal.
  *
  * @param {string|number} nodeId - ID del nodo a conectar.
  */
@@ -733,13 +741,7 @@ async function connectToSpecificNode(nodeId) {
   if (!node) return;
 
   try {
-    await postForm("api/connect.php", { node });
-    // After linking, place audio call via companion if available.
-    // Matches connectToNode(): the API link alone does not open the audio channel.
-    if (window.pttWidget && window.pttWidget.connected) {
-      window.pttWidget.placeCall(node);
-    }
-    afterNodeActionLive();
+    await linkAndCallNode(node);
   } catch (e) {
     if (e.message !== "Unauthorized") {
       alert(`Error al conectar: ${e.message}`);
@@ -839,7 +841,7 @@ function deleteNodeConfirm(nodeId) {
  * Flujo:
  *   Modal se abre → favoritesReload() carga lista desde API
  *   Formulario submit → postForm(api/favorites.php, {action: upsert})
- *   Botón Conectar → postForm(api/connect.php) + cierra modal
+ *   Botón Conectar → linkAndCallNode() (API + companion) + cierra modal
  *   Botón Eliminar → postForm(api/favorites.php, {action: delete})
  * ============================================================= */
 
@@ -1051,13 +1053,12 @@ function _favBindRowEvents(tbody) {
       const node = btn.getAttribute("data-fav-connect") || "";
       if (!confirm(`¿Conectar al nodo ${node}?`)) return;
       try {
-        await postForm("api/connect.php", { node });
+        await linkAndCallNode(node);
         const modalEl = document.getElementById("favoritesModal");
         if (modalEl && window.bootstrap) {
           const inst = window.bootstrap.Modal.getInstance(modalEl);
           if (inst) inst.hide();
         }
-        afterNodeActionLive();
       } catch (err) {
         if (err.message !== "Unauthorized") {
           alert(`Error al conectar: ${err.message}`);
