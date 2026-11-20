@@ -255,6 +255,18 @@ Para probar el comportamiento nuevo del badge sin el efecto colateral del fix vi
 
 Si se pushea antes del paso 1, el `git pull` trae todos los commits de una vez y no queda nada pendiente de detectar. El endpoint tiene rate limit de 30 requests por minuto.
 
+### 3.15 El canal de audio se abre antes de linkear (2026-11-20)
+
+El operador notó que por conexión rápida se escucha la telemetría de ASL («conectado al nodo… tu nodo es…») pero por favoritos no, aunque ambas rutas apuntan al mismo nodo y la transmisión funciona.
+
+**Causa:** no es un problema de audio sino de orden temporal. `app_rpt` emite el anuncio **en el instante** en que `rpt fun *3<node>` linkea. El helper `linkAndCallNode()` hacía primero `postForm("api/connect.php")` y recién después `placeCall()`. Si el canal IAX2 del companion todavía no estaba dentro del bridge del nodo local cuando se emitía el anuncio, éste ya pasó y no se escucha — aunque después haya audio y PTT. El mismo canal abierto de antes da la telemetría, y el abierto después solo da audio.
+
+**Fix aplicado:**
+- `ptt-widget.js` — nuevo `waitForCall(node, timeoutMs = 4000)`: llama a `placeCall()` y resuelve cuando el companion confirma `call_active: true` por WS. Resuelve `false` en error, desconexión o timeout; los waiters se asientan una sola vez.
+- `dashboard.js` — `linkAndCallNode()` invierte el orden: espera al canal activo **antes** del `POST` a `connect.php`. Si el companion no confirma, linkea igual y deja un `console.warn` (el link sigue funcionando, no se bloquea la radio por un WS caído).
+
+**Verificación:** `tests/js/dashboard-connect.test.js` pasa a 4 casos (agrega fallback sin companion y afirma que `placeCall` ocurre antes que `postForm` en las tres rutas); nuevo `tests/js/ptt-widget-call.test.js` con 4 casos (confirmación, timeout, canal ya activo, companion desconectado). Resultados: `4 passed`, `4 passed`, más `update modal behavior: 3 passed`. `node --check` y `git diff --check` limpios.
+
 ## 4. Puntos que hubo que salvar
 
 Lista de decisiones y workarounds que no eran obvios y que costaron tiempo descubrir:
