@@ -68,16 +68,13 @@ final class DestructiveActionsTest extends TestCase
     {
         $source = $this->source('bin/chilemon-rpt');
 
-        self::assertMatchesRegularExpression(
-            '/LOCAL=.*\[0-9\]/',
+        self::assertStringContainsString(
+            "if [[ ! \"\$value\" =~ ^[0-9]+\$ ]]; then",
             $source,
-            'Local node must be validated as digits before reaching asterisk -rx'
+            'Wrapper must validate node ids as digits before reaching asterisk -rx'
         );
-        self::assertMatchesRegularExpression(
-            '/REMOTE=.*\[0-9\]/',
-            $source,
-            'Remote node must be validated as digits before reaching asterisk -rx'
-        );
+        self::assertStringContainsString("require_node_id 'local'", $source);
+        self::assertStringContainsString("require_node_id 'remote'", $source);
         self::assertStringContainsString('exit 1', $source);
     }
 
