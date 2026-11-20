@@ -177,19 +177,17 @@ Lista de decisiones y workarounds que no eran obvios y que costaron tiempo descu
 
 - **Funcionando y medido:** señal TX y RX, 5/5 pruebas de TX, calibración UDP, codec validado contra CPython, badge con actividad de entrada detectada.
 - **Sin validación de oído:** eco `*0` y tonos en el repetidor con el PID `24936` (fix µ-law cargado).
-- **Git ordenado:** 5 work-units en `main` desde `1fd5349`, más el fix CSRF pendiente de commitear. Todo **no pusheado**. `public/api/log-call.php` excluido deliberadamente.
+- **Git ordenado y pusheado:** 6 work-units en `main` desde `1fd5349`, con HEAD `7667100`. Push autorizado por el usuario el 20/11/2026: `f617cd4..7667100 main -> main`. Remoto y local sincronizados. `public/api/log-call.php` excluido deliberadamente.
 - **Revisión nativa:** ambas transacciones abandonadas y cuarentenadas, no aprobadas. Finding de `review-risk` corregido y cubierto por test.
 - **Verificación:** suite PHP 71 tests / 124 assertiones, 0 errores (4 skipped, 6 incomplete preexistentes); pytest companion 37/37.
-- **Autorización pendiente del usuario:** push al repositorio para actualizar la Pi.
+- **Pendiente:** pruebas de oído en la Pi y follow-up opcional del badge.
 
 ---
 
 ## 6. Próximos pasos
 
-1. Commitear el fix CSRF como work-unit separado (`favorites.php`, `AuthTest.php`, `ApplyUpdateTest.php`, esta historia).
-2. Prueba de oído en horario diurno: eco `*0` y 5 tonos en el repetidor.
-3. Con autorización explícita, hacer push y repetir pruebas de campo en la Pi.
-4. Mejorar la legibilidad del badge de actividad de entrada (follow-up reportado por el usuario).
+1. Prueba de oído en horario diurno: eco `*0` y 5 tonos en el repetidor.
+2. Mejorar la legibilidad del badge de actividad de entrada (follow-up reportado por el usuario).
 
 ---
 
