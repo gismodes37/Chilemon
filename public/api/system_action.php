@@ -6,10 +6,10 @@ declare(strict_types=1);
  * -----------------------------------------------
  * Endpoint seguro para acciones de administración del sistema.
  *
- * Acciones soportadas (POST):
- *   action=restart-asterisk  → reinicia Asterisk
- *   action=restart-apache    → reinicia Apache
- *   action=poweroff          → apaga el nodo
+ * Acciones soportadas (POST): ninguna. El mapa de SystemController está
+ * vacío desde que los verbos destructivos se retiraron del wrapper sudo.
+ * Este endpoint se mantiene como punto de rechazo explícito para clientes
+ * antiguos y responde {"success": false, "error": "Acción no reconocida"}.
  *
  * Seguridad:
  *   - Requiere sesión activa (401 si no está autenticado)

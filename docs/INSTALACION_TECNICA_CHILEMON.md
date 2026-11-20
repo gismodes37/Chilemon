@@ -35,19 +35,19 @@ El instalador genera `config/local.php` con:
 - `wrapper_path`
 
 ## Wrapper seguro (v0.3.0)
-El wrapper (`/usr/local/bin/chilemon-rpt`) ha sido rediseñado para mayor robustez:
-- **Limpieza de parámetros**: Se eliminan comillas simples y dobles (`tr -d "'\""`) para evitar inyecciones desde la web.
-- **Soporte EchoLink**: Detecta números que comienzan por `8` y utiliza el comando de función de Asterisk correspondiente.
+El wrapper (`/usr/local/bin/chilemon-rpt`) se instala desde `bin/chilemon-rpt` del repositorio (no se genera una copia inline que pueda divergir):
+- **Validación de parámetros**: ambos IDs de nodo deben coincidir con `^[0-9]+$`; cualquier otro valor se rechaza con `exit 1` antes de invocar a Asterisk.
+- **Soporte EchoLink**: IDs de 7 dígitos con prefijo `3`, también numéricos.
 - **Acciones soportadas**:
     - `nodes <local_node>`
     - `stats <local_node>`
     - `connect <local_node> <remote_node>`
     - `disconnect <local_node> <remote_node>`
-    - `sys-restart-asterisk`
-    - `sys-restart-apache`
-    - `sys-poweroff`
+    - `git-fetch`, `git-compare`, `git-pull`
+    - `sys-restart-webrtc`, `sys-reload-apache`
+- **Acciones deliberadamente NO soportadas**: `sys-poweroff`, `sys-restart-asterisk`, `sys-restart-apache`. Se ejecutan por SSH con sudo real, nunca desde la web.
 
-Internamente ejecuta `/usr/sbin/asterisk -rx` con los parámetros limpios.
+Internamente ejecuta `/usr/sbin/asterisk -rx` con los parámetros validados.
 
 ## Sudoers
 El instalador escribe:

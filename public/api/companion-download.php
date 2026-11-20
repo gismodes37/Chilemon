@@ -40,8 +40,17 @@ if ($pi_ip === '127.0.0.1' || $pi_ip === '::1') {
 // Puerto IAX2
 $iax_port = 4569;
 
-// Password del peer companion-app
-$secret = 'chilemon2026';
+// Password del peer companion-app — generada en la instalación, nunca hardcodeada.
+$secret = defined('IAX_COMPANION_SECRET') ? (string) IAX_COMPANION_SECRET : '';
+if ($secret === '') {
+    http_response_code(503);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode([
+        'success' => false,
+        'error'   => 'IAX2 companion secret is not configured. Set iax_companion_secret in config/local.php.',
+    ]);
+    exit;
+}
 
 // Generar config.toml
 $config = <<<TOML
@@ -73,9 +82,8 @@ file = ""
 
 TOML;
 
-// Guardar config temporalmente
-$config_path = sys_get_temp_dir() . '/chilemon-companion-config.toml';
-file_put_contents($config_path, $config);
+// El config se entrega directamente en la respuesta: escribirlo en /tmp con
+// un nombre predecible dejaría el secreto IAX2 legible por otros usuarios.
 
 // Por ahora, solo retornar el config (el .exe se descarga de GitHub)
 // En el futuro, se puede empaquetar el .exe con el config

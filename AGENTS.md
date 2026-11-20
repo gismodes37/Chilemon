@@ -81,9 +81,10 @@ php public/test-db.php # Test endpoint
 5. **1.5** Usar Subresource Integrity (SRI) en CDN Bootstrap
 
 ### system_action.php (acciones peligrosas)
-- `restart-asterisk` → Reinicia Asterisk
-- `restart-apache` → Reinicia Apache
-- `poweroff` → Apaga el equipo
+Sin acciones disponibles desde la web. Los verbos `sys-poweroff`,
+`sys-restart-asterisk` y `sys-restart-apache` se quitaron del wrapper
+`chilemon-rpt` y del dashboard: se ejecutan por SSH con sudo real.
+El endpoint queda como punto de rechazo explícito (`Acción no reconocida`).
 
 ---
 

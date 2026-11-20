@@ -242,7 +242,7 @@ El dashboard es el corazón visual de ChileMon. Se accede vía
 | `/api/connect.php` | POST | Conectar a nodo remoto |
 | `/api/disconnect.php` | POST | Desconectar nodo remoto |
 | `/api/ami/status.php` | GET | Estado AMI detallado |
-| `/api/system_action.php` | POST | Acciones del sistema (restart, poweroff) |
+| `/api/system_action.php` | POST | Sin acciones habilitadas; las acciones de sistema se hacen por SSH |
 | `/api/health.php` | GET | Health check público (rate limited) |
 | `/api/ptt-status.php` | GET | Estado del puente WebRTC |
 | `/api/ptt-ws-token.php` | GET | Token WebSocket para bridge |
