@@ -349,49 +349,24 @@ PHP
 }
 
 write_wrapper_if_missing() {
-    if [[ -x "$WRAPPER_PATH" ]]; then
-        warn "El wrapper ya existe en $WRAPPER_PATH"
-        return
+    # Install the maintained wrapper from the repository. The previous inline
+    # copy drifted: it lacked the git-* verbs used by UpdateService and exposed
+    # destructive system verbs to the NOPASSWD sudoers rule.
+    local wrapper_src="${REPO_DIR}/bin/chilemon-rpt"
+
+    if [[ ! -f "$wrapper_src" ]]; then
+        warn "No se encontró $wrapper_src — no se puede instalar el wrapper"
+        return 1
     fi
 
-    cat > "$WRAPPER_PATH" <<'BASH'
-#!/usr/bin/env bash
-# ==============================================================================
-# ChileMon - Wrapper seguro para comandos rpt de Asterisk (v0.3.1)
-# ==============================================================================
-# Limpieza de parámetros para evitar inyecciones y fallos de comillas desde PHP
-CMD=$(echo ${1:-} | tr -d "'\"")
-LOCAL=$(echo ${2:-} | tr -d "'\"")
-REMOTE=$(echo ${3:-} | tr -d "'\"")
-
-# LOG DE DEPURACIÓN (Ayuda a ver qué llega desde la web)
-# echo "[$(date)] WEB_CMD: $CMD LOCAL:$LOCAL REMOTE:$REMOTE" >> /tmp/chilemon.log
-
-case "$CMD" in
-    nodes) /usr/sbin/asterisk -rx "rpt nodes $LOCAL" ;;
-    stats) /usr/sbin/asterisk -rx "rpt stats $LOCAL" ;;
-    connect)
-        # Conectar a nodo remoto (*3 = transceive)
-        # Funciona tanto para ASL como EchoLink (prefijo 3xxxxxx)
-        /usr/sbin/asterisk -rx "rpt fun $LOCAL *3$REMOTE"
-        ;;
-    disconnect) /usr/sbin/asterisk -rx "rpt fun $LOCAL *1$REMOTE" ;;
-    sys-restart-asterisk) systemctl restart asterisk ;;
-    sys-restart-apache) systemctl restart apache2 ;;
-    sys-poweroff) poweroff ;;
-    *) echo "Comando invalido: $CMD" >> /tmp/chilemon.log; exit 1 ;;
-esac
-BASH
-
-    chmod 755 "$WRAPPER_PATH"
-    chown root:root "$WRAPPER_PATH"
-    ok "Wrapper robusto instalado en $WRAPPER_PATH"
+    install -m 755 -o root -g root "$wrapper_src" "$WRAPPER_PATH"
+    ok "Wrapper instalado desde bin/chilemon-rpt en $WRAPPER_PATH"
 }
 
 write_sudoers() {
     backup_if_exists "$SUDOERS_FILE"
     cat > "$SUDOERS_FILE" <<EOF2
-www-data ALL=(ALL) NOPASSWD: ${WRAPPER_PATH}
+www-data ALL=(root) NOPASSWD: ${WRAPPER_PATH}
 EOF2
     chmod 440 "$SUDOERS_FILE"
     visudo -cf "$SUDOERS_FILE" >/dev/null

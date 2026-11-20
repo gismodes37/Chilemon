@@ -7,22 +7,17 @@ use App\Services\AslRptService;
 use RuntimeException;
 
 /**
- * SystemController — Ejecuta acciones de administración del sistema
- * de forma segura a través del wrapper chilemon-rpt.
+ * SystemController — Punto de entrada de acciones de administración del sistema.
  *
- * Acciones permitidas:
- *   restart-asterisk  → reinicia el servicio Asterisk
- *   restart-apache    → reinicia Apache (¡ojo! la respuesta puede no llegar)
- *   poweroff          → apaga el nodo completamente
+ * Las acciones destructivas (restart de Asterisk/Apache y poweroff) ya no se
+ * exponen por la web: se ejecutan por SSH con sudo real. El mapa está vacío a
+ * propósito, de modo que cualquier action recibida se rechaza de forma
+ * explícita con "Acción no reconocida".
  */
 final class SystemController
 {
-    /** Mapeo de acciones UI → métodos del servicio. */
-    private const ACTION_MAP = [
-        'restart-asterisk' => 'restartAsterisk',
-        'restart-apache'   => 'restartApache',
-        'poweroff'         => 'powerOff',
-    ];
+    /** No hay acciones de sistema disponibles desde el dashboard. */
+    private const ACTION_MAP = [];
 
     private AslRptService $svc;
 

@@ -14,10 +14,7 @@ final class AslRptService
         'stats',
         'nodes',
         'connect',
-        'disconnect',
-        'sys-restart-asterisk',
-        'sys-restart-apache',
-        'sys-poweroff'
+        'disconnect'
     ];
 
     private string $wrapper;
@@ -55,30 +52,6 @@ final class AslRptService
     public function disconnect(string $remoteNode): string
     {
         return $this->run('disconnect', $remoteNode);
-    }
-
-    /**
-     * Reinicia el servicio Asterisk mediante el wrapper.
-     */
-    public function restartAsterisk(): string
-    {
-        return $this->run('sys-restart-asterisk', $this->nodeId);
-    }
-
-    /**
-     * Reinicia el servidor web Apache.
-     */
-    public function restartApache(): string
-    {
-        return $this->run('sys-restart-apache', $this->nodeId);
-    }
-
-    /**
-     * Apaga el nodo completamente (hardware).
-     */
-    public function powerOff(): string
-    {
-        return $this->run('sys-poweroff', $this->nodeId);
     }
 
     /**
@@ -275,10 +248,6 @@ final class AslRptService
             }
             if ($cmd === 'nodes') {
                 return "T1000\nT2000\n*3333\nE3001234\nE3054614\n<NONE>\n";
-            }
-            // Mocks para acciones de sistema en Windows
-            if (in_array($cmd, ['sys-restart-asterisk', 'sys-restart-apache', 'sys-poweroff'], true)) {
-                return "Simulated success for action: {$cmd}";
             }
             // Para 'connect' y 'disconnect'
             return "Local simulate success";

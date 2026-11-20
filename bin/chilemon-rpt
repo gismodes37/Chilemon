@@ -1,64 +1,72 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# ChileMon - Wrapper seguro para comandos rpt de Asterisk (v0.3.1)
+# ChileMon - Wrapper seguro para comandos rpt de Asterisk
 # ==============================================================================
-# Este script actúa como un puente seguro entre PHP y Asterisk.
-# Limpia los parámetros de entrada y los ejecuta mediante 'rpt fun'.
+# Acepta solo un conjunto fijo de verbos. Los IDs de nodo se validan como
+# dígitos decimales antes de llegar a `asterisk -rx`.
 #
-# Soporte EchoLink:
-#   Los nodos EchoLink en AllStarLink usan prefijo 3 + 6 dígitos (7 total).
-#   Ej: EchoLink 1234 → 3001234 en ASL.
-#   Se conectan/desconectan con los mismos comandos *3 y *1 que nodos ASL.
+# Los verbos destructivos de sistema (poweroff, restart de Asterisk/Apache)
+# NO están disponibles aquí a propósito: se ejecutan por SSH con sudo real.
+# Cualquier persona con ejecución de código como www-data podría invocar un
+# wrapper sudo NOPASSWD, así que este archivo solo expone operaciones de radio
+# y de actualización controlada.
+#
+# EchoLink: los nodos usan prefijo 3 + 6 dígitos (7 en total), todos numéricos.
 # ==============================================================================
 
-# Limpieza de parámetros para evitar inyecciones y fallos de comillas desde PHP
-CMD=$(echo ${1:-} | tr -d "'\"")
-LOCAL=$(echo ${2:-} | tr -d "'\"")
-REMOTE=$(echo ${3:-} | tr -d "'\"")
+set -u
 
-# LOG DE DEPURACIÓN (descomentar para ver qué llega desde la web)
-# echo "[$(date)] WEB_CMD: $CMD LOCAL:$LOCAL REMOTE:$REMOTE" >> /tmp/chilemon.log
+CMD="${1:-}"
+LOCAL="${2:-}"
+REMOTE="${3:-}"
+
+ASTERISK_BIN=/usr/sbin/asterisk
+
+require_node_id() {
+    local label="$1"
+    local value="$2"
+
+    if [[ ! "$value" =~ ^[0-9]+$ ]]; then
+        printf 'Invalid %s node id: digits only\n' "$label" >&2
+        exit 1
+    fi
+}
 
 case "$CMD" in
-    nodes)
-        # Lista los nodos conectados actualmente
-        /usr/sbin/asterisk -rx "rpt nodes $LOCAL"
+    nodes|stats)
+        require_node_id 'local' "$LOCAL"
+        "$ASTERISK_BIN" -rx "rpt $CMD $LOCAL"
         ;;
-    stats)
-        # Obtiene estadísticas detalladas del nodo local
-        /usr/sbin/asterisk -rx "rpt stats $LOCAL"
-        ;;
+
     connect)
-        # Conectar a un nodo remoto (*3 = transceive)
-        # Funciona tanto para nodos ASL normales como EchoLink (prefijo 3xxxxxx)
-        /usr/sbin/asterisk -rx "rpt fun $LOCAL *3$REMOTE"
+        # *3 = transceive (ASL normal y EchoLink con prefijo 3xxxxxx)
+        require_node_id 'local'  "$LOCAL"
+        require_node_id 'remote' "$REMOTE"
+        "$ASTERISK_BIN" -rx "rpt fun $LOCAL *3$REMOTE"
         ;;
+
     disconnect)
-        # Desconecta un nodo remoto específico (*1 = disconnect specific)
-        /usr/sbin/asterisk -rx "rpt fun $LOCAL *1$REMOTE"
+        # *1 = desconectar nodo remoto específico
+        require_node_id 'local'  "$LOCAL"
+        require_node_id 'remote' "$REMOTE"
+        "$ASTERISK_BIN" -rx "rpt fun $LOCAL *1$REMOTE"
         ;;
-    sys-restart-asterisk)
-        # Reinicia el servicio Asterisk completo
-        systemctl restart asterisk
-        ;;
-    sys-restart-apache)
-        # Reinicia el servidor web Apache
-        systemctl restart apache2
-        ;;
-    sys-poweroff)
-        # Apaga el hardware físicamente
-        poweroff
-        ;;
+
     git-fetch)
-        # Obtiene referencias remotas desde GitHub (no mergea)
+        # Obtiene refs remotas desde GitHub (no mergea)
         cd /opt/chilemon && git fetch origin 2>&1
         ;;
+
     git-compare)
         # Compara HEAD local con origin/main
-        cd /opt/chilemon && echo "LOCAL:$(git rev-parse HEAD)" && echo "REMOTE:$(git rev-parse origin/main)" && echo "SUMMARY:$(git log --oneline HEAD..origin/main 2>/dev/null || echo 'up-to-date')"
+        cd /opt/chilemon \
+            && echo "LOCAL:$(git rev-parse HEAD)" \
+            && echo "REMOTE:$(git rev-parse origin/main)" \
+            && echo "SUMMARY:$(git log --oneline HEAD..origin/main 2>/dev/null || echo 'up-to-date')"
         ;;
+
     git-pull)
-        # Stash cambios tracked, limpiar untracked que conflictean, pull, reporta
+        # Stash tracked, limpiar untracked que conflictean, pull y restore
         cd /opt/chilemon \
             && git stash push -m "chilemon-auto-stash-$(date +%s)" 2>/dev/null \
             && git clean -fd 2>/dev/null \
@@ -66,16 +74,18 @@ case "$CMD" in
             && git stash pop 2>/dev/null; \
         echo "STASHED:$?"
         ;;
+
     sys-restart-webrtc)
-        # Reinicia el servicio WebRTC Audio Bridge
         systemctl restart chilemon-webrtc
         ;;
+
     sys-reload-apache)
-        # Recarga Apache de forma graceful (no interrumpe conexiones)
         systemctl reload apache2
         ;;
+
     *)
-        echo "Comando invalido: $CMD" >> /tmp/chilemon.log
+        # Sin archivo /tmp predecible: el diagnosticador lo lee por stderr.
+        printf 'Comando invalido: %s\n' "$CMD" >&2
         exit 1
         ;;
 esac

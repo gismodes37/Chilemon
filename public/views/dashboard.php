@@ -170,21 +170,6 @@ $systemInfo = $systemInfo ?? [
                         title="Descargar Companion App (audio nativo)">
                         <i class="bi bi-download"></i> Companion App
                     </button>
-                    <button class="btn btn-outline-danger" id="btn-restart-asterisk"
-                        onclick="confirmarReinicio('Asterisk', 'restart-asterisk')"
-                        title="Reiniciar el servicio Asterisk">
-                        <i class="bi bi-arrow-repeat"></i> Reiniciar Asterisk
-                    </button>
-                    <button class="btn btn-outline-danger" id="btn-restart-apache"
-                        onclick="confirmarReinicio('Apache', 'restart-apache')"
-                        title="Reiniciar el servicio Apache">
-                        <i class="bi bi-arrow-repeat"></i> Reiniciar Apache
-                    </button>
-                    <button class="btn btn-outline-danger" id="btn-power-node"
-                        onclick="confirmarReinicio('Nodo (APAGAR)', 'poweroff')"
-                        title="Apagar el nodo">
-                        <i class="bi bi-power"></i> Apagar Nodo
-                    </button>
                 </div>
             </div>
         </div>
@@ -1095,36 +1080,6 @@ $systemInfo = $systemInfo ?? [
 })();
 </script>
 
-<div class="modal fade modal-chilemon-danger" id="modalReinicio" tabindex="-1" aria-labelledby="modalReicioLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="modalReicioLabel">
-                    <i class="bi bi-exclamation-triangle-fill"></i>
-                    <span id="reinicioTitulo">Confirmar acción</span>
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
-            </div>
-            <div class="modal-body text-center py-4">
-                <div class="mb-3">
-                    <i id="reinicioIcono" class="bi bi-exclamation-octagon text-danger" style="font-size: 3.5rem; opacity: 0.9;"></i>
-                </div>
-                <p class="mb-1 opacity-75 fs-5">¿Estás seguro que deseas realizar esta acción sobre</p>
-                <p class="fw-bold fs-3 mb-2" id="modal-servicio-nombre">—</p>
-                <p class="small opacity-50">Esta acción es sensible y puede interrumpir la operatividad del nodo.</p>
-            </div>
-            <div class="modal-footer justify-content-center gap-2">
-                <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">
-                    <i class="bi bi-x-circle"></i> Cancelar
-                </button>
-                <button type="button" class="btn btn-danger px-4" id="btn-confirmar-reinicio">
-                    <i class="bi bi-arrow-clockwise"></i> Sí, reiniciar
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-
 <script>
 function downloadCompanion() {
     // Descargar config.toml pre-configurado con la IP de la Pi
@@ -1150,70 +1105,6 @@ function downloadCompanion() {
     );
 }
 
-function confirmarReinicio(servicio, action) {
-    document.getElementById('modal-servicio-nombre').textContent = servicio;
-    
-    const reinicioIcono = document.getElementById('reinicioIcono');
-    const reinicioTitulo = document.getElementById('reinicioTitulo');
-    const btnConfirmar = document.getElementById('btn-confirmar-reinicio');
-
-    const isPoweroff = action === 'poweroff';
-    const isApacheRestart = action === 'restart-apache';
-
-    // Personalizar según acción
-    if (isPoweroff) {
-        reinicioIcono.className = "bi bi-power text-danger";
-        reinicioTitulo.textContent = "Confirmar Apagado";
-        btnConfirmar.className = 'btn btn-danger px-4';
-        btnConfirmar.innerHTML = '<i class="bi bi-power"></i> Sí, apagar';
-    } else {
-        reinicioIcono.className = "bi bi-arrow-repeat text-warning";
-        reinicioTitulo.textContent = "Confirmar Reinicio";
-        btnConfirmar.className = 'btn btn-warning px-4';
-        btnConfirmar.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Sí, reiniciar';
-    }
-
-    btnConfirmar.onclick = async function () {
-        btnConfirmar.disabled = true;
-        btnConfirmar.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Procesando...';
-
-        try {
-            await postForm('api/system_action.php', { action: action });
-
-            // Cerrar modal y mostrar resultado
-            bootstrap.Modal.getInstance(document.getElementById('modalReinicio')).hide();
-
-            if (isPoweroff) {
-                alert('✅ Orden de apagado enviada. El nodo se apagará en unos segundos.');
-            } else {
-                alert('✅ ' + servicio + ' reiniciado correctamente.');
-                setTimeout(() => { window.location.reload(); }, 3000);
-            }
-        } catch (err) {
-            // Cerrar el modal siempre
-            try { bootstrap.Modal.getInstance(document.getElementById('modalReinicio')).hide(); } catch(e) {}
-
-            // Cuando reiniciamos Apache o apagamos el nodo, el servidor se cae
-            // ANTES de enviar la respuesta HTTP. El navegador reporta "Failed to fetch"
-            // pero eso significa que la acción SÍ se ejecutó correctamente.
-            if ((isApacheRestart || isPoweroff) && err.message !== 'Unauthorized') {
-                if (isPoweroff) {
-                    alert('✅ Orden de apagado enviada. El nodo se apagará en unos segundos.');
-                } else {
-                    alert('✅ Apache se está reiniciando. La página se recargará en unos segundos...');
-                    setTimeout(() => { window.location.reload(); }, 5000);
-                }
-            } else if (err.message !== 'Unauthorized') {
-                alert('❌ Error: ' + err.message);
-            }
-        } finally {
-            btnConfirmar.disabled = false;
-            btnConfirmar.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Sí, reiniciar';
-        }
-    };
-
-    new bootstrap.Modal(document.getElementById('modalReinicio')).show();
-}
 </script>
 
 <div class="modal fade modal-chilemon-info" id="remoteNodesModal" tabindex="-1" aria-hidden="true">
