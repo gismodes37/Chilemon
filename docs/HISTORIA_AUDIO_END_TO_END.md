@@ -243,6 +243,18 @@ El operador confirmó que la actualización automática funciona, pero se quejó
 
 **Verificación:** nuevo test `tests/js/dashboard-update.test.js` (3 casos: polling no abre modal y mantiene el pulse, click sí abre, timers de polling no abren). Resultado: `update modal behavior: 3 passed`. El test de conexión sigue en `3 passed`. `node --check` y `git diff --check` limpios. No hay CLI de PHP instalada en la PC; el cambio en `header.php` es solo el valor del atributo `onclick`.
 
+### 3.14 Procedimiento para verificar la detección de updates (2026-11-20)
+
+Para probar el comportamiento nuevo del badge sin el efecto colateral del fix viejo, el orden importa:
+
+1. En la Pi: `git pull` (trae el fix de `f955159`).
+2. En el PC: hacer un push nuevo; `check-update.php` hará `git fetch origin` y comparará el HEAD local de la Pi contra `origin/main`.
+3. En el browser: Ctrl+F5 en el dashboard. El badge «Actualización Disponible» debe parpadear **sin** abrir el modal.
+4. Hacer clic en el badge: recién ahí debe aparecer el modal con el resumen de commits.
+5. Aplicar la actualización desde el propio modal, o hacer `git pull` manual en la Pi.
+
+Si se pushea antes del paso 1, el `git pull` trae todos los commits de una vez y no queda nada pendiente de detectar. El endpoint tiene rate limit de 30 requests por minuto.
+
 ## 4. Puntos que hubo que salvar
 
 Lista de decisiones y workarounds que no eran obvios y que costaron tiempo descubrir:
