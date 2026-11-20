@@ -19,6 +19,8 @@
  * -----------------------------------------------
  */
 
+const LAST_NODE_KEY = 'chilemon.ptt.lastNode';
+
 class PTTWidget {
 
     /**
@@ -34,7 +36,6 @@ class PTTWidget {
         this.pttActive = false;
         this.callActive = false;
         this.reconnectAttempts = 0;
-        this.maxReconnectAttempts = 20;
         this.reconnectBaseDelay = 1000;
         this.reconnectTimer = null;
         // True when the WS handshake failed (companion process not running).
@@ -63,6 +64,11 @@ class PTTWidget {
 
         // Visualizer reference (set by init)
         this._visualizer = null;
+
+        // Last node whose audio channel was opened. Kept in sessionStorage so
+        // the visible Reconnect button can restore it after a page reload.
+        this.lastCallNode = this._readLastNode();
+        this._restoreCallOnOpen = false;
     }
 
     // ---------------------------------------------------------------
@@ -121,8 +127,18 @@ class PTTWidget {
             this.reconnectAttempts = 0;
             this._wsFailed = false;
             this._setStatus('connected', 'Companion Connected');
+            // Keep the button available so the user can force a reconnect
+            // without waiting for the automatic backoff to fire.
             if (this.connectBtn) {
-                this.connectBtn.style.display = 'none';
+                this.connectBtn.disabled = false;
+                this.connectBtn.textContent = 'Reconectar';
+                this.connectBtn.title = 'Force reconnect to companion app';
+            }
+            // Restore the audio channel only when the operator pressed the
+            // button. Automatic WS reconnects never reopen the IAX2 call.
+            if (this._restoreCallOnOpen && this.lastCallNode) {
+                this._restoreCallOnOpen = false;
+                this.placeCall(this.lastCallNode);
             }
             this._updateUI();
         };
@@ -174,13 +190,12 @@ class PTTWidget {
     // ---------------------------------------------------------------
 
     _scheduleReconnect() {
-        if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-            this._setStatus('error', 'Companion no detectado');
-            return;
-        }
-        // Cap the backoff so a companion started later is picked up within 10s.
+        // Retry indefinitely: a companion started later must always be picked
+        // up, even after many failed attempts. Cap the exponent to avoid
+        // overflow while the delay itself stays below 10s.
+        const exponent = Math.min(this.reconnectAttempts, 10);
         const delay = Math.min(
-            this.reconnectBaseDelay * Math.pow(2, this.reconnectAttempts),
+            this.reconnectBaseDelay * Math.pow(2, exponent),
             10000
         );
         this.reconnectAttempts++;
@@ -295,10 +310,37 @@ class PTTWidget {
     //  Call — Place / Hangup via companion IAX2
     // ---------------------------------------------------------------
 
+    _readLastNode() {
+        try {
+            return sessionStorage.getItem(LAST_NODE_KEY) || '';
+        } catch (e) {
+            return '';
+        }
+    }
+
+    _rememberNode(node) {
+        this.lastCallNode = String(node);
+        try {
+            sessionStorage.setItem(LAST_NODE_KEY, this.lastCallNode);
+        } catch (e) {
+            // Storage may be unavailable (private mode); in-memory still works.
+        }
+    }
+
+    _forgetNode() {
+        this.lastCallNode = '';
+        try {
+            sessionStorage.removeItem(LAST_NODE_KEY);
+        } catch (e) {
+            // Ignore storage failures.
+        }
+    }
+
     /** Place an IAX2 call to a node through the companion app. */
     placeCall(node) {
         console.log("[PLACECALL] called with node:", node, "connected:", this.connected);
         if (!this.connected) return;
+        this._rememberNode(node);
         console.log("[PLACECALL] sending WS message");
         this._send({ type: 'call', node: String(node) });
         this._setStatus('connected', 'Llamando...');
@@ -306,6 +348,7 @@ class PTTWidget {
 
     /** Hang up the current call through the companion app. */
     hangupCall() {
+        this._forgetNode();
         if (!this.connected) return;
         this._send({ type: 'call', action: 'hangup' });
         this.pttActive = false;
@@ -413,6 +456,9 @@ class PTTWidget {
             this.reconnectAttempts = 0;
             this._clearReconnect();
             this._setStatus('disconnected', 'Buscando Companion...');
+            // Only an explicit click restores the audio channel that the
+            // companion may have dropped after 60s without received audio.
+            this._restoreCallOnOpen = Boolean(this.lastCallNode);
             this._openWebSocket();
         });
 

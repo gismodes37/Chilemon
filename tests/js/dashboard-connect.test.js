@@ -33,8 +33,8 @@ function makeContext(calls) {
     callActive: false,
     pttActive: false,
     placeCall(node) { calls.push(['placeCall', String(node)]); },
-    unkeyPtt() {},
-    hangupCall() {},
+    unkeyPtt() { calls.push(['unkeyPtt']); },
+    hangupCall() { calls.push(['hangupCall']); },
   };
 
   return vm.createContext({
@@ -112,11 +112,31 @@ async function testFavoritesConnect() {
   assertLinkedAndCalled(calls, 'favorites');
 }
 
+async function testDisconnectClearsCallState() {
+  const calls = [];
+  const ctx = loadDashboard(calls);
+  // The companion may already have auto-hung up the idle call.
+  ctx.window.pttWidget.callActive = false;
+  await ctx.disconnectFromNode(NODE);
+
+  assert.equal(
+    calls.filter((c) => c[0] === 'hangupCall').length,
+    1,
+    'disconnect must clear the remembered call even when callActive is false',
+  );
+  assert.equal(
+    calls.filter((c) => c[0] === 'postForm' && c[1] === 'api/disconnect.php').length,
+    1,
+    'disconnect must still unlink the node',
+  );
+}
+
 (async () => {
   await testQuickConnect();
   await testNodeTableConnect();
   await testFavoritesConnect();
-  console.log('dashboard connect paths: 3 passed');
+  await testDisconnectClearsCallState();
+  console.log('dashboard connect paths: 4 passed');
 })().catch((err) => {
   console.error(err.message);
   process.exitCode = 1;

@@ -761,8 +761,13 @@ async function disconnectFromNode(nodeId) {
 
   // Unkey before hanging up: in mode S the transmitter needs '*' or '#'
   // to turn off, and closing the IAX2 channel alone does not do it.
-  if (window.pttWidget && window.pttWidget.connected && window.pttWidget.callActive) {
-    window.pttWidget.unkeyPtt();
+  // Hangup runs even when callActive is false: the companion may have already
+  // dropped an idle call, and the remembered node must be cleared so the
+  // Reconectar button cannot reopen a deliberately disconnected channel.
+  if (window.pttWidget && window.pttWidget.connected) {
+    if (window.pttWidget.callActive) {
+      window.pttWidget.unkeyPtt();
+    }
     window.pttWidget.hangupCall();
   }
 
