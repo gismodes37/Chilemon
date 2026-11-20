@@ -179,7 +179,7 @@ Lista de decisiones y workarounds que no eran obvios y que costaron tiempo descu
 
 - **Funcionando y medido:** señal TX y RX, 5/5 pruebas de TX, calibración UDP, codec validado contra CPython, badge con actividad de entrada detectada.
 - **Sin validación de oído:** eco `*0` y tonos en el repetidor con el PID `24936` (fix µ-law cargado).
-- **Git ordenado y pusheado:** 6 work-units en `main` desde `1fd5349` más el commit de docs `c8eda14`, con HEAD `c8eda14`. Push autorizado por el usuario el 20/11/2026: `f617cd4..7667100 main -> main` y `7667100..c8eda14 main -> main`. Remoto y local sincronizados. `public/api/log-call.php` excluido deliberadamente. Los cambios del hito 17 quedan sin commitear.
+- **Git ordenado y pusheado:** 6 work-units en `main` desde `1fd5349` más el commit de docs `c8eda14`, con HEAD `c8eda14`. Push autorizado por el usuario el 20/11/2026: `f617cd4..7667100 main -> main` y `7667100..c8eda14 main -> main`. Remoto y local sincronizados. `public/api/log-call.php` excluido deliberadamente. Los cambios del hito 17 se commitearon y pushearon el 20/11/2026 en `6571d9a` (`c8eda14..6571d9a main -> main`): launcher del companion y feedback de conexión del widget.
 - **Revisión nativa:** ambas transacciones abandonadas y cuarentenadas, no aprobadas. Finding de `review-risk` corregido y cubierto por test.
 - **Verificación:** suite PHP 71 tests / 124 assertiones, 0 errores (4 skipped, 6 incomplete preexistentes); pytest companion 37/37.
 - **Pendiente:** pruebas de oído en la Pi y follow-up opcional del badge.
