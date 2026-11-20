@@ -193,6 +193,28 @@ La causa final era local: `disconnectFromNode()` colgaba el canal sin mandar el 
 
 **Verificación:** `python -m pytest tests/companion -q` → 41 passed (37 previos + 4 regresiones nuevas en `tests/companion/hangup_test.py`). Sintaxis Python y JS OK; `git diff --check` limpio. Falta la validación de oído con el operador: desconectar con PTT activo y confirmar que no queda sumbido.
 
+### 3.11 Selección de audio por dispositivo por defecto del sistema (2026-11-20)
+
+El operador aclaró que en su PC hay **tres dispositivos inalámbricos, dos ERAZER con el mismo nombre y un B8**, además de JQ-BT. Fijar un substring como `ERAZER XF22` no es válido para una comunidad con decenas de marcas de micrófono: Windows reenumera los IDs y el prefijo `(2-`/`(3-` cambia entre sesiones.
+
+**Causa de fondo encontrada:** `_resolve_device()` devolvía `0` para nombre vacío o no encontrado. En sounddevice el ID `0` es el *Asignador de sonido Microsoft*, **no** el dispositivo por defecto del sistema. Eso explicaba el `Invalid number of channels [PaErrorCode -9998]` del arranque anterior. Además, `sd.default.device` es un `_InputOutputPair` (indexable, pero no `tuple` ni `list`), así que un `isinstance(..., (tuple, list))` lo dejaba caer al mismo fallback roto.
+
+**Fix aplicado:**
+- `companion/audio.py:405` — resolución reescrita: nombre vacío o no encontrado → default real del sistema; índice numérico o substring → fijan un dispositivo; entre múltiples coincidencias prefiere nombre exacto, más canales (estéreo sobre manos-libres mono) y mayor sample rate. Loguea la descripción completa del dispositivo elegido (ID, API, canales).
+- `companion/main.py:336` — nuevo flag `--list-devices` que lista todos los dispositivos con su API y marca `DEFAULT INPUT` / `DEFAULT OUTPUT`.
+- `companion/config.toml` — plantilla con `input_device = ""` y `output_device = ""` por defecto, documentando que se puede fijar por ID o substring.
+- 7 tests nuevos en `tests/companion/device_resolution_test.py`, incluido el caso `_InputOutputPair` para evitar la regresión del `isinstance`.
+
+**Verificación en la PC:** `python -m pytest tests/companion -q` → 48 passed. `python -m companion.main --list-devices` marca id 1 (mic MME) y id 4 (ERAZER estéreo MME) como defaults. Al arrancar con config vacía el log confirma:
+
+```
+Using system default input device: 1: [MME] 'Auriculares con micrófono (2- E' in=1 out=0
+Using system default output device: 4: [MME] 'Auriculares (2- ERAZER XF22)' in=0 out=2
+Output stream opened: 2 channels
+```
+
+**Resultado:** una instalación nueva funciona con cualquier micrófono sin tocar la config; el usuario puede fijar un dispositivo explícito si lo necesita.
+
 ## 4. Puntos que hubo que salvar
 
 Lista de decisiones y workarounds que no eran obvios y que costaron tiempo descubrir:

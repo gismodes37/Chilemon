@@ -333,6 +333,45 @@ class CompanionApp:
         await self.stop()
 
 
+def list_audio_devices() -> None:
+    """Print available audio devices and mark the OS defaults."""
+    try:
+        import sounddevice as sd
+    except ImportError:
+        print("sounddevice is not installed — audio is unavailable.")
+        return
+
+    try:
+        devices = sd.query_devices()
+        apis = sd.query_hostapis()
+    except Exception as exc:
+        print(f"Cannot enumerate audio devices: {exc}")
+        return
+
+    default = sd.default.device
+    try:
+        default_in, default_out = default[0], default[1]
+    except (TypeError, IndexError):
+        default_in = default_out = default
+
+    print("Available audio devices:")
+    for i, dev in enumerate(devices):
+        api = apis[dev["hostapi"]]["name"]
+        markers = []
+        if i == default_in:
+            markers.append("DEFAULT INPUT")
+        if i == default_out:
+            markers.append("DEFAULT OUTPUT")
+        suffix = f"  <-- {', '.join(markers)}" if markers else ""
+        print(
+            f"  {i:>2}: [{api}] {dev['name']!r} "
+            f"in={dev['max_input_channels']} out={dev['max_output_channels']}{suffix}"
+        )
+    print()
+    print("Leave input_device/output_device empty in ~/.chilemon/config.toml")
+    print("to follow the system default, or set an ID or name substring to pin one.")
+
+
 def main() -> None:
     """CLI entry point."""
     parser = argparse.ArgumentParser(
@@ -348,7 +387,16 @@ def main() -> None:
         default="",
         help="Log level: DEBUG, INFO, WARNING, ERROR",
     )
+    parser.add_argument(
+        "--list-devices",
+        action="store_true",
+        help="List available audio devices and exit",
+    )
     args = parser.parse_args()
+
+    if args.list_devices:
+        list_audio_devices()
+        return
 
     # Load config
     config = load_config(args.config)

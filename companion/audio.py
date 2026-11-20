@@ -163,11 +163,11 @@ class AudioEngine:
         output_id = self._resolve_device(self._output_device, is_input=False)
 
         logger.info(
-            "Starting audio: input=%s (%s), output=%s (%s)",
-            self._input_device or "default",
-            input_id,
-            self._output_device or "default",
-            output_id,
+            "Starting audio: input=%s -> %s, output=%s -> %s",
+            self._input_device or "system default",
+            self._describe_device(input_id),
+            self._output_device or "system default",
+            self._describe_device(output_id),
         )
 
         # Input stream (mic) — callback pushes TX audio
@@ -402,27 +402,117 @@ class AudioEngine:
     # -- Helpers --
 
     @staticmethod
+    def _describe_device(index: int) -> str:
+        """Human-readable device description for startup logs."""
+        if sd is None or index < 0:
+            return f"id={index}"
+        try:
+            dev = sd.query_devices(index)
+            api = sd.query_hostapis()[dev["hostapi"]]["name"]
+            return (
+                f"{index}: [{api}] {dev['name']!r} "
+                f"in={dev['max_input_channels']} out={dev['max_output_channels']}"
+            )
+        except Exception:
+            return f"id={index}"
+
+    @staticmethod
     def _resolve_device(name: str, is_input: bool) -> int:
-        """Resolve device name to sounddevice device ID (0 = default)."""
-        if sd is None or not name:
+        """Resolve a configured device to a sounddevice device ID.
+
+        An empty or unmatched name falls back to the OS default device, so a
+        fresh install works with any microphone brand. A numeric index or a
+        name substring can pin a specific device when the user needs to.
+        """
+        if sd is None:
             return 0
 
+        kind = "input" if is_input else "output"
         try:
-            device_id = int(name)
-            return device_id
+            devices = list(sd.query_devices())
+        except Exception as exc:
+            logger.warning("Cannot enumerate audio devices: %s", exc)
+            return 0
+
+        def has_channels(dev: dict) -> bool:
+            key = "max_input_channels" if is_input else "max_output_channels"
+            return dev.get(key, 0) > 0
+
+        def valid(index: object) -> bool:
+            return (
+                isinstance(index, int)
+                and 0 <= index < len(devices)
+                and has_channels(devices[index])
+            )
+
+        # sounddevice exposes the OS default as an _InputOutputPair (indexable,
+        # but not a tuple/list), or as a single value when both sides were set
+        # to the same device. Index first, fall back for scalar defaults.
+        configured_default = sd.default.device
+        try:
+            default_id = configured_default[0 if is_input else 1]
+        except (TypeError, IndexError):
+            default_id = configured_default
+        if not valid(default_id):
+            default_id = next(
+                (i for i, dev in enumerate(devices) if has_channels(dev)), 0
+            )
+
+        if not name:
+            logger.info(
+                "Using system default %s device: %s",
+                kind,
+                AudioEngine._describe_device(default_id),
+            )
+            return default_id
+
+        # Explicit numeric index (allowed, but not required).
+        try:
+            index = int(name)
         except ValueError:
-            pass
+            index = None
+        if index is not None:
+            if valid(index):
+                return index
+            logger.warning(
+                "Configured %s device index %s is invalid — using system default: %s",
+                kind, name, AudioEngine._describe_device(default_id),
+            )
+            return default_id
 
-        # Search by name substring
-        for i, dev in enumerate(sd.query_devices()):
-            if name.lower() in dev["name"].lower():
-                if is_input and dev["max_input_channels"] > 0:
-                    return i
-                if not is_input and dev["max_output_channels"] > 0:
-                    return i
+        # Name substring. Prefer exact name, then more channels (stereo over
+        # mono hands-free profiles), then higher native sample rate.
+        needle = name.strip().lower()
+        candidates = [
+            (i, dev) for i, dev in enumerate(devices)
+            if needle in dev["name"].lower() and has_channels(dev)
+        ]
+        if not candidates:
+            logger.warning(
+                "Device '%s' not found — using system default: %s",
+                name, AudioEngine._describe_device(default_id),
+            )
+            return default_id
 
-        logger.warning("Device '%s' not found — using default", name)
-        return 0
+        channel_key = "max_input_channels" if is_input else "max_output_channels"
+        chosen = max(
+            candidates,
+            key=lambda item: (
+                item[1]["name"].lower() == needle,
+                item[1][channel_key],
+                item[1].get("default_samplerate") or 0,
+                -item[0],
+            ),
+        )
+        if len(candidates) > 1:
+            logger.info(
+                "%d devices match '%s': %s — using %s. Set %s_device to an exact "
+                "name or index to pin one.",
+                len(candidates), name,
+                ", ".join(AudioEngine._describe_device(i) for i, _ in candidates),
+                AudioEngine._describe_device(chosen[0]), kind,
+            )
+        return chosen[0]
 
     def get_jitter_stats(self) -> dict:
         """Return jitter buffer statistics for monitoring."""
