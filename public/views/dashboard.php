@@ -1090,18 +1090,16 @@ function downloadCompanion() {
     link.click();
     document.body.removeChild(link);
     
-    // Mostrar instrucciones
+    // Mostrar instrucciones de la instalación en un solo paso
     alert(
         '📥 Config descargado!\n\n' +
-        'Pasos:\n' +
-        '1. Descargá el Companion desde GitHub:\n' +
-        '   https://github.com/gismodes37/Chilemon/releases/latest\n\n' +
-        '2. Copiá config.toml a la carpeta del Companion\n\n' +
-        '3. Activalo cuando lo necesites: start-companion.bat\n' +
-        '   (o chilemon-companion.exe si usás el paquete).\n\n' +
-        '4. En el dashboard apretá Connect y después conectá un nodo.\n\n' +
-        'Para detenerlo: stop-companion.bat o cerrá la ventana.\n\n' +
-        '¡Listo para PTT!'
+        'Ahora hacé doble clic en companion\\install-companion.bat:\n' +
+        '  • encuentra el config en Descargas\n' +
+        '  • lo instala en %USERPROFILE%\\.chilemon\\config.toml\n' +
+        '  • registra el inicio automático y arranca el Companion\n\n' +
+        'Después en el dashboard apretá Connect y conectá un nodo para PTT.\n' +
+        'Requiere Python 3.11+ en la PC.\n\n' +
+        'Para detenerlo: stop-companion.bat.'
     );
 }
 

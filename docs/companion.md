@@ -4,12 +4,12 @@ The Companion is a small Python audio app that runs on the operator's PC. It giv
 
 > Status: updated for the idempotent logon autostart on branch `feat/companion-autostart-task`. Items marked **Verify** are contradictory in the repository and must be confirmed on the Pi before being treated as fact.
 
-## Quick path
+## Quick path (one action on Windows)
 
 1. On the Pi, run `install/install_chilemon.sh`. It generates a random IAX2 secret and writes it to `config/local.php`.
-2. On the Windows PC, obtain the built executable from Releases (or build it with `companion/build.bat`) and place the generated `config.toml` at `%USERPROFILE%\.chilemon\config.toml`.
-3. Start it with `companion/start-companion.bat`. The first run installs the login autostart; later logons start the companion without any manual step.
-4. In the dashboard, confirm **Companion Connected**, then press **Reconectar** to open the IAX2 channel.
+2. In the dashboard, click **Companion App**. The downloaded `chilemon-companion-config.toml` already contains the Pi IP and that secret.
+3. On the Windows PC, double-click `companion/install-companion.bat`. It places the download at `%USERPROFILE%\.chilemon\config.toml`, registers logon autostart and starts the companion. Python 3.11+ must be installed; each step has its own log and returns a real exit code.
+4. In the dashboard, confirm **Companion Connected**, then press **Reconectar** to open the IAX2 channel. PTT stays explicit: connect a node before keying.
 
 ## What the Companion is
 
@@ -35,8 +35,10 @@ pyinstaller --onefile --name chilemon-companion ...
 
 It then prints manual instructions: copy `dist\chilemon-companion.exe` somewhere, create `%USERPROFILE%\.chilemon\config.toml` yourself, and run the exe with `--config` if the file is not at the default path. SmartScreen may require a manual bypass because the binary is unsigned.
 
-For a source checkout, the launchers live in the repo:
+For a source checkout, the one-action installer and the launchers live in the repo:
 
+- `companion/install-companion.bat` — the onboarding entry point. It checks Python, calls `python -m companion.install_config` to find/validate the dashboard download and install it at the default path, then reuses `install-autostart.bat` and `start-companion.bat`. It is idempotent, logs to `%USERPROFILE%\.chilemon\companion-install.log` and propagates failures. `--config PATH` uses an explicit config; `--config-only` stops before autostart/start.
+- `companion/install_config.py` — config discovery, validation and placement. It refuses an empty `[peer].password` (auto-discovery learns the Pi IP but never invents the secret) and writes the config with mode 0600 on POSIX.
 - `companion/start-companion.bat` — `cd` to the repo, checks whether 9093 is already listening, installs the autostart on the first manual run, resolves an absolute Python path, then runs `python -m companion.main` minimized. A failed spawn is written to `%USERPROFILE%\.chilemon\companion-startup.log` and returns a non-zero exit code.
 - `companion/autostart-companion.bat` — no-argument logon target; calls `start-companion.bat --autostart`.
 - `companion/install-autostart.bat` — idempotent registration: checks for the `ChileMon Companion` logon task and creates it when missing. If Windows denies task creation to a standard user, it checks/creates the equivalent `HKCU\...\Run` entry.

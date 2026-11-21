@@ -4,12 +4,12 @@ El Companion es una pequeña aplicación Python que se ejecuta en la PC del oper
 
 > Estado: actualizado para el inicio automático idempotente en la rama `feat/companion-autostart-task`. Los elementos marcados como **Verificar** presentan contradicciones en el repositorio y deben confirmarse en la Pi antes de considerarlos válidos.
 
-## Ruta rápida
+## Ruta rápida (una sola acción en Windows)
 
 1. En la Pi, ejecutar `install/install_chilemon.sh`. El script genera un secreto IAX2 aleatorio y lo escribe en `config/local.php`.
-2. En la PC con Windows, obtener el ejecutable desde Releases (o compilarlo con `companion/build.bat`) y colocar el `config.toml` generado en `%USERPROFILE%\.chilemon\config.toml`.
-3. Iniciarlo con `companion/start-companion.bat`. La primera ejecución instala el inicio automático; los reinicios posteriores arrancan el companion sin ningún paso manual.
-4. En el panel, confirmar **Companion Connected** y luego presionar **Reconectar** para abrir el canal IAX2.
+2. En el panel, presionar **Companion App**. El `chilemon-companion-config.toml` descargado ya contiene la IP de la Pi y ese secreto.
+3. En la PC con Windows, hacer doble clic en `companion/install-companion.bat`. Instala el config en `%USERPROFILE%\.chilemon\config.toml`, registra el inicio automático y arranca el companion. Requiere Python 3.11+; cada paso tiene su propio log y devuelve un código de salida real.
+4. En el panel, confirmar **Companion Connected** y luego presionar **Reconectar** para abrir el canal IAX2. El PTT sigue siendo explícito: conectá un nodo antes de transmitir.
 
 ## Qué es el Companion
 
@@ -35,8 +35,10 @@ pyinstaller --onefile --name chilemon-companion ...
 
 Luego muestra instrucciones manuales: copiar `dist\chilemon-companion.exe` a la ubicación deseada, crear `%USERPROFILE%\.chilemon\config.toml` manualmente y ejecutar el exe con `--config` si el archivo no está en la ruta por defecto. SmartScreen puede requerir una omisión manual porque el binario no está firmado.
 
-Si se trabaja desde un checkout del código fuente, los scripts de arranque están en el repositorio:
+Si se trabaja desde un checkout del código fuente, el instalador de una sola acción y los scripts de arranque están en el repositorio:
 
+- `companion/install-companion.bat` — punto de entrada de la instalación. Verifica Python, llama a `python -m companion.install_config` para encontrar/validar la descarga del panel e instalarla en la ruta por defecto, y luego reutiliza `install-autostart.bat` y `start-companion.bat`. Es idempotente, registra en `%USERPROFILE%\.chilemon\companion-install.log` y propaga los fallos. `--config PATH` usa un config explícito; `--config-only` se detiene antes del autostart y el arranque.
+- `companion/install_config.py` — búsqueda, validación y colocación del config. Rechaza un `[peer].password` vacío (el descubrimiento automático aprende la IP de la Pi pero nunca inventa el secreto) y escribe el config con permisos 0600 en POSIX.
 - `companion/start-companion.bat` — cambia al directorio del repositorio, verifica si el puerto 9093 ya está en uso, instala el inicio automático en la primera ejecución manual, resuelve una ruta absoluta a Python y ejecuta `python -m companion.main` minimizado. Un fallo de arranque se escribe en `%USERPROFILE%\.chilemon\companion-startup.log` y devuelve un código de salida distinto de cero.
 - `companion/autostart-companion.bat` — objetivo de inicio de sesión sin argumentos; llama a `start-companion.bat --autostart`.
 - `companion/install-autostart.bat` — registro idempotente: consulta la tarea `ChileMon Companion` y la crea si falta. Si Windows no permite crear tareas a un usuario estándar, consulta/crea la entrada equivalente en `HKCU\...\Run`.
