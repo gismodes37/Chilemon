@@ -40,6 +40,12 @@ ULAW_INPUT_SCALE = 1 / 32768.0  # s16 -> float for RMS
 # detect it. A stalled callback also stops the other one: both share the same
 # callback thread, which is why mic levels and playback die together.
 AUDIO_CALLBACK_STALL_S = 3.0
+# A device can stay open and keep firing callbacks while delivering silence
+# (Windows switches the default input to a sleeping Bluetooth headset). Treat
+# sustained near-silence as a dead input and re-resolve the available devices.
+SILENT_INPUT_S = 15.0
+SILENT_INPUT_RMS = 0.0005
+RESTART_COOLDOWN_S = 30.0
 
 # ---------------------------------------------------------------------------
 # G.711 μ-law encode/decode (replaces deprecated audioop)
@@ -138,6 +144,13 @@ class AudioEngine:
         self._last_input_callback = 0.0
         self._last_output_callback = 0.0
 
+        # Device identity captured when the streams were opened. Compared
+        # against a fresh resolution so a changed OS default is picked up.
+        self._input_device_id = -1
+        self._output_device_id = -1
+        self._input_silent_since = 0.0
+        self._last_restart = 0.0
+
         # Thread safety for RX queue
         self._lock = threading.Lock()
         self._rx_queue: list[bytes] = []
@@ -170,6 +183,8 @@ class AudioEngine:
         # Resolve device IDs
         input_id = self._resolve_device(self._input_device, is_input=True)
         output_id = self._resolve_device(self._output_device, is_input=False)
+        self._input_device_id = input_id
+        self._output_device_id = output_id
 
         logger.info(
             "Starting audio: input=%s -> %s, output=%s -> %s",
@@ -223,6 +238,8 @@ class AudioEngine:
         now = time.monotonic()
         self._last_input_callback = now
         self._last_output_callback = now
+        self._input_silent_since = 0.0
+        self._last_restart = now
 
     def stop(self) -> None:
         """Stop and close audio streams."""
@@ -251,11 +268,12 @@ class AudioEngine:
         self._jitter_buffer.reset()
 
     def check_health(self) -> bool:
-        """Reopen streams when PortAudio callbacks stop firing.
+        """Reopen streams when a device changes, goes silent or stops firing.
 
         Called periodically from the main loop. A device disappearing can
-        stop callbacks without closing the stream objects, which leaves the
-        engine looking healthy while no audio moves in either direction.
+        stop callbacks without closing the stream objects, and a Windows
+        default-device switch can leave the old stream open but silent.
+        Re-resolving here means no fixed device name is ever required.
         Returns True when a restart was attempted.
 
         Returns
@@ -267,6 +285,15 @@ class AudioEngine:
             return False
 
         now = time.monotonic()
+        device_changed = (
+            self._input_device_id >= 0
+            and self._current_device_ids()
+            != (self._input_device_id, self._output_device_id)
+        )
+        input_silent = (
+            self._input_silent_since > 0.0
+            and now - self._input_silent_since > SILENT_INPUT_S
+        )
         input_stalled = (
             self._input_stream is not None
             and now - self._last_input_callback > AUDIO_CALLBACK_STALL_S
@@ -275,17 +302,37 @@ class AudioEngine:
             self._output_stream is not None
             and now - self._last_output_callback > AUDIO_CALLBACK_STALL_S
         )
-        if not (input_stalled or output_stalled):
+        if not (device_changed or input_silent or input_stalled or output_stalled):
+            return False
+
+        # A broken device can stay broken after a restart; without a cooldown
+        # the health loop would tear down the streams every 2 seconds.
+        if now - self._last_restart < RESTART_COOLDOWN_S:
             return False
 
         logger.warning(
-            "Audio callbacks stalled (input=%s, output=%s) - reopening streams",
+            "Audio unhealthy (device_changed=%s, silent=%s, input_stalled=%s, "
+            "output_stalled=%s) - re-resolving devices and reopening streams",
+            device_changed,
+            input_silent,
             input_stalled,
             output_stalled,
         )
         self.stop()
         self.start()
+        self._input_silent_since = 0.0
         return True
+
+    def _current_device_ids(self) -> tuple[int, int]:
+        """Resolve the devices that would be used by a fresh start().
+
+        Called every health tick, so device logging is suppressed here; the
+        restart itself logs the resolved devices through start().
+        """
+        return (
+            self._resolve_device(self._input_device, is_input=True, log=False),
+            self._resolve_device(self._output_device, is_input=False, log=False),
+        )
 
     @property
     def is_running(self) -> bool:
@@ -405,11 +452,20 @@ class AudioEngine:
     # -- Level computation --
 
     def _emit_levels(self, ulaw_payload: bytes) -> None:
-        """Compute RMS and spectrum from ulaw payload and fire callback."""
+        """Compute RMS/spectrum, track input silence and fire callback."""
+        rms, spectrum = self._compute_levels(ulaw_payload)
+
+        # A stalled callback is already covered by AUDIO_CALLBACK_STALL_S, but
+        # a sleeping device can keep firing with all-zero frames. Track that
+        # separately so check_health() can re-resolve the available devices.
+        if rms >= SILENT_INPUT_RMS:
+            self._input_silent_since = 0.0
+        elif self._input_silent_since == 0.0:
+            self._input_silent_since = time.monotonic()
+
         if self.on_levels is None:
             return
 
-        rms, spectrum = self._compute_levels(ulaw_payload)
         try:
             self.on_levels(rms, spectrum)
         except Exception:
@@ -473,12 +529,13 @@ class AudioEngine:
             return f"id={index}"
 
     @staticmethod
-    def _resolve_device(name: str, is_input: bool) -> int:
+    def _resolve_device(name: str, is_input: bool, log: bool = True) -> int:
         """Resolve a configured device to a sounddevice device ID.
 
         An empty or unmatched name falls back to the OS default device, so a
         fresh install works with any microphone brand. A numeric index or a
         name substring can pin a specific device when the user needs to.
+        Pass log=False for frequent health-check polls.
         """
         if sd is None:
             return 0
@@ -515,11 +572,12 @@ class AudioEngine:
             )
 
         if not name:
-            logger.info(
-                "Using system default %s device: %s",
-                kind,
-                AudioEngine._describe_device(default_id),
-            )
+            if log:
+                logger.info(
+                    "Using system default %s device: %s",
+                    kind,
+                    AudioEngine._describe_device(default_id),
+                )
             return default_id
 
         # Explicit numeric index (allowed, but not required).
@@ -530,10 +588,11 @@ class AudioEngine:
         if index is not None:
             if valid(index):
                 return index
-            logger.warning(
-                "Configured %s device index %s is invalid — using system default: %s",
-                kind, name, AudioEngine._describe_device(default_id),
-            )
+            if log:
+                logger.warning(
+                    "Configured %s device index %s is invalid — using system default: %s",
+                    kind, name, AudioEngine._describe_device(default_id),
+                )
             return default_id
 
         # Name substring. Prefer exact name, then more channels (stereo over
@@ -544,10 +603,11 @@ class AudioEngine:
             if needle in dev["name"].lower() and has_channels(dev)
         ]
         if not candidates:
-            logger.warning(
-                "Device '%s' not found — using system default: %s",
-                name, AudioEngine._describe_device(default_id),
-            )
+            if log:
+                logger.warning(
+                    "Device '%s' not found — using system default: %s",
+                    name, AudioEngine._describe_device(default_id),
+                )
             return default_id
 
         channel_key = "max_input_channels" if is_input else "max_output_channels"
@@ -560,7 +620,7 @@ class AudioEngine:
                 -item[0],
             ),
         )
-        if len(candidates) > 1:
+        if len(candidates) > 1 and log:
             logger.info(
                 "%d devices match '%s': %s — using %s. Set %s_device to an exact "
                 "name or index to pin one.",
