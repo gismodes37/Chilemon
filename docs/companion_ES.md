@@ -2,13 +2,13 @@
 
 El Companion es una pequeña aplicación Python que se ejecuta en la PC del operador. Proporciona al navegador un WebSocket local para PTT y niveles de audio, además de un enlace IAX2 con Asterisk en la Raspberry Pi. Esta guía explica qué se instala y dónde, cómo se conectan las piezas, qué supuestos de seguridad se aplican y si el botón **Companion App** del panel puede servir como instalador para otros usuarios.
 
-> Estado: información vigente en el commit `61582c3`. Los elementos marcados como **Verificar** presentan contradicciones en el repositorio y deben confirmarse en la Pi antes de considerarlos válidos.
+> Estado: actualizado para el inicio automático idempotente en la rama `feat/companion-autostart-task`. Los elementos marcados como **Verificar** presentan contradicciones en el repositorio y deben confirmarse en la Pi antes de considerarlos válidos.
 
 ## Ruta rápida
 
 1. En la Pi, ejecutar `install/install_chilemon.sh`. El script genera un secreto IAX2 aleatorio y lo escribe en `config/local.php`.
 2. En la PC con Windows, obtener el ejecutable desde Releases (o compilarlo con `companion/build.bat`) y colocar el `config.toml` generado en `%USERPROFILE%\.chilemon\config.toml`.
-3. Iniciarlo con `companion/start-companion.bat`. Si el acceso directo de inicio de sesión está instalado, este paso ocurre automáticamente al iniciar sesión.
+3. Iniciarlo con `companion/start-companion.bat`. La primera ejecución instala el inicio automático; los reinicios posteriores arrancan el companion sin ningún paso manual.
 4. En el panel, confirmar **Companion Connected** y luego presionar **Reconectar** para abrir el canal IAX2.
 
 ## Qué es el Companion
@@ -37,13 +37,15 @@ Luego muestra instrucciones manuales: copiar `dist\chilemon-companion.exe` a la 
 
 Si se trabaja desde un checkout del código fuente, los scripts de arranque están en el repositorio:
 
-- `companion/start-companion.bat` — cambia al directorio del repositorio, verifica si el puerto 9093 ya está en uso y ejecuta `python -m companion.main`.
+- `companion/start-companion.bat` — cambia al directorio del repositorio, verifica si el puerto 9093 ya está en uso, instala el inicio automático en la primera ejecución manual, resuelve una ruta absoluta a Python y ejecuta `python -m companion.main` minimizado. Un fallo de arranque se escribe en `%USERPROFILE%\.chilemon\companion-startup.log` y devuelve un código de salida distinto de cero.
+- `companion/autostart-companion.bat` — objetivo de inicio de sesión sin argumentos; llama a `start-companion.bat --autostart`.
+- `companion/install-autostart.bat` — registro idempotente: consulta la tarea `ChileMon Companion` y la crea si falta. Si Windows no permite crear tareas a un usuario estándar, consulta/crea la entrada equivalente en `HKCU\...\Run`.
 - `companion/stop-companion.bat` — busca el PID que escucha en 9093 y lo termina.
 - `install/companion/install-firewall.ps1` — regla de entrada UDP opcional, limitada a la IP de la Pi si se indica.
 
 El orden de búsqueda de la configuración es `--config`, luego `~/.chilemon/config.toml` y finalmente `companion/config.toml` del repositorio (`main.py:40-51`). El descubrimiento automático puede reescribir `~/.chilemon/config.toml` con permisos `0600` (`main.py:287-339`).
 
-**Inicio automático al iniciar sesión.** Un acceso directo llamado `ChileMon Companion.lnk` en la carpeta Startup del usuario apunta a `start-companion.bat` con el argumento `--autostart` y la ventana minimizada. esa bandera solo cambia un comportamiento: si 9093 ya está escuchando, el script sale silenciosamente en lugar de esperar una tecla (`start-companion.bat:5-14`). Ningún script del repositorio crea este acceso directo; es un paso de configuración por usuario.
+**Inicio automático al iniciar sesión.** Ejecutar `start-companion.bat` una vez (o `install-autostart.bat` directamente) registra `ChileMon Companion` para cada inicio de sesión. La rutina es idempotente: consulta el registro existente y solo lo crea si falta. Se prefiere el Programador de tareas de Windows; cuando el usuario no puede crear tareas, la rutina usa como respaldo una entrada `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` que apunta a `autostart-companion.bat` con una ruta absoluta. Ambos caminos llaman a `start-companion.bat --autostart`, donde la bandera solo evita el aviso de "ya está corriendo". Un acceso directo previo en Startup es inofensivo: si 9093 ya está escuchando, el objetivo de autostart sale silenciosamente.
 
 ### Raspberry Pi (lado servidor)
 
@@ -95,7 +97,7 @@ El stream de entrada permanece abierto, pero los frames IAX2 dejan de enviarse d
 
 El reposo **no** keya el transmisor: el PTT sigue siendo un toggle DTMF `*` explícito desde el panel. El estado se muestra como `Mic en reposo - listo para transmitir`; es un estado normal de disponibilidad, no un error. Todos los umbrales se configuran en `[tx]` de `config.toml`.
 
-Para un usuario no técnico, `start-companion.bat` ahora inicia la aplicación minimizada y escribe los diagnósticos en `%USERPROFILE%\.chilemon\companion.log` en lugar de mostrar una terminal con texto desplazándose.
+Para un usuario no técnico, `start-companion.bat` ahora inicia la aplicación minimizada y escribe los diagnósticos en `%USERPROFILE%\.chilemon\companion.log` en lugar de mostrar una terminal con texto desplazándose. Los fallos anteriores a la configuración del logging se capturan en `companion-startup.log`.
 
 ## Evaluación de seguridad
 
@@ -107,7 +109,7 @@ No se distribuye ningún secreto: `companion/config.toml` tiene `password = ""` 
 | WebSocket local | Escucha en loopback, pero establece `Access-Control-Allow-Origin: *` y **no tiene autenticación ni verificación de origen**. Cualquier página abierta en el navegador del operador puede enviar `ptt`, `call` o `hangup` a `127.0.0.1:9093`. Es la principal exposición local. |
 | Entrega del secreto | `companion-download.php` exige una sesión iniciada y devuelve HTTP 503 cuando no hay secreto configurado, pero no aplica limitación de tasa, CSRF ni verificación de rol de administrador. La respuesta contiene el secreto IAX2 compartido en TOML sin cifrar. |
 | Límite de sudo | `www-data` solo puede ejecutar el wrapper permitido `chilemon-rpt`. `system_action.php` rechaza todas las acciones. |
-| Inicio automático | Se ejecuta con los permisos del usuario al iniciar sesión, no eleva privilegios, pero deja el WS local disponible durante toda la sesión. |
+| Inicio automático | Se ejecuta con los permisos del usuario al iniciar sesión, no eleva privilegios, pero deja el WS local disponible durante toda la sesión. Se registra como tarea de inicio de sesión cuando se permite; si no, como entrada `Run` del usuario. |
 
 **Verificar:** `install/asterisk/iax-companion.conf` usa `auth=md5` y espera AUTHREP; `docs/HISTORIA_AUDIO_END_TO_END.md` concluyó en su momento que se requería `auth=none`. El `iax2.py` actual implementa AUTHREP, así que conviene confirmar la configuración real del peer en la Pi antes de modificarla.
 
@@ -122,7 +124,7 @@ Para una instalación real con un solo clic haría falta:
 1. Un ejecutable firmado y alojado que incluya o consiga del servidor la configuración generada.
 2. Un agente local o un esquema de URI personalizado, porque un navegador no puede iniciar un proceso de Windows.
 3. Endurecimiento del endpoint del secreto: limitación de tasa, verificación de rol de administrador y control de origen.
-4. Automatización del acceso directo en Startup y del contexto `[radio-companion]` en la Pi.
+4. El contexto `[radio-companion]` en la Pi (el registro de inicio de sesión en Windows ya está automatizado).
 5. Eliminar la documentación y los encabezados obsoletos del `.exe` para que la interfaz no prometa lo que el endpoint no entrega.
 
 ## Lista de verificación
@@ -130,7 +132,7 @@ Para una instalación real con un solo clic haría falta:
 - [ ] `Get-Process python*` muestra un proceso del companion y `netstat -ano | findstr :9093` muestra un listener.
 - [ ] `GET /health` devuelve `{"status":"ok"}`.
 - [ ] El panel dice **Companion Connected**, no *Companion no detectado*. Ese mensaje significa que falló el handshake del WebSocket, es decir, no hay ningún proceso escuchando.
-- [ ] Tras reiniciar, el acceso directo de Startup existe y se ejecuta sin una ventana esperando `pause`.
+- [ ] Tras reiniciar, `schtasks /query /tn "ChileMon Companion"` o `reg query "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" /v "ChileMon Companion"` muestra el registro de inicio automático, y el companion arranca sin una ventana esperando `pause`.
 - [ ] El `status` del WS informa `connected: true` para IAX2; presionar **Reconectar** si `call_active: false`.
 - [ ] El RMS de `audio_level` está claramente por encima de `0.0005`; un valor casi nulo con callbacks activos indica un dispositivo silencioso obsoleto, que `check_health()` debería reabrir.
 - [ ] El secreto del peer en la Pi coincide con `config/local.php`; un secreto rotado rompe la autenticación sin aviso.
