@@ -72,6 +72,13 @@ output_device = ""
 sample_rate = 8000
 frames_per_buffer = 160
 
+[tx]
+idle_rest_s = 120
+wake_rms = 0.01
+sleep_rms = 0.005
+wake_frames = 3
+preroll_frames = 10
+
 [ws]
 bind_host = "127.0.0.1"
 bind_port = 9093

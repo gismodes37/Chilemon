@@ -35,6 +35,7 @@ class PTTWidget {
         this.connected = false;
         this.pttActive = false;
         this.callActive = false;
+        this.txState = 'active';
         this.reconnectAttempts = 0;
         this.reconnectBaseDelay = 1000;
         this.reconnectTimer = null;
@@ -244,9 +245,12 @@ class PTTWidget {
     _handleStatus(msg) {
         this.callActive = msg.call_active === true;
         this.pttActive = msg.ptt === true;
+        this.txState = msg.tx_state
+            || (msg.audio && msg.audio.tx_state)
+            || 'active';
 
         if (this.callActive) {
-            this._setStatus('connected', 'Call active');
+            this._setStatus('connected', this._callStatusText());
         } else if (msg.connected) {
             this._setStatus('connected', 'Companion Connected');
         } else {
@@ -293,7 +297,7 @@ class PTTWidget {
         this._send({ type: 'ptt', action: 'unkey' });
         this.pttActive = false;
         if (this._visualizer) this._visualizer.setTransmitting(false);
-        this._setStatus('connected', this.callActive ? 'Call active' : 'Companion Connected');
+        this._setStatus('connected', this.callActive ? this._callStatusText() : 'Companion Connected');
         this._updateUI();
     }
 
@@ -382,6 +386,13 @@ class PTTWidget {
     // ---------------------------------------------------------------
     //  UI — Status
     // ---------------------------------------------------------------
+
+    // A resting mic is a normal state, not an error. Say so in plain words.
+    _callStatusText() {
+        return this.txState === 'resting'
+            ? 'Mic en reposo - listo para transmitir'
+            : 'Call active';
+    }
 
     _setStatus(state, text) {
         if (this.statusDot) {

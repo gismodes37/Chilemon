@@ -16,6 +16,7 @@ import math
 import struct
 import threading
 import time
+from collections import deque
 from typing import Callable, Optional
 
 import numpy as np
@@ -46,6 +47,16 @@ AUDIO_CALLBACK_STALL_S = 3.0
 SILENT_INPUT_S = 15.0
 SILENT_INPUT_RMS = 0.0005
 RESTART_COOLDOWN_S = 30.0
+
+# Idle TX suppression. The mic stream stays open so voice can be detected,
+# but IAX2 frames stop flowing after a period without voice. Keeping the
+# stream open avoids a device restart and lets a short pre-roll cover the
+# first syllable when the operator starts speaking.
+TX_REST_S = 120.0
+TX_WAKE_RMS = 0.01
+TX_SLEEP_RMS = 0.005
+TX_WAKE_FRAMES = 3
+TX_PREROLL_FRAMES = 10
 
 # ---------------------------------------------------------------------------
 # G.711 μ-law encode/decode (replaces deprecated audioop)
@@ -134,9 +145,20 @@ class AudioEngine:
         self,
         input_device: str = "",
         output_device: str = "",
+        tx_rest_s: float = TX_REST_S,
+        tx_wake_rms: float = TX_WAKE_RMS,
+        tx_sleep_rms: float = TX_SLEEP_RMS,
+        tx_wake_frames: int = TX_WAKE_FRAMES,
+        tx_preroll_frames: int = TX_PREROLL_FRAMES,
     ) -> None:
         self._input_device = input_device
         self._output_device = output_device
+
+        self._tx_rest_s = tx_rest_s
+        self._tx_wake_rms = tx_wake_rms
+        self._tx_sleep_rms = tx_sleep_rms
+        self._tx_wake_frames = tx_wake_frames
+        self._tx_preroll_frames = tx_preroll_frames
 
         self._running = False
         self._input_stream: Optional[sd.InputStream] = None
@@ -165,9 +187,19 @@ class AudioEngine:
         )
         self._frame_counter: int = 0
 
+        # Idle TX state machine. All mutation happens on the PortAudio input
+        # callback thread; is_ptt_active and on_tx_state are the only bridges
+        # to the asyncio side and follow the same pattern used for levels.
+        self._tx_state = "active"
+        self._tx_voice_frames = 0
+        self._tx_last_voice = time.monotonic()
+        self._tx_preroll: deque[bytes] = deque(maxlen=max(1, tx_preroll_frames))
+        self.is_ptt_active: Optional[Callable[[], bool]] = None
+
         # Callbacks
         self.on_tx_audio: Optional[Callable[[bytes], None]] = None
         self.on_levels: Optional[Callable[[float, list[float]], None]] = None
+        self.on_tx_state: Optional[Callable[[str], None]] = None
 
     # -- Lifecycle --
 
@@ -240,6 +272,7 @@ class AudioEngine:
         self._last_output_callback = now
         self._input_silent_since = 0.0
         self._last_restart = now
+        self._reset_tx_state()
 
     def stop(self) -> None:
         """Stop and close audio streams."""
@@ -267,6 +300,75 @@ class AudioEngine:
         """Discard buffered RX audio so nothing plays after a hangup."""
         self._jitter_buffer.reset()
 
+    def _reset_tx_state(self) -> None:
+        """Return TX to active after a start or device restart."""
+        self._tx_state = "active"
+        self._tx_voice_frames = 0
+        self._tx_last_voice = time.monotonic()
+        self._tx_preroll.clear()
+
+    @property
+    def tx_state(self) -> str:
+        """Current TX state: 'active' or 'resting'."""
+        return self._tx_state
+
+    def _notify_tx_state(self) -> None:
+        if self.on_tx_state is None:
+            return
+        try:
+            self.on_tx_state(self._tx_state)
+        except Exception:
+            pass  # Never let a UI callback break the audio thread.
+
+    def _handle_tx(self, ulaw_payload: bytes, rms: float) -> None:
+        """Gate mic frames on voice activity and explicit PTT.
+
+        Runs on the PortAudio input callback thread. While resting, frames
+        are only kept in a short pre-roll so the first syllable is not lost
+        when the operator starts speaking.
+        """
+        if not self._running or not ulaw_payload:
+            return
+
+        now = time.monotonic()
+        ptt_active = bool(self.is_ptt_active and self.is_ptt_active())
+
+        if rms >= self._tx_wake_rms:
+            self._tx_voice_frames += 1
+        else:
+            self._tx_voice_frames = 0
+        if rms >= self._tx_sleep_rms:
+            self._tx_last_voice = now
+
+        if self._tx_state == "resting":
+            should_wake = (
+                ptt_active or self._tx_voice_frames >= self._tx_wake_frames
+            )
+            if not should_wake:
+                self._tx_preroll.append(ulaw_payload)
+                return
+
+            # The current frame is sent live, not from the pre-roll.
+            buffered = list(self._tx_preroll)
+            self._tx_preroll.clear()
+            self._tx_voice_frames = 0
+            self._tx_state = "active"
+            logger.info("TX active (%s)", "PTT" if ptt_active else "voice")
+            self._notify_tx_state()
+            for frame in buffered:
+                self.send_audio(frame)
+            self.send_audio(ulaw_payload)
+            return
+
+        if not ptt_active and now - self._tx_last_voice > self._tx_rest_s:
+            self._tx_state = "resting"
+            self._tx_preroll.clear()
+            logger.info("TX resting - no voice for %.0fs", self._tx_rest_s)
+            self._notify_tx_state()
+            return
+
+        self.send_audio(ulaw_payload)
+
     def check_health(self) -> bool:
         """Reopen streams when a device changes, goes silent or stops firing.
 
@@ -290,8 +392,11 @@ class AudioEngine:
             and self._current_device_ids()
             != (self._input_device_id, self._output_device_id)
         )
+        # Silence is intentional while TX is resting, so it must not be
+        # treated as a dead input and restart the streams.
         input_silent = (
-            self._input_silent_since > 0.0
+            self._tx_state != "resting"
+            and self._input_silent_since > 0.0
             and now - self._input_silent_since > SILENT_INPUT_S
         )
         input_stalled = (
@@ -321,6 +426,8 @@ class AudioEngine:
         self.stop()
         self.start()
         self._input_silent_since = 0.0
+        self._reset_tx_state()
+        self._notify_tx_state()
         return True
 
     def _current_device_ids(self) -> tuple[int, int]:
@@ -408,11 +515,10 @@ class AudioEngine:
         pcm_bytes = indata.tobytes()
         ulaw_payload = lin2ulaw(pcm_bytes)
 
-        # Fire TX callback (hand off to IAX2 session)
-        self.on_tx_audio(ulaw_payload)
-
-        # Emit audio levels for visualizer
-        self._emit_levels(ulaw_payload)
+        # Emit audio levels for visualizer and reuse the measured RMS for
+        # the idle-TX decision instead of decoding the frame twice.
+        rms = self._emit_levels(ulaw_payload)
+        self._handle_tx(ulaw_payload, rms)
 
     def _output_callback(
         self,
@@ -451,7 +557,7 @@ class AudioEngine:
 
     # -- Level computation --
 
-    def _emit_levels(self, ulaw_payload: bytes) -> None:
+    def _emit_levels(self, ulaw_payload: bytes) -> float:
         """Compute RMS/spectrum, track input silence and fire callback."""
         rms, spectrum = self._compute_levels(ulaw_payload)
 
@@ -464,12 +570,13 @@ class AudioEngine:
             self._input_silent_since = time.monotonic()
 
         if self.on_levels is None:
-            return
+            return rms
 
         try:
             self.on_levels(rms, spectrum)
         except Exception:
             pass  # Don't crash audio thread on callback errors
+        return rms
 
     @staticmethod
     def _compute_levels(ulaw_payload: bytes) -> tuple[float, list[float]]:
@@ -640,6 +747,7 @@ class AudioEngine:
             "running": self._running,
             "input_stream": self._input_stream is not None,
             "output_stream": self._output_stream is not None,
+            "tx_state": self._tx_state,
             "jitter_buffer": self.get_jitter_stats(),
         }
 

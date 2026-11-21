@@ -74,6 +74,7 @@ class CompanionApp:
         ast_cfg = config.get("asterisk", {})
         peer_cfg = config.get("peer", {})
         audio_cfg = config.get("audio", {})
+        tx_cfg = config.get("tx", {})
         ws_cfg = config.get("ws", {})
 
         # Session
@@ -91,6 +92,11 @@ class CompanionApp:
         self.audio = AudioEngine(
             input_device=audio_cfg.get("input_device", ""),
             output_device=audio_cfg.get("output_device", ""),
+            tx_rest_s=float(tx_cfg.get("idle_rest_s", 120)),
+            tx_wake_rms=float(tx_cfg.get("wake_rms", 0.01)),
+            tx_sleep_rms=float(tx_cfg.get("sleep_rms", 0.005)),
+            tx_wake_frames=int(tx_cfg.get("wake_frames", 3)),
+            tx_preroll_frames=int(tx_cfg.get("preroll_frames", 10)),
         )
 
         # WS server
@@ -115,6 +121,10 @@ class CompanionApp:
 
         # Audio -> WS: level metadata
         self.audio.on_levels = self._on_audio_levels
+
+        # PTT state is read by the audio callback to wake a resting mic.
+        self.audio.is_ptt_active = lambda: self.session.ptt_active
+        self.audio.on_tx_state = self._on_tx_state
 
         # WS -> Session: PTT, DTMF, call
         self.ws_server.on_ptt_key = self.session.ptt_key
@@ -151,6 +161,18 @@ class CompanionApp:
             asyncio.run_coroutine_threadsafe(
                 self.ws_server.broadcast_audio_level(rms, spectrum),
                 loop,
+            )
+
+    def _on_tx_state(self, state: str) -> None:
+        """Push a TX rest/wake transition to the dashboard.
+
+        Called from the audio thread, so the broadcast is scheduled on the
+        event loop exactly like audio level updates.
+        """
+        loop = getattr(self, '_loop', None)
+        if loop is not None and loop.is_running():
+            asyncio.run_coroutine_threadsafe(
+                self.session.set_tx_state(state), loop
             )
 
     def _get_full_status(self) -> dict:
@@ -420,6 +442,11 @@ def main() -> None:
         help="Log level: DEBUG, INFO, WARNING, ERROR",
     )
     parser.add_argument(
+        "--log-file",
+        default="",
+        help="Write logs to this file instead of stdout",
+    )
+    parser.add_argument(
         "--list-devices",
         action="store_true",
         help="List available audio devices and exit",
@@ -435,7 +462,7 @@ def main() -> None:
 
     # Setup logging
     log_level = args.log_level or config.get("logging", {}).get("level", "INFO")
-    log_file = config.get("logging", {}).get("file", "")
+    log_file = args.log_file or config.get("logging", {}).get("file", "")
     setup_logging(log_level, log_file)
 
     # Run app

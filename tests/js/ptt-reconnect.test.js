@@ -199,3 +199,37 @@ test('an explicit hangup does not reopen the call on a later reconnect', () => {
     'a deliberate disconnect must not be undone by a later reconnect',
   );
 });
+
+test('a resting mic is shown as a normal ready state, not a failure', () => {
+  const { widget } = makeWidget();
+  widget._handleJSON({
+    type: 'status',
+    connected: true,
+    call_active: true,
+    ptt: false,
+    tx_state: 'resting',
+  });
+
+  assert.equal(widget.txState, 'resting');
+  assert.equal(
+    widget.statusText.textContent,
+    'Mic en reposo - listo para transmitir',
+  );
+});
+
+test('the resting state also arrives nested in audio stats', () => {
+  const { widget } = makeWidget();
+  widget._handleJSON({
+    type: 'status',
+    connected: true,
+    call_active: true,
+    ptt: false,
+    audio: { tx_state: 'resting' },
+  });
+
+  assert.equal(widget.txState, 'resting');
+  assert.equal(
+    widget.statusText.textContent,
+    'Mic en reposo - listo para transmitir',
+  );
+});

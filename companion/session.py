@@ -64,6 +64,7 @@ class CompanionSession:
 
         # PTT state (toggled by DTMF *)
         self.ptt_active: bool = False
+        self.tx_state: str = "active"
 
         # Timing
         self._last_audio_time: float = 0.0
@@ -356,6 +357,11 @@ class CompanionSession:
 
     # -- Status --
 
+    async def set_tx_state(self, state: str) -> None:
+        """Update the mic rest state shown by the dashboard."""
+        self.tx_state = state
+        await self._emit_status()
+
     async def _emit_status(self, error: str = "") -> None:
         """Broadcast current status via callback."""
         if self.on_status is None:
@@ -364,6 +370,7 @@ class CompanionSession:
             "connected": self._registered,
             "call_active": self._in_call,
             "ptt": self.ptt_active,
+            "tx_state": self.tx_state,
         }
         if error:
             status["error"] = error
@@ -375,6 +382,7 @@ class CompanionSession:
             "connected": self._registered,
             "call_active": self._in_call,
             "ptt": self.ptt_active,
+            "tx_state": self.tx_state,
         }
 
     def get_full_status(self, audio_stats: dict = None) -> dict:

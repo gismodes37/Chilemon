@@ -13,6 +13,9 @@ if %ERRORLEVEL%==0 (
     exit /b 0
 )
 
-echo [ChileMon] Starting ChileMon Companion Audio App...
-echo [ChileMon] Press Ctrl+C to stop it, or run stop-companion.bat.
-python -m companion.main
+rem Keep the console out of the user's way and keep a log for support.
+rem --autostart is handled above and is never passed to the Python CLI.
+set "LOGDIR=%USERPROFILE%\.chilemon"
+if not exist "%LOGDIR%" mkdir "%LOGDIR%" >nul 2>&1
+start "ChileMon Companion" /min python -m companion.main --log-file "%LOGDIR%\companion.log"
+exit /b 0
