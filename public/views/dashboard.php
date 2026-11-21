@@ -125,7 +125,7 @@ $systemInfo = $systemInfo ?? [
         <div class="row align-items-center">
             <div class="col-12">
                 <h5 class="mb-3"><i class="bi bi-grid-3x3-gap"></i> Accesos rápidos</h5>
-                <div class="d-flex flex-wrap gap-2">
+                <div class="d-flex flex-wrap justify-content-center gap-2">
                     <button class="btn btn-outline-custom" onclick="window.open('https://www.allstarlink.org/', '_blank')">
                         <i class="bi bi-globe"></i> AllStarLink !
                     </button>
