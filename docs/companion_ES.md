@@ -55,9 +55,10 @@ El orden de búsqueda de la configuración es `--config`, luego `~/.chilemon/con
 - Detecta la CIDR de la red local, con `127.0.0.1/32` como respaldo si no puede determinarla.
 - Escribe el peer `[companion-app]` desde `install/asterisk/iax-companion.conf`, sustituyendo el secreto y la ACL de la red local.
 - Restringe el peer con `deny=0.0.0.0/0.0.0.0` más `permit=<LAN>` y un `calltokenoptional` limitado a la subred.
+- Instala el contexto de dialplan `[radio-companion]` con el número de nodo ingresado durante la instalación, desde `install/asterisk/extensions-companion.conf`.
 - Concede a `www-data` sudo sin contraseña solo para `bin/chilemon-rpt`, que permite `nodes`, `stats`, `connect`, `disconnect` y `git-*`. Los verbos destructivos están ausentes.
 
-**Brecha:** el instalador de la Pi no agrega el contexto de dialplan `[radio-companion]`. Solo `install/companion/install.sh:236-250` lo hace, en la ruta de PC con Linux. Una instalación solo con Windows debe agregarlo manualmente en la Pi.
+El contexto `[radio-companion]` lo instala el propio instalador de la Pi y es idempotente: una segunda ejecución preserva el contexto existente.
 
 ### Alternativa con PC Linux
 
@@ -124,8 +125,7 @@ Para una instalación real con un solo clic haría falta:
 1. Un ejecutable firmado y alojado que incluya o consiga del servidor la configuración generada.
 2. Un agente local o un esquema de URI personalizado, porque un navegador no puede iniciar un proceso de Windows.
 3. Endurecimiento del endpoint del secreto: limitación de tasa, verificación de rol de administrador y control de origen.
-4. El contexto `[radio-companion]` en la Pi (el registro de inicio de sesión en Windows ya está automatizado).
-5. Eliminar la documentación y los encabezados obsoletos del `.exe` para que la interfaz no prometa lo que el endpoint no entrega.
+4. Eliminar la documentación y los encabezados obsoletos del `.exe` para que la interfaz no prometa lo que el endpoint no entrega.
 
 ## Lista de verificación
 

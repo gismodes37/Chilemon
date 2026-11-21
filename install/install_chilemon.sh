@@ -32,6 +32,8 @@ ASTERISK_RPT_CONF="/etc/asterisk/rpt.conf"
 INSTALL_IAX_SNIPPET="$REPO_DIR/install/asterisk/iax.conf"
 INSTALL_IAX_COMPANION="$REPO_DIR/install/asterisk/iax-companion.conf"
 INSTALL_RPT_DOCS="$REPO_DIR/install/asterisk/rpt.conf"
+INSTALL_EXTENSIONS_COMPANION="$REPO_DIR/install/asterisk/extensions-companion.conf"
+ASTERISK_EXTENSIONS_CONF="/etc/asterisk/extensions.conf"
 DEFAULT_NODE_PROTO="https"
 ASL3_MODULES_ADDED=0
 INSTALL_MODE="new"
@@ -559,6 +561,8 @@ configure_asl3_modules() {
 configure_webrtc_asterisk() {
     info "Configurando Asterisk para WebRTC Audio Bridge"
 
+    local local_node="$1"
+
     # Scope every IAX2 peer to the detected LAN. A previous release widened
     # calltokenoptional to 0.0.0.0/0, which let any host reach the radio peer.
     local lan_cidr lan_acl companion_secret
@@ -638,6 +642,22 @@ configure_webrtc_asterisk() {
         fi
     else
         warn "Snippet companion-app no encontrado en $INSTALL_IAX_COMPANION"
+    fi
+
+    # Step 1c: Install the dialplan context the companion peer points at.
+    # Without it the peer exists but calls have no valid destination.
+    if [[ -f "$INSTALL_EXTENSIONS_COMPANION" && -f "$ASTERISK_EXTENSIONS_CONF" ]]; then
+        if grep -q '^\[radio-companion\]' "$ASTERISK_EXTENSIONS_CONF"; then
+            ok "Contexto [radio-companion] ya existe — preservado"
+        else
+            backup_if_exists "$ASTERISK_EXTENSIONS_CONF"
+            echo "" >> "$ASTERISK_EXTENSIONS_CONF"
+            sed "s|__LOCAL_NODE__|${local_node}|g" \
+                "$INSTALL_EXTENSIONS_COMPANION" >> "$ASTERISK_EXTENSIONS_CONF"
+            ok "Contexto [radio-companion] agregado para el nodo ${local_node}"
+        fi
+    else
+        warn "Dialplan companion o extensions.conf no encontrado — contexto [radio-companion] no instalado"
     fi
 
     # Step 2: Add phonelogin directives to rpt.conf node block
@@ -1220,7 +1240,7 @@ main() {
     configure_asl3_modules
 
     step "8" "Configurando Asterisk para WebRTC"
-    configure_webrtc_asterisk
+    configure_webrtc_asterisk "$local_node"
 
     step "9" "Instalando wrapper y sudoers"
     write_wrapper_if_missing

@@ -55,9 +55,10 @@ The configuration search order is `--config`, then `~/.chilemon/config.toml`, th
 - Detects the LAN CIDR, falling back to `127.0.0.1/32` if it cannot.
 - Writes the `[companion-app]` peer from `install/asterisk/iax-companion.conf`, substituting the secret and the LAN ACL.
 - Restricts the peer with `deny=0.0.0.0/0.0.0.0` plus `permit=<LAN>` and scoped `calltokenoptional`.
+- Installs the `[radio-companion]` dialplan context with the node number entered during installation, from `install/asterisk/extensions-companion.conf`.
 - Grants `www-data` passwordless sudo only for `bin/chilemon-rpt`, which allows `nodes`, `stats`, `connect`, `disconnect` and `git-*`. Destructive system verbs are absent.
 
-**Gap:** the Pi installer does not add the `[radio-companion]` dialplan context. Only `install/companion/install.sh:236-250` does that, on the Linux-PC path. A Windows-only deployment must add it manually on the Pi.
+The `[radio-companion]` context is installed by the Pi installer itself and is idempotent: re-running the installer preserves an existing context.
 
 ### Linux PC alternative
 
@@ -124,8 +125,7 @@ For a real one-click install you would still need:
 1. A signed, hosted executable that bundles or fetches the generated config server-side.
 2. A local agent or custom URI scheme, because a browser cannot launch a Windows process.
 3. Hardening of the secret endpoint: rate limiting, an admin-role check and an origin check.
-4. The `[radio-companion]` dialplan context on the Pi (Windows logon registration is already automated).
-5. Removal of the stale `.exe` docblock/headers so the UI does not promise what the endpoint does not deliver.
+4. Removal of the stale `.exe` docblock/headers so the UI does not promise what the endpoint does not deliver.
 
 ## Troubleshooting checklist
 
