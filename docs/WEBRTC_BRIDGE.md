@@ -177,13 +177,16 @@ phonecontext=radio-ptt
 
 ### 3. Configure the bridge
 
-Edit `config/local.php`:
+The main installer generates these values automatically in `config/local.php`,
+`/etc/asterisk/iax.conf` and `/etc/default/chilemon-webrtc`. No manual edit is
+needed on a standard install. The generated configuration contains:
 ```php
 'webrtc_port' => 9091,
-'webrtc_secret' => 'your-hmac-secret-here',
+'webrtc_secret' => '<generated-hex>',
 'iax_phone_user' => 'webrtc-bridge',
-'iax_phone_pass' => 'your-iax-secret-here',
+'iax_phone_pass' => '<generated-hex>',
 ```
+Override these keys only for a custom deployment, keeping all three files in sync.
 
 ### 4. Restart and verify
 

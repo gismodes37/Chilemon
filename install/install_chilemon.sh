@@ -37,6 +37,8 @@ ASTERISK_EXTENSIONS_CONF="/etc/asterisk/extensions.conf"
 DEFAULT_NODE_PROTO="https"
 ASL3_MODULES_ADDED=0
 INSTALL_MODE="new"
+IAX_PHONE_SECRET_VAL=""
+WEBRTC_SECRET_VAL=""
 
 TOTAL_STEPS=14
 
@@ -284,6 +286,48 @@ generate_random_secret() {
     fi
 }
 
+# Read a secret from an existing config/local.php without requiring PHP.
+read_local_config_secret() {
+    local key="$1" line
+    [[ -f "$LOCAL_CONFIG" ]] || return 0
+    line="$(grep -m1 "'$key'" "$LOCAL_CONFIG" 2>/dev/null || true)"
+    [[ -n "$line" ]] || return 0
+    sed -n "s/.*'$key'[[:space:]]*=>[[:space:]]*'\([^']*\)'.*/\1/p" <<<"$line"
+}
+
+# Single source of truth for the WebRTC bridge credentials. Values are
+# generated once and reused by config/local.php, iax.conf and the env file.
+ensure_webrtc_secrets() {
+    [[ -n "$IAX_PHONE_SECRET_VAL" && -n "$WEBRTC_SECRET_VAL" ]] && return 0
+
+    if [[ -z "$IAX_PHONE_SECRET_VAL" ]]; then
+        IAX_PHONE_SECRET_VAL="$(read_local_config_secret iax_phone_pass)"
+    fi
+    if [[ -z "$WEBRTC_SECRET_VAL" ]]; then
+        WEBRTC_SECRET_VAL="$(read_local_config_secret webrtc_secret)"
+    fi
+    [[ -n "$IAX_PHONE_SECRET_VAL" ]] || IAX_PHONE_SECRET_VAL="$(generate_random_secret 24)"
+    [[ -n "$WEBRTC_SECRET_VAL" ]] || WEBRTC_SECRET_VAL="$(generate_random_secret 24)"
+}
+
+# Update mode preserves config/local.php; add WebRTC secrets to older configs.
+ensure_webrtc_secrets_in_config() {
+    [[ -f "$LOCAL_CONFIG" ]] || return 0
+    local key secret changed=0
+    for key in iax_phone_pass webrtc_secret; do
+        if ! grep -q "'$key'" "$LOCAL_CONFIG"; then
+            secret="$(generate_random_secret 24)"
+            sed -i "/^];/i\\    '$key' => '${secret}'," "$LOCAL_CONFIG"
+            changed=1
+            ok "Secreto $key generado y agregado a $LOCAL_CONFIG"
+        fi
+    done
+    if [[ "$changed" -eq 1 ]]; then
+        chown root:www-data "$LOCAL_CONFIG"
+        chmod 640 "$LOCAL_CONFIG"
+    fi
+}
+
 detect_lan_cidr() {
     local iface cidr
     iface="$(ip -4 route show default 2>/dev/null \
@@ -345,12 +389,16 @@ write_local_config() {
         iax_companion_secret="$(generate_random_secret 24)"
     fi
 
+    ensure_webrtc_secrets
+
     local safe_local_node safe_server_host safe_header_tagline
     local safe_ami_host safe_ami_user safe_ami_pass
     local safe_repo_dir safe_db_path safe_wrapper_path
-    local safe_hub_url safe_iax_companion_secret
+    local safe_hub_url safe_iax_companion_secret safe_iax_phone_pass safe_webrtc_secret
 
     safe_iax_companion_secret="$(escape_php_string "$iax_companion_secret")"
+    safe_iax_phone_pass="$(escape_php_string "$IAX_PHONE_SECRET_VAL")"
+    safe_webrtc_secret="$(escape_php_string "$WEBRTC_SECRET_VAL")"
     safe_local_node="$(escape_php_string "$local_node")"
     safe_server_host="$(escape_php_string "$server_host")"
     safe_header_tagline="$(escape_php_string "$header_tagline")"
@@ -405,6 +453,14 @@ return [
     // IAX2 companion peer secret. Generated at install time and shared with
     // the dashboard's config.toml download and /etc/asterisk/iax.conf.
     'iax_companion_secret' => '${safe_iax_companion_secret}',
+
+    // IAX2 phone extension secret. Shared with /etc/asterisk/iax.conf and
+    // /etc/default/chilemon-webrtc so the browser PTT bridge can authenticate.
+    'iax_phone_user' => 'webrtc-bridge',
+    'iax_phone_pass' => '${safe_iax_phone_pass}',
+
+    // HMAC secret used to sign WebRTC WebSocket auth tokens.
+    'webrtc_secret' => '${safe_webrtc_secret}',
 ];
 PHP
 
@@ -557,6 +613,74 @@ configure_asl3_modules() {
     ASL3_MODULES_ADDED="$added"
 }
 
+# Render the [webrtc-bridge] IAX2 peer with the same secret stored in
+# config/local.php. Called from configure_webrtc_asterisk and from tests.
+install_iax_bridge_snippet() {
+    ensure_webrtc_secrets
+
+    if [[ ! -f "$INSTALL_IAX_SNIPPET" || ! -f "$ASTERISK_IAX_CONF" ]]; then
+        warn "Snippet IAX2 o iax.conf no encontrado — se omite [webrtc-bridge]"
+        return 0
+    fi
+
+    if grep -q '^\[webrtc-bridge\]' "$ASTERISK_IAX_CONF"; then
+        backup_if_exists "$ASTERISK_IAX_CONF"
+        sed -i "/^\[webrtc-bridge\]/,/^\[/{s|^secret=.*|secret=${IAX_PHONE_SECRET_VAL}|;}" \
+            "$ASTERISK_IAX_CONF"
+        ok "Peer [webrtc-bridge] sincronizado con config/local.php"
+    else
+        backup_if_exists "$ASTERISK_IAX_CONF"
+        echo "" >> "$ASTERISK_IAX_CONF"
+        sed "s|CHANGEME_PHONE_SECRET|${IAX_PHONE_SECRET_VAL}|g" \
+            "$INSTALL_IAX_SNIPPET" >> "$ASTERISK_IAX_CONF"
+        ok "Snippet IAX2 ([webrtc-bridge]) agregado con secreto generado"
+    fi
+}
+
+# Render the systemd env file with real credentials and the prompted node.
+write_webrtc_env_file() {
+    local local_node="$1"
+    ensure_webrtc_secrets
+    local node_val="${local_node:-494780}"
+
+    if [[ ! -f "$DEFAULT_ENV_FILE" ]]; then
+        cat > "$DEFAULT_ENV_FILE" <<EOF
+# ChileMon WebRTC Bridge — Configuration
+# This file is sourced by the chilemon-webrtc systemd service.
+# Generated by install/install_chilemon.sh; values come from config/local.php.
+
+# Port for the bridge HTTP/WS server
+WEBRTC_PORT=9091
+
+# Asterisk IAX2 credentials (must match iax.conf phone extension)
+IAX_PHONE_USER=webrtc-bridge
+IAX_PHONE_PASS=${IAX_PHONE_SECRET_VAL}
+
+# HMAC secret for WebSocket auth (must match config/local.php webrtc_secret)
+WEBRTC_SECRET=${WEBRTC_SECRET_VAL}
+
+# Local ASL node number
+ASL_NODE=${node_val}
+
+# Asterisk IAX2 connection
+IAX_HOST=127.0.0.1
+IAX_PORT=4569
+
+# Log level: DEBUG, INFO, WARNING, ERROR
+LOG_LEVEL=INFO
+EOF
+        chmod 600 "$DEFAULT_ENV_FILE"
+        ok "Configuración WebRTC creada en $DEFAULT_ENV_FILE"
+    else
+        sed -i \
+            -e "s|^IAX_PHONE_PASS=.*|IAX_PHONE_PASS=${IAX_PHONE_SECRET_VAL}|" \
+            -e "s|^WEBRTC_SECRET=.*|WEBRTC_SECRET=${WEBRTC_SECRET_VAL}|" \
+            -e "s|^ASL_NODE=.*|ASL_NODE=${node_val}|" \
+            "$DEFAULT_ENV_FILE"
+        ok "Configuración WebRTC sincronizada en $DEFAULT_ENV_FILE"
+    fi
+}
+
 
 configure_webrtc_asterisk() {
     info "Configurando Asterisk para WebRTC Audio Bridge"
@@ -579,43 +703,30 @@ configure_webrtc_asterisk() {
         companion_secret="$(php -r "\$c = require '$LOCAL_CONFIG'; echo \$c['iax_companion_secret'] ?? '';" 2>/dev/null || true)"
     fi
 
-    # Step 1: Append IAX2 snippet to iax.conf
-    if [[ -f "$INSTALL_IAX_SNIPPET" ]]; then
-        if [[ -f "$ASTERISK_IAX_CONF" ]]; then
-            # Check if [webrtc-bridge] section already exists in target
-            if grep -q '^\[webrtc-bridge\]' "$ASTERISK_IAX_CONF"; then
-                ok "Sección [webrtc-bridge] ya existe en $ASTERISK_IAX_CONF — se omite"
-            else
-                backup_if_exists "$ASTERISK_IAX_CONF"
-                echo "" >> "$ASTERISK_IAX_CONF"
-                cat "$INSTALL_IAX_SNIPPET" >> "$ASTERISK_IAX_CONF"
-                ok "Snippet IAX2 ([webrtc-bridge]) agregado a $ASTERISK_IAX_CONF"
-                warn "IMPORTANTE: Cambie CHANGEME_PHONE_SECRET en $ASTERISK_IAX_CONF"
-            fi
+    # Step 1: Append IAX2 snippet to iax.conf with the generated credential.
+    install_iax_bridge_snippet
 
-            # Ensure [general] has calltokenoptional scoped to the LAN only.
-            # Without it ASL3 drops frames lacking IE_CALLTOKEN, but 0.0.0.0/0
-            # exposed the radio peer to every host that could reach UDP 4569.
-            local general_has_ct
-            general_has_ct=$(awk '/^\[general\]/{found=1} found && /calltokenoptional/{print "yes"; exit} /^\[/{if(found && !/general/)exit}' "$ASTERISK_IAX_CONF")
-            if [[ "$general_has_ct" != "yes" ]]; then
-                backup_if_exists "$ASTERISK_IAX_CONF"
-                if grep -q 'requirecalltoken=no' "$ASTERISK_IAX_CONF"; then
-                    sed -i "/^requirecalltoken=no/a calltokenoptional=${lan_cidr}" "$ASTERISK_IAX_CONF"
-                    ok "calltokenoptional=${lan_cidr} agregado a [general] de iax.conf"
-                else
-                    warn "No se encontró requirecalltoken=no en iax.conf — calltokenoptional no agregado"
-                fi
-            elif ! grep -q "calltokenoptional=${lan_cidr}" "$ASTERISK_IAX_CONF"; then
-                # Replace a previously widened or stale value.
-                sed -i -E "s/^calltokenoptional=.*/calltokenoptional=${lan_cidr}/" "$ASTERISK_IAX_CONF"
-                ok "calltokenoptional limitado a ${lan_cidr}"
+    # Ensure [general] has calltokenoptional scoped to the LAN only.
+    # Without it ASL3 drops frames lacking IE_CALLTOKEN, but 0.0.0.0/0
+    # exposed the radio peer to every host that could reach UDP 4569.
+    if [[ -f "$ASTERISK_IAX_CONF" ]]; then
+        local general_has_ct
+        general_has_ct=$(awk '/^\[general\]/{found=1} found && /calltokenoptional/{print "yes"; exit} /^\[/{if(found && !/general/)exit}' "$ASTERISK_IAX_CONF")
+        if [[ "$general_has_ct" != "yes" ]]; then
+            backup_if_exists "$ASTERISK_IAX_CONF"
+            if grep -q 'requirecalltoken=no' "$ASTERISK_IAX_CONF"; then
+                sed -i "/^requirecalltoken=no/a calltokenoptional=${lan_cidr}" "$ASTERISK_IAX_CONF"
+                ok "calltokenoptional=${lan_cidr} agregado a [general] de iax.conf"
+            else
+                warn "No se encontró requirecalltoken=no en iax.conf — calltokenoptional no agregado"
             fi
-        else
-            warn "$ASTERISK_IAX_CONF no existe — se omite snippet IAX2"
+        elif ! grep -q "calltokenoptional=${lan_cidr}" "$ASTERISK_IAX_CONF"; then
+            # Replace a previously widened or stale value.
+            sed -i -E "s/^calltokenoptional=.*/calltokenoptional=${lan_cidr}/" "$ASTERISK_IAX_CONF"
+            ok "calltokenoptional limitado a ${lan_cidr}"
         fi
     else
-        warn "Snippet IAX2 no encontrado en $INSTALL_IAX_SNIPPET"
+        warn "$ASTERISK_IAX_CONF no existe — se omite ajuste de calltokenoptional"
     fi
 
     # Step 1b: Append companion-app peer snippet to iax.conf
@@ -965,46 +1076,8 @@ install_webrtc_bridge() {
         fi
     fi
 
-    # Step D: Create env file if not exists
-    if [[ ! -f "$DEFAULT_ENV_FILE" ]]; then
-        ASL_NODE_VAL="${local_node:-494780}"
-        cat > "$DEFAULT_ENV_FILE" <<EOF
-# ChileMon WebRTC Bridge — Configuration
-# This file is sourced by the chilemon-webrtc systemd service.
-# Edit and restart the service after changes:
-#   sudo systemctl restart chilemon-webrtc
-
-# Port for the bridge HTTP/WS server
-WEBRTC_PORT=9091
-
-# Asterisk IAX2 credentials (must match iax.conf phone extension)
-IAX_PHONE_USER=webrtc-bridge
-IAX_PHONE_PASS=CHANGE_ME
-
-# HMAC secret for WebSocket auth (must match config/local.php webrtc_secret)
-WEBRTC_SECRET=CHANGE_ME
-
-# Local ASL node number
-ASL_NODE=${ASL_NODE_VAL}
-
-# Asterisk IAX2 connection
-IAX_HOST=127.0.0.1
-IAX_PORT=4569
-
-# Log level: DEBUG, INFO, WARNING, ERROR
-LOG_LEVEL=INFO
-EOF
-        chmod 600 "$DEFAULT_ENV_FILE"
-        ok "Configuración WebRTC creada en $DEFAULT_ENV_FILE"
-        echo
-        echo "  ${C_YELLOW}IMPORTANTE: Configure credenciales reales:${C_RESET}"
-        echo "  sudo nano $DEFAULT_ENV_FILE"
-        echo "  - IAX_PHONE_PASS: misma clave que en /etc/asterisk/iax.conf"
-        echo "  - WEBRTC_SECRET: misma clave que en config/local.php webrtc_secret"
-        echo
-    else
-        ok "Configuración WebRTC ya existe en $DEFAULT_ENV_FILE"
-    fi
+    # Step D: Create or synchronize the env file with the generated secrets.
+    write_webrtc_env_file "$local_node"
 
     # Step E: Enable and start service
     systemctl daemon-reload
@@ -1222,6 +1295,7 @@ main() {
     if [[ "$INSTALL_MODE" == "update" ]]; then
         info "Modo actualización — configuración existente preservada"
         ensure_companion_secret_in_config
+        ensure_webrtc_secrets_in_config
         ok "Archivo de configuración mantenido: $LOCAL_CONFIG"
     else
         write_local_config \
