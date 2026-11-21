@@ -135,6 +135,30 @@ def test_cli_returns_nonzero_and_prints_guidance_without_config(
     assert "Companion App" in stderr.getvalue()
 
 
+def test_cli_explicit_credentials_win_over_discovered_config(
+    tmp_path: Path,
+) -> None:
+    _write(
+        tmp_path / ic.DASHBOARD_CONFIG_NAMES[0],
+        DASHBOARD_TOML,
+    )
+    target = tmp_path / "profile" / "config.toml"
+    stdout = io.StringIO()
+    code = ic.main(
+        [
+            "--search-dir", str(tmp_path),
+            "--target", str(target),
+            "--host", "10.9.8.7",
+            "--secret", "manual-secret",
+        ],
+        stdout=stdout,
+    )
+    assert code == 0
+    parsed = ic.load_and_validate(target)
+    assert parsed["asterisk"]["host"] == "10.9.8.7"
+    assert parsed["peer"]["password"] == "manual-secret"
+
+
 @pytest.mark.skipif(os.name == "nt", reason="POSIX mode bits")
 def test_target_is_created_with_restricted_mode(tmp_path: Path) -> None:
     source = _write(tmp_path / "config.toml", DASHBOARD_TOML)

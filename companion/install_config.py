@@ -189,7 +189,14 @@ def main(
     )
 
     try:
-        source = resolve_source(args.config, dirs)
+        if args.config:
+            source = Path(args.config).expanduser()
+        elif args.host or args.secret:
+            # Explicit credentials are deliberate: a stale download in the
+            # search directories must never silently override them.
+            source = None
+        else:
+            source = resolve_source(None, dirs)
         if source is not None and not source.is_file():
             raise ConfigError(f"Config file not found: {source}")
         installed = install_config(
