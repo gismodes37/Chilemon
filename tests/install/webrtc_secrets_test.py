@@ -145,3 +145,70 @@ def test_webrtc_env_file_uses_generated_secrets_and_prompted_node(tmp_path: Path
     assert "WEBRTC_SECRET=hmac-secret" in rendered
     assert "ASL_NODE=123456" in rendered
     assert "CHANGE_ME" not in rendered
+
+
+def test_webrtc_env_file_carries_ami_credentials(tmp_path: Path) -> None:
+    """The bridge requires AMI_PASS; a fresh install must write it."""
+    config = tmp_path / "config" / "local.php"
+    config.parent.mkdir(parents=True, exist_ok=True)
+    config.write_text(
+        "<?php return ['ami_host' => '127.0.0.1', 'ami_port' => '5038', "
+        "'ami_user' => 'admin', 'ami_pass' => 'ami-secret'];\n",
+        encoding="utf-8",
+    )
+    env_file = tmp_path / "chilemon-webrtc"
+    _run(
+        tmp_path,
+        "\n".join(
+            [
+                f'LOCAL_CONFIG="{_posix(config)}"',
+                f'DEFAULT_ENV_FILE="{_posix(env_file)}"',
+                'IAX_PHONE_SECRET_VAL="phone-secret"',
+                'WEBRTC_SECRET_VAL="hmac-secret"',
+                'write_webrtc_env_file "494780"',
+            ]
+        ),
+    )
+    rendered = env_file.read_text(encoding="utf-8")
+    assert 'AMI_PASS="ami-secret"' in rendered
+    assert "AMI_HOST=127.0.0.1" in rendered
+    assert "AMI_PORT=5038" in rendered
+    assert "AMI_USER=admin" in rendered
+
+
+def test_webrtc_env_sync_updates_ami_password_safely(tmp_path: Path) -> None:
+    """Reruns must replace AMI_PASS without breaking sed on special chars."""
+    config = tmp_path / "config" / "local.php"
+    config.parent.mkdir(parents=True, exist_ok=True)
+    config.write_text(
+        "<?php return ['ami_pass' => 'p&ss|word$'];\n",
+        encoding="utf-8",
+    )
+    env_file = tmp_path / "chilemon-webrtc"
+    env_file.write_text(
+        'AMI_PASS="OLD"\nIAX_PHONE_PASS=OLD\nWEBRTC_SECRET=OLD\nASL_NODE=494780\n',
+        encoding="utf-8",
+    )
+    _run(
+        tmp_path,
+        "\n".join(
+            [
+                f'LOCAL_CONFIG="{_posix(config)}"',
+                f'DEFAULT_ENV_FILE="{_posix(env_file)}"',
+                'IAX_PHONE_SECRET_VAL="phone-secret"',
+                'WEBRTC_SECRET_VAL="hmac-secret"',
+                'write_webrtc_env_file "494780"',
+            ]
+        ),
+    )
+    rendered = env_file.read_text(encoding="utf-8")
+    assert 'AMI_PASS="p&ss|word\\$"' in rendered
+    assert "OLD" not in rendered
+
+
+def test_installer_handles_debian_13_python_dependencies() -> None:
+    """PEP 668 and Python 3.13 need explicit pip flags and audioop-lts."""
+    installer = INSTALLER.read_text(encoding="utf-8", errors="replace")
+    assert "--ignore-installed" in installer
+    assert "audioop-lts" in installer
+    assert "import audioop_lts" in installer

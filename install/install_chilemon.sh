@@ -638,10 +638,34 @@ install_iax_bridge_snippet() {
 }
 
 # Render the systemd env file with real credentials and the prompted node.
+# Escape a value for a double-quoted systemd EnvironmentFile assignment.
+escape_env_value() {
+    local value="$1"
+    value="${value//\\/\\\\}"
+    value="${value//\"/\\\"}"
+    value="${value//\$/\\\$}"
+    value="${value//\`/\\\`}"
+    printf '%s' "$value"
+}
+
 write_webrtc_env_file() {
     local local_node="$1"
     ensure_webrtc_secrets
     local node_val="${local_node:-494780}"
+
+    local ami_host_val ami_port_val ami_user_val ami_pass_val
+    ami_host_val="$(read_local_config_secret ami_host)"
+    ami_port_val="$(read_local_config_secret ami_port)"
+    ami_user_val="$(read_local_config_secret ami_user)"
+    ami_pass_val="$(read_local_config_secret ami_pass)"
+    [[ -n "$ami_host_val" ]] || ami_host_val="127.0.0.1"
+    [[ -n "$ami_port_val" ]] || ami_port_val="5038"
+    [[ -n "$ami_user_val" ]] || ami_user_val="admin"
+
+    local ami_pass_file="\"$(escape_env_value "$ami_pass_val")\""
+    local ami_pass_sed="${ami_pass_file//\\/\\\\}"
+    ami_pass_sed="${ami_pass_sed//&/\\&}"
+    ami_pass_sed="${ami_pass_sed//|/\\|}"
 
     if [[ ! -f "$DEFAULT_ENV_FILE" ]]; then
         cat > "$DEFAULT_ENV_FILE" <<EOF
@@ -666,6 +690,12 @@ ASL_NODE=${node_val}
 IAX_HOST=127.0.0.1
 IAX_PORT=4569
 
+# Asterisk AMI credentials (required by the bridge to originate calls)
+AMI_HOST=${ami_host_val}
+AMI_PORT=${ami_port_val}
+AMI_USER=${ami_user_val}
+AMI_PASS=${ami_pass_file}
+
 # Log level: DEBUG, INFO, WARNING, ERROR
 LOG_LEVEL=INFO
 EOF
@@ -676,6 +706,10 @@ EOF
             -e "s|^IAX_PHONE_PASS=.*|IAX_PHONE_PASS=${IAX_PHONE_SECRET_VAL}|" \
             -e "s|^WEBRTC_SECRET=.*|WEBRTC_SECRET=${WEBRTC_SECRET_VAL}|" \
             -e "s|^ASL_NODE=.*|ASL_NODE=${node_val}|" \
+            -e "s|^AMI_HOST=.*|AMI_HOST=${ami_host_val}|" \
+            -e "s|^AMI_PORT=.*|AMI_PORT=${ami_port_val}|" \
+            -e "s|^AMI_USER=.*|AMI_USER=${ami_user_val}|" \
+            -e "s|^AMI_PASS=.*|AMI_PASS=${ami_pass_sed}|" \
             "$DEFAULT_ENV_FILE"
         ok "Configuración WebRTC sincronizada en $DEFAULT_ENV_FILE"
     fi
@@ -933,15 +967,15 @@ print_final_banner() {
     echo -e " ${C_GREEN}Nodo ASL local :${C_RESET} ${local_node}"
     echo -e " ${C_GREEN}Usuario AMI    :${C_RESET} ${ami_user}"
     echo
-    echo -e " ${C_GREEN}Dirección nodo :${C_RESET} ${DEFAULT_NODE_PROTO}://${server_host}"
-    echo -e " ${C_GREEN}Acceso ChileMon:${C_RESET} ${DEFAULT_NODE_PROTO}://${server_host}/chilemon"
+    echo -e " ${C_GREEN}Dirección nodo :${C_RESET} ${web_proto}://${server_host}"
+    echo -e " ${C_GREEN}Acceso ChileMon:${C_RESET} ${web_proto}://${server_host}/chilemon"
     echo
     echo -e " ${C_GREEN}Usuario web    :${C_RESET} ${web_user}"
     echo -e " ${C_GREEN}Módulos ASL3   :${C_RESET} ${ASL3_MODULES_ADDED:-0} load => agregados"
     echo -e " ${C_GREEN}WebRTC bridge  :${C_RESET} Si (PTT desde el navegador)"
     echo
     echo -e "${C_WHITE}Probar puente WebRTC:${C_RESET}"
-    echo "  curl http://localhost:\${WEBRTC_PORT:-9091}/health"
+    echo "  curl http://localhost:${WEBRTC_PORT}/health"
     echo
     echo -e "${C_CYAN}----------------------------------------------------------------${C_RESET}"
     echo -e "${C_WHITE}Pruebas rápidas:${C_RESET}"
@@ -1040,15 +1074,25 @@ install_webrtc_bridge() {
         fi
 
         if [[ -n "$pip_cmd" ]]; then
-            local pip_flags=""
+            local pip_flags="--ignore-installed"
             if "$pip_cmd" install --help 2>/dev/null | grep -q -- '--break-system-packages'; then
-                pip_flags="--break-system-packages"
+                pip_flags="--break-system-packages $pip_flags"
                 info "PEP 668 detectado — usando $pip_flags"
             fi
             if "$pip_cmd" install $pip_flags "aiortc>=1.4.0"; then
                 ok "aiortc instalado vía $pip_cmd"
             else
                 warn "No se pudo instalar aiortc con $pip_cmd — WebRTC PTT puede no funcionar"
+            fi
+
+            # Python 3.13 removed audioop; the bridge falls back to audioop_lts.
+            if ! python3 -c "import audioop" &>/dev/null; then
+                info "Python sin módulo audioop — instalando audioop-lts"
+                if "$pip_cmd" install $pip_flags audioop-lts; then
+                    ok "audioop-lts instalado vía $pip_cmd"
+                else
+                    warn "No se pudo instalar audioop-lts — el bridge no arrancará"
+                fi
             fi
         else
             warn "pip no disponible — WebRTC deshabilitado (se requiere aiortc)"
@@ -1073,6 +1117,12 @@ install_webrtc_bridge() {
         ok "python3-aiortc verificada"
     else
         warn "python3-aiortc no importable — el PTT desde el navegador no funcionará"
+        import_fail=1
+    fi
+    if python3 -c "import audioop" &>/dev/null || python3 -c "import audioop_lts" &>/dev/null; then
+        ok "audioop disponible"
+    else
+        warn "audioop no importable — el bridge no arrancará en Python 3.13+"
         import_fail=1
     fi
 
