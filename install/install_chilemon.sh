@@ -36,6 +36,7 @@ INSTALL_EXTENSIONS_COMPANION="$REPO_DIR/install/asterisk/extensions-companion.co
 ASTERISK_EXTENSIONS_CONF="/etc/asterisk/extensions.conf"
 DEFAULT_NODE_PROTO="https"
 ASL3_MODULES_ADDED=0
+ASTERISK_RESTART_NEEDED=0
 INSTALL_MODE="new"
 IAX_PHONE_SECRET_VAL=""
 WEBRTC_SECRET_VAL=""
@@ -663,7 +664,8 @@ configure_asl3_modules() {
 
     if [[ "$added" -gt 0 ]]; then
         ok "Módulos Asterisk: $added load => agregados"
-        warn "Reinicie Asterisk manualmente: systemctl restart asterisk"
+        ASTERISK_RESTART_NEEDED=1
+        info "Asterisk se reiniciará al terminar la configuración"
     else
         ok "Todos los módulos ya estaban presentes"
     fi
@@ -774,6 +776,61 @@ EOF
 }
 
 
+# Snapshot helper: Asterisk only needs a restart when a config file really
+# changed. Update mode must stay idempotent and avoid dropping live calls.
+asterisk_config_snapshot() {
+    local file="$1"
+    if [[ -f "$file" ]]; then
+        cat "$file"
+    fi
+}
+
+asterisk_config_mark_if_changed() {
+    local before="$1" file="$2"
+    local after=""
+    if [[ -f "$file" ]]; then
+        after="$(cat "$file")"
+    fi
+    if [[ "$before" != "$after" ]]; then
+        ASTERISK_RESTART_NEEDED=1
+        info "Configuración Asterisk actualizada: $(basename "$file")"
+    fi
+}
+
+# Apply every Asterisk config change made by steps 7 and 8. Writing a new
+# [companion-app] peer or new load => lines is not enough: Asterisk keeps the
+# old view until the process is restarted, so the companion call would fail
+# with repeated AUTHREQ / "no NEWACK" and no TX would ever reach the radio.
+apply_asterisk_config() {
+    if [[ "${ASTERISK_RESTART_NEEDED:-0}" != "1" ]]; then
+        ok "Configuración Asterisk sin cambios — reinicio no necesario"
+        return 0
+    fi
+
+    if ! command -v systemctl >/dev/null 2>&1; then
+        warn "systemctl no disponible — reinicie Asterisk manualmente"
+        return 0
+    fi
+
+    info "Reiniciando Asterisk para aplicar la configuración"
+    if ! systemctl restart asterisk; then
+        warn "No se pudo reiniciar Asterisk — ejecute: systemctl restart asterisk"
+        return 0
+    fi
+
+    local i
+    for i in $(seq 1 15); do
+        if systemctl is-active --quiet asterisk; then
+            ok "Asterisk reiniciado y activo"
+            ASTERISK_RESTART_NEEDED=0
+            return 0
+        fi
+        sleep 1
+    done
+    warn "Asterisk no quedó activo tras el reinicio — revise: systemctl status asterisk"
+}
+
+
 configure_webrtc_asterisk() {
     info "Configurando Asterisk para WebRTC Audio Bridge"
 
@@ -782,6 +839,11 @@ configure_webrtc_asterisk() {
     # Scope every IAX2 peer to the detected LAN. A previous release widened
     # calltokenoptional to 0.0.0.0/0, which let any host reach the radio peer.
     local lan_cidr lan_acl companion_secret
+    local iax_before rpt_before extensions_before
+    iax_before="$(asterisk_config_snapshot "$ASTERISK_IAX_CONF")"
+    rpt_before="$(asterisk_config_snapshot "$ASTERISK_RPT_CONF")"
+    extensions_before="$(asterisk_config_snapshot "$ASTERISK_EXTENSIONS_CONF")"
+
     if lan_cidr="$(detect_lan_cidr)"; then
         lan_acl="$(cidr_to_asterisk_acl "$lan_cidr")"
     else
@@ -884,6 +946,10 @@ configure_webrtc_asterisk() {
     else
         warn "$ASTERISK_RPT_CONF no existe — se omite configuración de phonelogin"
     fi
+
+    asterisk_config_mark_if_changed "$iax_before" "$ASTERISK_IAX_CONF"
+    asterisk_config_mark_if_changed "$rpt_before" "$ASTERISK_RPT_CONF"
+    asterisk_config_mark_if_changed "$extensions_before" "$ASTERISK_EXTENSIONS_CONF"
 }
 
 
@@ -1453,6 +1519,7 @@ main() {
 
     step "8" "Configurando Asterisk para WebRTC"
     configure_webrtc_asterisk "$local_node"
+    apply_asterisk_config
 
     step "9" "Instalando wrapper y sudoers"
     write_wrapper_if_missing
