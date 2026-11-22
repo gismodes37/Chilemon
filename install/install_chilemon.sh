@@ -111,6 +111,12 @@ warn() {
     echo "[WARN] $1"
 }
 
+clear_screen() {
+    # ncurses prints "'unknown': I need something more specific." when TERM is
+    # unset or invalid, which is common in one-command/CI installs over ssh.
+    clear >/dev/null 2>&1 || true
+}
+
 require_root() {
     if [[ "$EUID" -ne 0 ]]; then
         echo "[ERROR] Este instalador debe ejecutarse con sudo o como root."
@@ -597,12 +603,16 @@ run_php_user_creation() {
 
 
 configure_asl3_modules() {
-    local modules_conf="/etc/asterisk/modules.conf"
+    local modules_conf="${ASL_MODULES_CONF:-/etc/asterisk/modules.conf}"
+    local module_dir="${ASTERISK_MODULE_DIR:-/usr/lib/asterisk/modules}"
     local -a required_modules=(res_http_websocket res_aeap res_sorcery_config \
         res_pjproject res_srtp res_rtp_asterisk bridge_softmix chan_bridge_media)
     local added=0
 
-    if [[ ! -f "$modules_conf" ]] || ! grep -q '^autoload=no' "$modules_conf"; then
+    # ASL3 writes 'autoload=no' on older releases and 'autoload = no' on
+    # Debian 13. Both mean the same thing: explicit load lines are required.
+    if [[ ! -f "$modules_conf" ]] || \
+       ! grep -qE '^[[:space:]]*autoload[[:space:]]*=[[:space:]]*no([[:space:]]|$)' "$modules_conf"; then
         warn "ASL3 no detectado — se omite configuración de módulos"
         return 0
     fi
@@ -610,15 +620,25 @@ configure_asl3_modules() {
     info "ASL3 detectado en $modules_conf"
     backup_if_exists "$modules_conf"
 
+    # Accept both legacy 'load = module.so' and 'load => module' spellings.
     local existing
-    existing=$(grep -E '^load\s*=>\s*' "$modules_conf" | sed 's/.*=>\s*//' | tr -d ' ')
+    existing=$(grep -E '^[[:space:]]*load[[:space:]]*=>?[[:space:]]*' "$modules_conf" \
+        | sed -E 's/^[[:space:]]*load[[:space:]]*=>?[[:space:]]*//; s/\.so.*$//; s/[[:space:]]*$//' \
+        || true)
 
     for mod in "${required_modules[@]}"; do
-        if ! echo "$existing" | grep -qxF "$mod"; then
-            echo "load => $mod" >> "$modules_conf"
-            added=$((added + 1))
-            info "  load => $mod agregado"
+        if echo "$existing" | grep -qxF "$mod"; then
+            continue
         fi
+        # Newer ASL/Asterisk builds these modules into the core and ships no
+        # .so file: adding a load line would prevent Asterisk from starting.
+        if [[ -d "$module_dir" && ! -f "$module_dir/${mod}.so" ]]; then
+            info "  $mod compilado en el core — se omite"
+            continue
+        fi
+        echo "load => $mod" >> "$modules_conf"
+        added=$((added + 1))
+        info "  load => $mod agregado"
     done
 
     if [[ "$added" -gt 0 ]]; then
@@ -998,7 +1018,7 @@ print_final_banner() {
     echo -e " ${C_GREEN}WebRTC bridge  :${C_RESET} Si (PTT desde el navegador)"
     echo
     echo -e "${C_WHITE}Probar puente WebRTC:${C_RESET}"
-    echo "  curl http://localhost:${WEBRTC_PORT}/health"
+    echo "  curl http://localhost:${WEBRTC_PORT:-9091}/health"
     echo
     echo -e "${C_CYAN}----------------------------------------------------------------${C_RESET}"
     echo -e "${C_WHITE}Pruebas rápidas:${C_RESET}"
@@ -1238,7 +1258,7 @@ configure_git_permissions() {
 main() {
     require_root
 
-    clear || true
+    clear_screen
     echo "ChileMon - Instalador automático"
     echo "--------------------------------"
     echo "Proyecto detectado en: $REPO_DIR"

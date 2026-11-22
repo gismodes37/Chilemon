@@ -81,3 +81,21 @@ def test_final_banner_reports_real_web_credentials() -> None:
     assert "definido durante instalación" not in source
     assert "Contraseña web" in source
     assert "WEB_ADMIN_PASS" in source
+
+
+def test_clear_screen_is_silent_with_unknown_term(tmp_path: Path) -> None:
+    """One-command installs must not print an ncurses TERM error."""
+    result = _run_shell(tmp_path, "TERM=unknown clear_screen")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "I need something more specific" not in result.stdout + result.stderr
+
+
+def test_final_banner_health_command_expands_webrtc_port(tmp_path: Path) -> None:
+    """The printed health check must show a real port under set -u."""
+    result = _run_shell(
+        tmp_path,
+        'print_final_banner "494780" "node494780" "admin" "admin" "http"',
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "curl http://localhost:9091/health" in result.stdout
+    assert "${WEBRTC_PORT" not in result.stdout
