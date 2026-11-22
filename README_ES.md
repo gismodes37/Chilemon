@@ -239,58 +239,65 @@ ChileMon **no reemplaza Supermon**, sino que ofrece una alternativa moderna para
 
 ---
 
-# 🚀 Opciones de Instalación
+# 🚀 Instalación
 
-ChileMon puede instalarse directamente en un nodo **ASL3**. Se recomienda utilizar un sistema basado en Debian (como el oficial de ASL3).
+ChileMon se instala directamente en un nodo **ASL3**. Se recomienda un sistema basado en Debian (como el oficial de ASL3).
 
-### 📦 Opción 1: Instalación Automática (Recomendada)
+### 📦 Instalación con un solo comando (Recomendada)
 
-El instalador detecta automáticamente si es una instalación **NUEVA** (setup interactivo completo) o una **ACTUALIZACIÓN** (solo agrega dependencias faltantes, preserva la configuración existente).
+Copiá y pegá esta única línea en la Pi. Instala `git`, descarga el repositorio en `/opt/chilemon` y ejecuta el instalador:
 
-#### 1. Descargar ChileMon
+```bash
+curl -fsSL https://raw.githubusercontent.com/gismodes37/Chilemon/main/install/bootstrap.sh | sudo bash
+```
+
+Alternativa manual (solo si `git` ya está instalado):
+
 ```bash
 sudo git clone https://github.com/gismodes37/Chilemon.git /opt/chilemon
-```
-*Esto crea la carpeta `/opt/chilemon` con todos los archivos del proyecto.*
-
-#### 2. Ejecutar el instalador principal
-```bash
 cd /opt/chilemon && sudo bash install/install_chilemon.sh
 ```
 
-El instalador ejecuta **pasos 13**:
+El instalador ejecuta **14 pasos**:
 1. Validar estructura del repositorio
-2. Instalar dependencias base (Apache, PHP, SQLite, Python 3)
-3. Configurar datos del nodo (NUEVO) o leer configuración existente (ACTUALIZACIÓN)
+2. Instalar dependencias base (git, Apache, PHP con SQLite/curl/mbstring, Python 3, sudo)
+3. Pedir los datos del nodo (NUEVO) o leer la configuración existente (ACTUALIZACIÓN)
 4. Preparar carpetas y permisos
-5. Generar configuración local (NUEVO) o preservar existente (ACTUALIZACIÓN)
-6. Configurar módulos ASL3 de Asterisk
-7. Configurar Asterisk para WebRTC (IAX2 + rpt.conf phonelogin)
-8. Instalar wrapper seguro + sudoers
-9. Configurar alias de Apache
-10. Habilitar proxy WebSocket de Apache
-11. Validar módulos PHP + inicializar base de datos
-12. **Instalar puente WebRTC** (PTT desde el navegador — aiohttp, aiortc, websockets, systemd service)
-13. Crear usuario administrador (NUEVO) o ejecutar verificación (ACTUALIZACIÓN)
+5. Endurecer los permisos del repositorio para actualizaciones desde el dashboard
+6. Generar la configuración local (NUEVO) o preservar la existente (ACTUALIZACIÓN)
+7. Configurar módulos ASL3 de Asterisk
+8. Configurar Asterisk para WebRTC (IAX2 + rpt.conf phonelogin)
+9. Instalar el wrapper seguro y la regla sudoers
+10. Configurar el alias de Apache
+11. Habilitar el proxy WebSocket de Apache
+12. Validar módulos PHP e inicializar la base de datos
+13. **Instalar el puente WebRTC** (PTT desde el navegador — aiohttp, aiortc, websockets, systemd service)
+14. Crear el usuario administrador (NUEVO) o ejecutar la verificación (ACTUALIZACIÓN)
 
-> ⚠️ **Instalación NUEVA**: Ten a mano tu **número de nodo** ASL y la **clave AMI** (de `/etc/asterisk/manager.conf`). El instalador te las va a pedir.
+> ⚠️ **Instalación NUEVA**: Ten a mano tu **número de nodo** ASL y la **clave AMI**. La clave AMI es el valor `secret=` del bloque `[admin]` en `/etc/asterisk/manager.conf`. El instalador ya detecta el host, puerto y usuario AMI, así que solo te pide la clave. También pregunta por la IP/host del servidor (ya prellenada), un texto descriptivo del nodo y una URL opcional del mapa comunitario — presioná Enter para aceptar el valor por defecto u omitir.
 
-> 💡 **ACTUALIZACIÓN (sistema existente)**: El instalador detecta `config/local.php` y omite todos los prompts — solo agrega dependencias faltantes, configura WebRTC/WebSocket, y ejecuta una verificación completa.
+> 💡 **ACTUALIZACIÓN (sistema existente)**: Si ya existe `config/local.php`, el instalador omite las preguntas, preserva tu configuración y solo agrega lo que falta.
 
-> 🎯 **WebRTC Audio Bridge**: El puente para hablar por radio desde el navegador ya **se instala automáticamente** en el paso 12. No necesitas ejecutar un script aparte. Solo configura las credenciales en `/etc/default/chilemon-webrtc` después de la instalación.
+> 🗺️ **Mapa comunitario (opcional)**: Durante una instalación NUEVA se te pregunta por una **URL de hub**. Si tenés un hub de ChileMon, ingresá su URL (ej: `http://192.168.0.111`) para registrar el nodo. Si no, presioná Enter.
+
+> 🎯 **WebRTC Audio Bridge**: El puente para hablar por radio desde el navegador se instala automáticamente en el paso 13. Los secretos IAX2 y WebRTC los **genera el instalador** y los propaga a `config/local.php`, `iax.conf` y `/etc/default/chilemon-webrtc` — no hace falta editar esos archivos a mano.
+
+Después de instalar, abrí `http://<ip-de-tu-pi>/chilemon` e ingresá con el usuario administrador creado en el paso 14.
+
+### 🖥️ Companion de Windows (PTT desde el navegador)
+
+1. En el dashboard, hacé clic en **Companion App** para descargar `config.toml`.
+2. En la PC con Windows, hacé doble clic en `companion\install-companion.bat` y elegí ese archivo cuando te lo pida.
+3. El instalador coloca la configuración en `%USERPROFILE%\.chilemon\`, registra el inicio automático al iniciar sesión y arranca el companion.
+4. El dashboard muestra **Companion Connected**. Presioná **Reconectar** para abrir la llamada IAX2.
+
+Para desinstalar el companion por completo — para una prueba limpia o cambiar de PC — ejecutá `companion\uninstall-companion.bat`.
 
 ---
 
-## 🧪 Opción 2: Rama Main (Último desarrollo)
+## ℹ️ ¿Qué rama uso?
 
-Clonar y ejecutar el instalador — igual que la Opción 1:
-
-```bash
-sudo git clone https://github.com/gismodes37/Chilemon.git /opt/chilemon
-cd /opt/chilemon && sudo bash install/install_chilemon.sh
-```
-
-El instalador configura automáticamente Apache, PHP, SQLite, el wrapper de seguridad, soporte WebRTC/WebSocket, y ejecuta una verificación. ChileMon queda listo en `http://tu_ip/chilemon`.
+`main` es la rama instalable. Los comandos de arriba siempre la usan, así que no hace falta elegir una rama o un tag manualmente.
 
 ---
 
@@ -317,22 +324,11 @@ sudo bash install
 
 ### 3.4 Instalar ChileMon
 ```bash
-cd /opt
-sudo git clone -b v0.4.0 https://github.com/gismodes37/Chilemon.git chilemon
-cd chilemon
-sudo bash install/install_chilemon.sh
+curl -fsSL https://raw.githubusercontent.com/gismodes37/Chilemon/main/install/bootstrap.sh | sudo bash
 ```
-> El instalador detecta si es sistema nuevo o actualización. En modo NUEVO te pedirá el número de nodo ASL y la clave AMI.
+> El instalador detecta si es sistema nuevo o actualización. En modo NUEVO te pide el número de nodo y la clave AMI, y genera todos los secretos WebRTC.
 
-### 3.5 Configurar WebRTC Bridge
-El bridge se instala automáticamente (Paso 12). Solo edita las credenciales reales:
-```bash
-sudo nano /etc/default/chilemon-webrtc
-# Cambiar IAX_PHONE_PASS y WEBRTC_SECRET
-sudo systemctl restart chilemon-webrtc
-```
-
-### 3.6 Acceder al Dashboard
+### 3.5 Acceder al Dashboard
 Abrí `http://<ip-de-tu-vm>/chilemon` — PTT desde el navegador incluido 🇨🇱
 
 ---
