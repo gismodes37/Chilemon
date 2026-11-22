@@ -1032,12 +1032,24 @@ install_webrtc_bridge() {
         ok "python3-aiortc instalado vía apt"
     else
         info "python3-aiortc no disponible en apt — intentando pip"
+        local pip_cmd=""
         if command -v pip3 &>/dev/null; then
-            pip3 install "aiortc>=1.4.0"
-            ok "python3-aiortc instalado vía pip3"
+            pip_cmd="pip3"
         elif command -v pip &>/dev/null; then
-            pip install "aiortc>=1.4.0"
-            ok "python3-aiortc instalado vía pip"
+            pip_cmd="pip"
+        fi
+
+        if [[ -n "$pip_cmd" ]]; then
+            local pip_flags=""
+            if "$pip_cmd" install --help 2>/dev/null | grep -q -- '--break-system-packages'; then
+                pip_flags="--break-system-packages"
+                info "PEP 668 detectado — usando $pip_flags"
+            fi
+            if "$pip_cmd" install $pip_flags "aiortc>=1.4.0"; then
+                ok "aiortc instalado vía $pip_cmd"
+            else
+                warn "No se pudo instalar aiortc con $pip_cmd — WebRTC PTT puede no funcionar"
+            fi
         else
             warn "pip no disponible — WebRTC deshabilitado (se requiere aiortc)"
         fi
@@ -1055,6 +1067,13 @@ install_webrtc_bridge() {
         ok "python3-websockets verificada"
     else
         warn "python3-websockets no importable — WebSocket podría no funcionar"
+        import_fail=1
+    fi
+    if python3 -c "import aiortc" &>/dev/null; then
+        ok "python3-aiortc verificada"
+    else
+        warn "python3-aiortc no importable — el PTT desde el navegador no funcionará"
+        import_fail=1
     fi
 
     if [[ "$import_fail" -ne 0 ]]; then
@@ -1094,7 +1113,11 @@ install_webrtc_bridge() {
         fi
     fi
 
-    ok "Puente WebRTC instalado — PTT desde el navegador disponible"
+    if [[ "$import_fail" -eq 0 ]]; then
+        ok "Puente WebRTC instalado — PTT desde el navegador disponible"
+    else
+        warn "Puente WebRTC instalado pero incompleto — revise los avisos anteriores"
+    fi
 }
 
 
@@ -1179,6 +1202,7 @@ main() {
     ensure_package php
     ensure_package php-sqlite3
     ensure_package php-curl
+    ensure_package php-mbstring
     ensure_package sqlite3
     ensure_package sudo
     ensure_package python3
