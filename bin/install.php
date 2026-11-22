@@ -98,6 +98,23 @@ function isInteractiveCli(): bool
 }
 
 /**
+ * Inserts an admin account with a hashed password.
+ *
+ * Shared by the interactive flow and the non-interactive bootstrap flow so
+ * both produce identical records.
+ */
+function insertAdminUser(PDO $pdo, string $username, string $password): void
+{
+    $hash = password_hash($password, PASSWORD_DEFAULT);
+    if ($hash === false) {
+        fail('No se pudo generar hash de contraseña.');
+    }
+
+    $insert = $pdo->prepare("INSERT INTO users (username, password_hash, role) VALUES (?, ?, 'admin')");
+    $insert->execute([$username, $hash]);
+}
+
+/**
  * Devuelve la ruta a config/local.php según el base path.
  */
 function localConfigPath(string $basePath): string
@@ -260,6 +277,30 @@ try {
     echo "✅ Schema aplicado.\n";
 
     /**
+     * Non-interactive bootstrap: the shell installer supplies generated
+     * credentials so the first admin exists even without a TTY.
+     */
+    $envUser = getenv('CHILEMON_ADMIN_USER');
+    $envPass = getenv('CHILEMON_ADMIN_PASS');
+    if ($envUser !== false && $envPass !== false && $envUser !== '' && $envPass !== '') {
+        $envUser = trim($envUser);
+        if (strlen($envUser) < 3) {
+            fail('El usuario debe tener al menos 3 caracteres.');
+        }
+
+        $hasEnvUser = (int)($pdo->query('SELECT COUNT(*) FROM users')->fetchColumn() ?: 0);
+        if ($hasEnvUser > 0) {
+            echo "ℹ️  Ya existen usuarios; se omite la creación automática.\n";
+        } else {
+            insertAdminUser($pdo, $envUser, $envPass);
+            echo "\n✅ Usuario administrador creado correctamente: {$envUser}\n";
+        }
+        echo "🚀 Instalación/upgrade finalizado\n\n";
+        echo 'Accede en: ' . buildAccessUrl($basePath) . "\n\n";
+        exit(0);
+    }
+
+    /**
      * Si no hay terminal interactiva, no intentamos crear usuario.
      * Esto permite que install/install_chilemon.sh ejecute este script
      * como www-data sin quedarse bloqueado esperando input.
@@ -324,13 +365,7 @@ try {
         break;
     }
 
-    $hash = password_hash($password, PASSWORD_DEFAULT);
-    if ($hash === false) {
-        fail("No se pudo generar hash de contraseña.");
-    }
-
-    $insert = $pdo->prepare("INSERT INTO users (username, password_hash, role) VALUES (?, ?, 'admin')");
-    $insert->execute([$username, $hash]);
+    insertAdminUser($pdo, $username, $password);
 
     echo "\n✅ Usuario administrador creado correctamente: {$username}\n";
     echo "🚀 Instalación finalizada\n\n";

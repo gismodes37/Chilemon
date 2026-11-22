@@ -39,6 +39,8 @@ ASL3_MODULES_ADDED=0
 INSTALL_MODE="new"
 IAX_PHONE_SECRET_VAL=""
 WEBRTC_SECRET_VAL=""
+WEB_ADMIN_USER=""
+WEB_ADMIN_PASS=""
 
 TOTAL_STEPS=14
 
@@ -573,8 +575,24 @@ run_php_user_creation() {
     echo "Se creará el primer usuario administrador de ChileMon."
     echo
 
-    php "$INSTALLER_PHP"
-    ok "Creación de usuario completada"
+    if [[ -t 0 ]]; then
+        php "$INSTALLER_PHP"
+        ok "Creación de usuario completada"
+        return
+    fi
+
+    # One-command installs have no TTY. Generate credentials and let install.php
+    # create the first admin non-interactively, then report them in the summary.
+    WEB_ADMIN_USER="admin"
+    WEB_ADMIN_PASS="$(generate_random_secret 20)"
+    if CHILEMON_ADMIN_USER="$WEB_ADMIN_USER" CHILEMON_ADMIN_PASS="$WEB_ADMIN_PASS" \
+        php "$INSTALLER_PHP" </dev/null; then
+        ok "Usuario administrador creado de forma no interactiva"
+    else
+        WEB_ADMIN_USER=""
+        WEB_ADMIN_PASS=""
+        warn "No se pudo crear el usuario administrador — créelo con: sudo php $INSTALLER_PHP"
+    fi
 }
 
 
@@ -948,6 +966,7 @@ print_final_banner() {
     local ami_user="$3"
     local web_user="${4:-no definido}"
     local web_proto="${5:-http}"
+    local web_pass="${6:-}"
 
     echo
     echo -e "${C_CYAN}================================================================${C_RESET}"
@@ -971,6 +990,10 @@ print_final_banner() {
     echo -e " ${C_GREEN}Acceso ChileMon:${C_RESET} ${web_proto}://${server_host}/chilemon"
     echo
     echo -e " ${C_GREEN}Usuario web    :${C_RESET} ${web_user}"
+    if [[ -n "$web_pass" ]]; then
+        echo -e " ${C_GREEN}Contraseña web :${C_RESET} ${web_pass}"
+        echo -e " ${C_YELLOW}Guarde esta contraseña: no se muestra nuevamente.${C_RESET}"
+    fi
     echo -e " ${C_GREEN}Módulos ASL3   :${C_RESET} ${ASL3_MODULES_ADDED:-0} load => agregados"
     echo -e " ${C_GREEN}WebRTC bridge  :${C_RESET} Si (PTT desde el navegador)"
     echo
@@ -997,6 +1020,7 @@ validate_installation() {
     local ami_user="$3"
     local web_user="$4"
     local web_proto="$5"
+    local web_pass="${6:-}"
 
     echo
     echo "Resumen técnico"
@@ -1006,7 +1030,7 @@ validate_installation() {
     echo "Wrapper  : $WRAPPER_PATH"
     echo "Config   : $LOCAL_CONFIG"
 
-    print_final_banner "$local_node" "$server_host" "$ami_user" "$web_user" "$web_proto"
+    print_final_banner "$local_node" "$server_host" "$ami_user" "$web_user" "$web_proto" "$web_pass"
 }
 
 
@@ -1415,7 +1439,18 @@ main() {
         run_verification
     fi
 
-    validate_installation "$local_node" "$server_host" "$ami_user" "definido durante instalación" "$web_proto"
+    local web_user
+    if [[ "$INSTALL_MODE" == "new" ]]; then
+        if [[ -n "$WEB_ADMIN_USER" && -n "$WEB_ADMIN_PASS" ]]; then
+            web_user="$WEB_ADMIN_USER"
+        else
+            web_user="NO CREADO — ejecute: sudo php $INSTALLER_PHP"
+        fi
+    else
+        web_user="existente (sin cambios)"
+    fi
+
+    validate_installation "$local_node" "$server_host" "$ami_user" "$web_user" "$web_proto" "$WEB_ADMIN_PASS"
 }
 
 main "$@"
