@@ -83,6 +83,13 @@ def test_final_banner_reports_real_web_credentials() -> None:
     assert "WEB_ADMIN_PASS" in source
 
 
+def test_php_installer_points_to_step_14_without_tty() -> None:
+    """The schema step must not tell users to create an admin manually."""
+    source = PHP_INSTALLER.read_text(encoding="utf-8", errors="replace")
+    assert "El instalador crea el usuario admin en el paso 14." in source
+    assert "Luego puede crear el usuario admin ejecutando" not in source
+
+
 def test_clear_screen_is_silent_with_unknown_term(tmp_path: Path) -> None:
     """One-command installs must not print an ncurses TERM error."""
     result = _run_shell(tmp_path, "TERM=unknown clear_screen")

@@ -604,10 +604,30 @@ run_php_user_creation() {
 
 configure_asl3_modules() {
     local modules_conf="${ASL_MODULES_CONF:-/etc/asterisk/modules.conf}"
-    local module_dir="${ASTERISK_MODULE_DIR:-/usr/lib/asterisk/modules}"
+    local module_dir="${ASTERISK_MODULE_DIR:-}"
     local -a required_modules=(res_http_websocket res_aeap res_sorcery_config \
         res_pjproject res_srtp res_rtp_asterisk bridge_softmix chan_bridge_media)
     local added=0
+
+    if [[ -z "$module_dir" ]] && command -v asterisk &>/dev/null; then
+        module_dir=$(asterisk -rx 'core show settings' 2>/dev/null \
+            | awk -F: '/Module directory/ {gsub(/^[ \t]+/, "", $2); print $2; exit}' \
+            || true)
+    fi
+    if [[ -z "$module_dir" ]]; then
+        local candidate
+        for candidate in /usr/lib/asterisk/modules /usr/lib/*/asterisk/modules \
+                         /usr/lib64/asterisk/modules; do
+            if [[ -d "$candidate" ]]; then
+                module_dir="$candidate"
+                break
+            fi
+        done
+    fi
+    if [[ -z "$module_dir" ]]; then
+        warn "No se pudo ubicar el directorio de módulos de Asterisk — se omiten load =>"
+        return 0
+    fi
 
     # ASL3 writes 'autoload=no' on older releases and 'autoload = no' on
     # Debian 13. Both mean the same thing: explicit load lines are required.

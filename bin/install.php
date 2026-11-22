@@ -301,14 +301,13 @@ try {
     }
 
     /**
-     * Si no hay terminal interactiva, no intentamos crear usuario.
-     * Esto permite que install/install_chilemon.sh ejecute este script
-     * como www-data sin quedarse bloqueado esperando input.
+     * Si no hay terminal interactiva, no intentamos crear usuario aquí.
+     * El instalador principal crea el primer admin en el paso 14 con
+     * CHILEMON_ADMIN_USER / CHILEMON_ADMIN_PASS.
      */
     if (!$interactive) {
-        echo "ℹ️  No hay terminal interactiva disponible.\n";
-        echo "ℹ️  Se omite la creación de usuario en este paso.\n";
-        echo "ℹ️  Luego puede crear el usuario admin ejecutando este script manualmente en terminal.\n";
+        echo "ℹ️  Sin terminal interactiva: se omite la creación en este paso.\n";
+        echo "ℹ️  El instalador crea el usuario admin en el paso 14.\n";
         echo "🚀 Instalación/upgrade finalizado\n\n";
         exit(0);
     }

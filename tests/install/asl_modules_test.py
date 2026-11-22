@@ -13,7 +13,14 @@ def _posix(path: Path) -> str:
     return value
 
 
-def _run(tmp_path: Path, autoload_line: str, module_files: list[str]) -> subprocess.CompletedProcess[str]:
+def _run(
+    tmp_path: Path,
+    autoload_line: str,
+    module_files: list[str],
+    *,
+    module_dir_override: str | None = "default",
+    reported_module_dir: Path | None = None,
+) -> tuple[subprocess.CompletedProcess[str], Path]:
     lines = INSTALLER.read_text(encoding="utf-8", errors="replace").splitlines()
     if lines and lines[-1].strip() == 'main "$@"':
         lines = lines[:-1]
@@ -39,8 +46,21 @@ def _run(tmp_path: Path, autoload_line: str, module_files: list[str]) -> subproc
                 'warn() { echo "WARN: $*"; }',
                 "info() { :; }",
                 "backup_if_exists() { :; }",
+                *(
+                    []
+                    if reported_module_dir is None
+                    else [
+                        'asterisk() { echo "  Module directory:            '
+                        + _posix(reported_module_dir)
+                        + '"; }'
+                    ]
+                ),
                 f'ASL_MODULES_CONF="{_posix(modules_conf)}"',
-                f'ASTERISK_MODULE_DIR="{_posix(module_dir)}"',
+                *(
+                    []
+                    if module_dir_override is None
+                    else [f'ASTERISK_MODULE_DIR="{_posix(module_dir)}"']
+                ),
                 "configure_asl3_modules",
                 'echo "ADDED=${ASL3_MODULES_ADDED}"',
             ]
@@ -93,6 +113,26 @@ def test_existing_load_equals_form_is_not_duplicated(tmp_path: Path) -> None:
     _assert_ok(result)
     assert "ADDED=0" in result.stdout
     assert conf.read_text(encoding="utf-8").count("res_http_websocket") == 1
+
+
+def test_multiarch_module_dir_discovered_from_asterisk_settings(tmp_path: Path) -> None:
+    """Debian 13 keeps modules under /usr/lib/<triplet>/asterisk/modules."""
+    reported = tmp_path / "multiarch-modules"
+    reported.mkdir()
+    (reported / "res_http_websocket.so").write_bytes(b"")
+
+    result, conf = _run(
+        tmp_path,
+        "autoload = no",
+        [],
+        module_dir_override=None,
+        reported_module_dir=reported,
+    )
+    _assert_ok(result)
+    assert "ADDED=1" in result.stdout
+    rendered = conf.read_text(encoding="utf-8")
+    assert "load => res_http_websocket" in rendered
+    assert "load => res_srtp" not in rendered
 
 
 def test_non_asl_asterisk_is_left_untouched(tmp_path: Path) -> None:
