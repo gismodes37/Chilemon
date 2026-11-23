@@ -311,6 +311,19 @@ if (!defined('IAX_COMPANION_SECRET')) {
 }
 
 /**
+ * IAX2 host advertised to the Windows Companion. When set, it overrides the
+ * address inferred from the HTTP request, which can be wrong on multi-homed
+ * nodes. Empty value keeps the legacy SERVER_ADDR-based detection.
+ */
+if (!defined('IAX_COMPANION_HOST')) {
+    define(
+        'IAX_COMPANION_HOST',
+        getenv('CHILEMON_IAX_COMPANION_HOST')
+            ?: ($localConfig['companion_iax_host'] ?? '')
+    );
+}
+
+/**
  * Validación: en producción, IAX_PHONE_PASS y WEBRTC_SECRET
  * deben estar configurados en config/local.php.
  */

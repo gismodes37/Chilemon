@@ -54,6 +54,7 @@ The configuration search order is `--config`, then `~/.chilemon/config.toml`, th
 `install/install_chilemon.sh` does the authoritative setup:
 
 - Generates `iax_companion_secret` with `openssl rand -hex 24` and stores it in `config/local.php` (mode `640`).
+- Optionally reads `companion_iax_host` from `config/local.php` (or `CHILEMON_IAX_COMPANION_HOST`). The dashboard's `.bat` installer uses it as the IAX2 host instead of the HTTP request address. Set it to this Pi's LAN IP on multi-homed nodes or when a proxy is in front of the dashboard; without it the previous `SERVER_ADDR` detection applies.
 - Detects the LAN CIDR, falling back to `127.0.0.1/32` if it cannot.
 - Writes the `[companion-app]` peer from `install/asterisk/iax-companion.conf`, substituting the secret and the LAN ACL.
 - Restricts the peer with `deny=0.0.0.0/0.0.0.0` plus `permit=<LAN>` and scoped `calltokenoptional`.

@@ -8,7 +8,7 @@ declare(strict_types=1);
  *
  * Flujo:
  *   1. Valida sesión
- *   2. Obtiene la IP de la Pi y el secreto IAX2 generado en la instalación
+ *   2. Resuelve el host IAX2 (companion_iax_host o SERVER_ADDR) y el secreto IAX2
  *   3. Genera config.toml con esos valores
  *   4. Rellena la plantilla versionada del instalador .bat y la entrega
  *
@@ -20,6 +20,7 @@ require_once __DIR__ . '/../../config/app.php';
 require_once ROOT_PATH . '/app/autoload.php';
 
 use App\Auth\Auth;
+use App\Companion\CompanionHost;
 use App\Companion\InstallerPayload;
 
 // Validar sesión
@@ -31,11 +32,19 @@ if (!Auth::isLoggedIn()) {
     exit;
 }
 
-// Obtener IP de la Pi
-$pi_ip = $_SERVER['SERVER_ADDR'] ?? '127.0.0.1';
-if ($pi_ip === '127.0.0.1' || $pi_ip === '::1') {
-    // Fallback: obtener IP de la interfaz de red
-    $pi_ip = gethostbyname(gethostname());
+// Host IAX2 anunciado al Companion. La config explícita gana siempre:
+// SERVER_ADDR depende de la request HTTP y puede apuntar a otra máquina.
+$configuredHost = defined('IAX_COMPANION_HOST') ? (string) IAX_COMPANION_HOST : '';
+try {
+    $pi_ip = CompanionHost::resolve($configuredHost, (string)($_SERVER['SERVER_ADDR'] ?? ''));
+} catch (\InvalidArgumentException $e) {
+    http_response_code(503);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode([
+        'success' => false,
+        'error'   => 'Invalid companion IAX host configuration.',
+    ]);
+    exit;
 }
 
 // Puerto IAX2
