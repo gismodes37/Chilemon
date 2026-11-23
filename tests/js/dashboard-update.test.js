@@ -26,6 +26,8 @@ function loadDashboard(overrides = {}) {
     setAttribute() {},
   };
   const icon = { className: '' };
+  const resultEl = { className: '', innerHTML: '' };
+  const confirmBtn = { disabled: false, innerHTML: '' };
 
   const document = {
     addEventListener() {},
@@ -36,7 +38,8 @@ function loadDashboard(overrides = {}) {
       if (id === 'update-badge-icon') return icon;
       if (id === 'updateModal') return {};
       if (id === 'update-modal-body') return { innerHTML: '' };
-      if (id === 'update-result') return { className: '', innerHTML: '' };
+      if (id === 'update-result') return resultEl;
+      if (id === 'btn-confirm-update') return confirmBtn;
       return null;
     },
   };
@@ -77,7 +80,7 @@ function loadDashboard(overrides = {}) {
   context.afterNodeActionLive = () => {};
   context.postForm = async () => {};
 
-  return { context, calls, classes };
+  return { context, calls, classes, resultEl, confirmBtn };
 }
 
 const flush = () => new Promise((resolve) => setImmediate(resolve));
@@ -121,11 +124,31 @@ async function testPollingCallbacksPassFalse() {
     'a polling timer opened the modal');
 }
 
+async function testApplyClearsStaleRedError() {
+  const { context, resultEl } = loadDashboard();
+  let resolvePost;
+  context.postForm = () => new Promise((resolve) => { resolvePost = resolve; });
+
+  resultEl.className = 'alert alert-danger mt-3';
+  resultEl.innerHTML = '<strong>Error:</strong> Git pull failed. (exit code 1)';
+
+  context.applyUpdate();
+
+  assert.equal(resultEl.className, 'd-none',
+    'a previous red error stayed visible while applying');
+  assert.equal(resultEl.innerHTML, '',
+    'a previous red error stayed in the result area');
+
+  resolvePost({ success: true, message: 'Update applied successfully.' });
+  await flush();
+}
+
 (async () => {
   await testPollingDoesNotOpenModal();
   await testClickOpensModal();
   await testPollingCallbacksPassFalse();
-  console.log('update modal behavior: 3 passed');
+  await testApplyClearsStaleRedError();
+  console.log('update modal behavior: 4 passed');
 })().catch((err) => {
   console.error(err.message);
   process.exitCode = 1;

@@ -1526,6 +1526,13 @@ function applyUpdate() {
 
   if (!confirmBtn || !modalBody) return;
 
+  // Descartar el error rojo de un intento anterior: el resultado que se
+  // muestra debe corresponder siempre a la aplicación actual.
+  if (resultDiv) {
+    resultDiv.className = "d-none";
+    resultDiv.innerHTML = "";
+  }
+
   // Disable + loading spinner
   confirmBtn.disabled = true;
   confirmBtn.innerHTML =
