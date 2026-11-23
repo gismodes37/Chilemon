@@ -72,25 +72,26 @@ try {
     $svc = new AslRptService();
     $svc->disconnect($node);
 
-    // Registrar evento en SQLite para actividad reciente
+    // Registrar evento en SQLite para actividad reciente.
+    // Schema real (install/sql): node_number / details — NOT node_id / username.
     try {
         $db = \App\Core\Database::getConnection();
         $db->exec("
             CREATE TABLE IF NOT EXISTS node_events (
-                id         INTEGER PRIMARY KEY AUTOINCREMENT,
-                node_id    TEXT NOT NULL,
-                event_type TEXT NOT NULL,
-                username   TEXT DEFAULT NULL,
-                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                node_number TEXT NOT NULL,
+                event_type  TEXT NOT NULL,
+                details     TEXT,
+                created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
             )
         ");
         $stmt = $db->prepare(
-            "INSERT INTO node_events (node_id, event_type, username, created_at)
-             VALUES (:node, 'disconnect', :user, datetime('now'))"
+            "INSERT INTO node_events (node_number, event_type, details, created_at)
+             VALUES (:node, 'disconnect', :details, datetime('now'))"
         );
         $stmt->execute([
             ':node' => $node,
-            ':user' => Auth::getUsername() ?: 'system',
+            ':details' => 'user=' . (Auth::getUsername() ?: 'system'),
         ]);
     } catch (Throwable $dbEx) {
         error_log('[disconnect.php] SQLite error: ' . $dbEx->getMessage());

@@ -98,6 +98,9 @@ async function testFavoritesConnect() {
   const ctx = loadDashboard(calls);
   let onClick;
   const button = {
+    dataset: {},
+    innerHTML: 'original',
+    disabled: false,
     getAttribute(name) { return name === 'data-fav-connect' ? NODE : null; },
     addEventListener(event, fn) { if (event === 'click') onClick = fn; },
   };

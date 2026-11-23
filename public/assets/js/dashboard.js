@@ -1052,12 +1052,15 @@ function _favUpdatePagination(showStart, showEnd) {
  * @param {HTMLElement} tbody
  */
 function _favBindRowEvents(tbody) {
-  // Conectar
+  // Conectar — the click itself is the confirmation, matching the header and
+  // node-table connect buttons. A native confirm() inside the Bootstrap modal
+  // was silently dismissed in Firefox and no api/connect.php POST was sent.
   tbody.querySelectorAll("[data-fav-connect]").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const node = btn.getAttribute("data-fav-connect") || "";
-      if (!confirm(`¿Conectar al nodo ${node}?`)) return;
+      console.log("[FAV-CONNECT] connecting to node", node);
       try {
+        setButtonLoading(btn, true, "Conectando...");
         await linkAndCallNode(node);
         const modalEl = document.getElementById("favoritesModal");
         if (modalEl && window.bootstrap) {
@@ -1068,6 +1071,8 @@ function _favBindRowEvents(tbody) {
         if (err.message !== "Unauthorized") {
           alert(`Error al conectar: ${err.message}`);
         }
+      } finally {
+        setButtonLoading(btn, false);
       }
     });
   });
