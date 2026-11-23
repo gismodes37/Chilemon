@@ -3,9 +3,10 @@
 
 install-companion.bat calls this module so config discovery, validation and
 placement are testable outside a batch file. The dashboard's **Companion App**
-button downloads a config.toml that already contains the Pi IP and the random
-IAX2 companion secret; this module finds that download, validates it and copies
-it to the default path the companion reads (``~/.chilemon/config.toml``).
+button downloads a .bat installer that embeds the generated config (Pi IP and
+random IAX2 companion secret) as base64; the installer decodes it to a staging
+file and calls this module, which validates it and copies it to the default
+path the companion reads (``~/.chilemon/config.toml``).
 
 An explicit ``--host``/``--secret`` pair is supported as a manual fallback for
 operators who know the secret, but the dashboard download is the recommended

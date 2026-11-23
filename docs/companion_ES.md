@@ -7,8 +7,8 @@ El Companion es una pequeña aplicación Python que se ejecuta en la PC del oper
 ## Ruta rápida (una sola acción en Windows)
 
 1. En la Pi, ejecutar `install/install_chilemon.sh`. El script genera un secreto IAX2 aleatorio y lo escribe en `config/local.php`.
-2. En el panel, presionar **Companion App**. El `chilemon-companion-config.toml` descargado ya contiene la IP de la Pi y ese secreto.
-3. En la PC con Windows, hacer doble clic en `companion/install-companion.bat`. Instala el config en `%USERPROFILE%\.chilemon\config.toml`, registra el inicio automático y arranca el companion. Requiere Python 3.11+; cada paso tiene su propio log y devuelve un código de salida real.
+2. En el panel, presionar **Companion App**. El `chilemon-companion-install.bat` descargado ya contiene la IP de la Pi y ese secreto (en base64).
+3. En la PC con Windows, hacer doble clic en ese archivo desde Descargas. Descarga el código del companion desde GitHub, instala `numpy`/`sounddevice`/`aiohttp`, valida la config con `companion.install_config`, registra el inicio automático y arranca el companion. Requiere Python 3.11+ e internet; el ref del código es `main` salvo que `CHILEMON_COMPANION_REF` fije otra rama o tag.
 4. En el panel, confirmar **Companion Connected** y luego presionar **Reconectar** para abrir el canal IAX2. El PTT sigue siendo explícito: conectá un nodo antes de transmitir.
 
 ## Qué es el Companion
@@ -120,16 +120,15 @@ No se distribuye ningún secreto: `companion/config.toml` tiene `password = ""` 
 
 ## ¿Puede el botón "Companion App" instalarlo para futuros usuarios?
 
-**No, no como instalador.** El botón (`dashboard.php:169-173`) llama a `downloadCompanion()` (`:1085-1107`), que descarga `api/companion-download.php` como `config.toml` y muestra una alerta con pasos manuales: obtener el exe desde GitHub, copiar la configuración, iniciar el companion y conectarse. El endpoint genera y devuelve **solamente** TOML. Su documentación y los encabezados iniciales todavía prometen un `.exe` incluido, pero esos encabezados se sobreescriben en `:90-92`.
+**Sí — como instalador de Windows de una sola acción.** El botón (`dashboard.php:169-173`) llama a `downloadCompanion()`, que descarga `api/companion-download.php` como `chilemon-companion-install.bat`. El endpoint lee la plantilla versionada `companion/installer-template.bat.tpl`, incrusta el TOML generado en base64 y el ref del repositorio configurado, y entrega bytes CRLF con nombre de archivo `.bat`.
 
-Lo que sí aporta hoy es útil: entrega la IP correcta de la Pi, el secreto IAX2 y la configuración de audio/WS sin exponerlos en un archivo del repositorio. Por eso funciona bien como paso de **aprovisionamiento de configuración** para usuarios nuevos.
+En la PC, el instalador descarga el zip del repositorio desde GitHub, extrae solamente `companion/` y `app/Services/WebRTCBridge/iax2.py` en `%USERPROFILE%\.chilemon\src\`, instala `numpy`/`sounddevice`/`aiohttp` con pip, escribe la config en un archivo temporal y delega la validación y el armado al módulo ya testeado `companion.install_config`. Después reutiliza el idempotente `install-autostart.bat` y el `start-companion.bat` que verifica el puerto; no crea tareas ni escribe la clave Run por su cuenta.
 
-Para una instalación real con un solo clic haría falta:
+Consideraciones pendientes:
 
-1. Un ejecutable firmado y alojado que incluya o consiga del servidor la configuración generada.
-2. Un agente local o un esquema de URI personalizado, porque un navegador no puede iniciar un proceso de Windows.
-3. Endurecimiento del endpoint del secreto: limitación de tasa, verificación de rol de administrador y control de origen.
-4. Eliminar la documentación y los encabezados obsoletos del `.exe` para que la interfaz no prometa lo que el endpoint no entrega.
+1. La PC necesita internet para la descarga de GitHub y el pip install. Fijá `CHILEMON_COMPANION_REF` para hacer reproducible la revisión del código.
+2. El instalador es un script batch simple, así que no hay binario firmado ni aviso de SmartScreen.
+3. El endpoint requiere sesión, pero la limitación de tasa, el rol de administrador y el control de origen siguen siendo trabajo de endurecimiento separado.
 
 ## Lista de verificación
 

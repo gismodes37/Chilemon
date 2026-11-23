@@ -4,28 +4,29 @@ declare(strict_types=1);
 /**
  * public/api/companion-download.php
  * -----------------------------------------------
- * Descarga el Companion App con configuración pre-instalada.
+ * Descarga el instalador del Companion con la configuración pre-generada.
  *
  * Flujo:
  *   1. Valida sesión
- *   2. Obtiene la IP de la Pi
- *   3. Genera config.toml con la IP correcta
- *   4. Retorna el .exe con el config incluido
- * -----------------------------------------------
+ *   2. Obtiene la IP de la Pi y el secreto IAX2 generado en la instalación
+ *   3. Genera config.toml con esos valores
+ *   4. Rellena la plantilla versionada del instalador .bat y la entrega
+ *
+ * El .bat baja el código del companion desde GitHub, instala sus dependencias
+ * Python y reutiliza los scripts de config/autostart/start del repositorio.
  */
 
 require_once __DIR__ . '/../../config/app.php';
 require_once ROOT_PATH . '/app/autoload.php';
 
 use App\Auth\Auth;
-
-header('Content-Type: application/octet-stream');
-header('Content-Disposition: attachment; filename="chilemon-companion.exe"');
+use App\Companion\InstallerPayload;
 
 // Validar sesión
 Auth::startSession();
 if (!Auth::isLoggedIn()) {
     http_response_code(401);
+    header('Content-Type: application/json; charset=utf-8');
     echo json_encode(['success' => false, 'error' => 'Unauthorized']);
     exit;
 }
@@ -51,6 +52,12 @@ if ($secret === '') {
     ]);
     exit;
 }
+
+// Ref del repositorio del cual el instalador descarga el código fuente.
+// `main` es el punto de descarga/instalación; puede fijarse a un tag o commit.
+$repo_ref = defined('CHILEMON_COMPANION_REF')
+    ? (string) constant('CHILEMON_COMPANION_REF')
+    : 'main';
 
 // Generar config.toml
 $config = <<<TOML
@@ -89,13 +96,13 @@ file = ""
 
 TOML;
 
-// El config se entrega directamente en la respuesta: escribirlo en /tmp con
-// un nombre predecible dejaría el secreto IAX2 legible por otros usuarios.
+// El config se entrega dentro del .bat: escribirlo en /tmp con un nombre
+// predecible dejaría el secreto IAX2 legible por otros usuarios.
+$template = ROOT_PATH . '/companion/installer-template.bat.tpl';
+$payload = (new InstallerPayload($template))->build($config, $repo_ref);
 
-// Por ahora, solo retornar el config (el .exe se descarga de GitHub)
-// En el futuro, se puede empaquetar el .exe con el config
-header('Content-Type: application/toml');
-header('Content-Disposition: attachment; filename="config.toml"');
-header('Content-Length: ' . strlen($config));
-echo $config;
+header('Content-Type: application/octet-stream');
+header('Content-Disposition: attachment; filename="chilemon-companion-install.bat"');
+header('Content-Length: ' . strlen($payload));
+echo $payload;
 exit;

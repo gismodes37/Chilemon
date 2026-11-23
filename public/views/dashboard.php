@@ -167,7 +167,7 @@ $systemInfo = $systemInfo ?? [
                     </button>
                     <button class="btn btn-outline-secondary" id="btn-companion-download"
                         onclick="downloadCompanion()"
-                        title="Descargar Companion App (audio nativo)">
+                        title="Descargar instalador del Companion (audio nativo)">
                         <i class="bi bi-download"></i> Companion App
                     </button>
                 </div>
@@ -1082,24 +1082,26 @@ $systemInfo = $systemInfo ?? [
 
 <script>
 function downloadCompanion() {
-    // Descargar config.toml pre-configurado con la IP de la Pi
+    // Descargar el instalador .bat con la config pre-generada (IP del Pi y secreto IAX2)
     const link = document.createElement('a');
     link.href = 'api/companion-download.php';
-    link.download = 'chilemon-companion-config.toml';
+    link.download = 'chilemon-companion-install.bat';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     
     // Mostrar instrucciones de la instalación en un solo paso
     alert(
-        '📥 Config descargado!\n\n' +
-        'Ahora hacé doble clic en companion\\install-companion.bat:\n' +
-        '  • encuentra el config en Descargas\n' +
-        '  • lo instala en %USERPROFILE%\\.chilemon\\config.toml\n' +
+        '📥 Instalador descargado: chilemon-companion-install.bat\n\n' +
+        'Hacé doble clic en ese archivo desde Descargas. El instalador:\n' +
+        '  • baja el código del companion desde GitHub\n' +
+        '  • instala numpy y sounddevice con pip\n' +
+        '  • guarda la config con la IP del Pi y el secreto IAX2\n' +
         '  • registra el inicio automático y arranca el Companion\n\n' +
         'Después en el dashboard apretá Connect y conectá un nodo para PTT.\n' +
-        'Requiere Python 3.11+ en la PC.\n\n' +
-        'Para detenerlo: stop-companion.bat.'
+        'Requiere Python 3.11+ e internet en la PC.\n\n' +
+        'Para detenerlo o desinstalarlo, usá los .bat en:\n' +
+        '%USERPROFILE%\\.chilemon\\src\\companion\\'
     );
 }
 

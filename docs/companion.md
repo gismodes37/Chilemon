@@ -7,8 +7,8 @@ The Companion is a small Python audio app that runs on the operator's PC. It giv
 ## Quick path (one action on Windows)
 
 1. On the Pi, run `install/install_chilemon.sh`. It generates a random IAX2 secret and writes it to `config/local.php`.
-2. In the dashboard, click **Companion App**. The downloaded `chilemon-companion-config.toml` already contains the Pi IP and that secret.
-3. On the Windows PC, double-click `companion/install-companion.bat`. It places the download at `%USERPROFILE%\.chilemon\config.toml`, registers logon autostart and starts the companion. Python 3.11+ must be installed; each step has its own log and returns a real exit code.
+2. In the dashboard, click **Companion App**. The downloaded `chilemon-companion-install.bat` already contains the Pi IP and that secret (base64-encoded).
+3. On the Windows PC, double-click that file from Downloads. It downloads the companion source from GitHub, installs `numpy`/`sounddevice`/`aiohttp`, validates the config via `companion.install_config`, registers logon autostart and starts the companion. Python 3.11+ and internet access are required; the source ref is `main` unless `CHILEMON_COMPANION_REF` pins another branch or tag.
 4. In the dashboard, confirm **Companion Connected**, then press **Reconectar** to open the IAX2 channel. PTT stays explicit: connect a node before keying.
 
 ## What the Companion is
@@ -120,16 +120,15 @@ No shipped secret exists: `companion/config.toml` has `password = ""` and `confi
 
 ## Can the "Companion App" button install it for future users?
 
-**No — not as an installer.** The button (`dashboard.php:169-173`) calls `downloadCompanion()` (`:1085-1107`), which downloads `api/companion-download.php` as `config.toml` and then shows an alert with manual steps: get the exe from GitHub, copy the config, start the companion, connect. The endpoint generates and returns **only** TOML. Its docblock and initial headers still promise a bundled `.exe`, but those headers are overwritten at `:90-92`.
+**Yes — as a one-action Windows installer.** The button (`dashboard.php:169-173`) calls `downloadCompanion()`, which downloads `api/companion-download.php` as `chilemon-companion-install.bat`. The endpoint reads the versioned `companion/installer-template.bat.tpl`, embeds the generated TOML as base64 and the configured repo ref, and serves CRLF batch bytes with an `.bat` attachment name.
 
-What it does provide today is useful: it ships the correct Pi IP, IAX2 secret and audio/WS settings without exposing them in a repository file. That makes it a good **configuration provisioning** step for new users.
+On the PC the installer downloads the repository zip from GitHub, extracts only `companion/` and `app/Services/WebRTCBridge/iax2.py` into `%USERPROFILE%\.chilemon\src\`, installs `numpy`/`sounddevice`/`aiohttp` with pip, writes the config to a staging file and delegates validation and placement to the tested `companion.install_config` module. It then reuses the idempotent `install-autostart.bat` and the readiness-checked `start-companion.bat`; it does not create tasks or write the Run key itself.
 
-For a real one-click install you would still need:
+Remaining considerations:
 
-1. A signed, hosted executable that bundles or fetches the generated config server-side.
-2. A local agent or custom URI scheme, because a browser cannot launch a Windows process.
-3. Hardening of the secret endpoint: rate limiting, an admin-role check and an origin check.
-4. Removal of the stale `.exe` docblock/headers so the UI does not promise what the endpoint does not deliver.
+1. The PC needs internet access for the GitHub download and the pip install. Pin `CHILEMON_COMPANION_REF` to make the source revision reproducible.
+2. The installer is a plain batch script, so there is no signed binary or SmartScreen prompt.
+3. The endpoint requires a session, but rate limiting, an admin-role check and an origin check remain separate hardening work.
 
 ## Troubleshooting checklist
 
