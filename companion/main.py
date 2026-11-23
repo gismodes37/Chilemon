@@ -20,6 +20,7 @@ import logging
 import os
 import signal
 import sys
+import time
 import tomllib
 from typing import Any, Optional
 
@@ -39,6 +40,10 @@ logger = logging.getLogger("companion")
 # Default config path
 DEFAULT_CONFIG = os.path.expanduser("~/.chilemon/config.toml")
 FALLBACK_CONFIG = os.path.join(os.path.dirname(__file__), "config.toml")
+
+# Audio callbacks fire every 20 ms; the browser only needs 20 updates/s.
+# Throttling per direction keeps TX and RX visualizers independent.
+AUDIO_LEVEL_INTERVAL_S = 0.05
 
 
 def load_config(path: str) -> dict[str, Any]:
@@ -105,6 +110,9 @@ class CompanionApp:
             port=ws_cfg.get("bind_port", 9093),
         )
 
+        # Last audio_level broadcast per direction, on the monotonic clock.
+        self._last_level_broadcast: dict[str, float] = {}
+
         # Wire callbacks
         self._wire_callbacks()
 
@@ -119,7 +127,8 @@ class CompanionApp:
         # Audio -> Session: TX audio forwarding
         self.audio.on_tx_audio = self._on_audio_tx
 
-        # Audio -> WS: level metadata
+        # Audio -> WS: level metadata (TX mic and RX playback share this hook;
+        # the audio engine tags each event with its direction).
         self.audio.on_levels = self._on_audio_levels
 
         # PTT state is read by the audio callback to wake a resting mic.
@@ -151,15 +160,28 @@ class CompanionApp:
         """Forward mic audio to IAX2 session for transmission."""
         self.session.send_audio(ulaw_payload)
 
-    def _on_audio_levels(self, rms: float, spectrum: list[float]) -> None:
+    def _on_audio_levels(
+        self, rms: float, spectrum: list[float], direction: str = "tx"
+    ) -> None:
         """Forward audio level metadata to browser visualizer.
 
-        Called from audio thread (non-async), so use run_coroutine_threadsafe.
+        Called from the PortAudio callback thread, so the throttle uses the
+        monotonic clock and the broadcast is scheduled with
+        run_coroutine_threadsafe — never awaited on the audio thread.
         """
+        last_sent = getattr(self, "_last_level_broadcast", None)
+        if last_sent is None:
+            last_sent = self._last_level_broadcast = {}
+
+        now = time.monotonic()
+        if now - last_sent.get(direction, 0.0) < AUDIO_LEVEL_INTERVAL_S:
+            return
+        last_sent[direction] = now
+
         loop = getattr(self, '_loop', None)
         if loop is not None and loop.is_running():
             asyncio.run_coroutine_threadsafe(
-                self.ws_server.broadcast_audio_level(rms, spectrum),
+                self.ws_server.broadcast_audio_level(rms, spectrum, direction),
                 loop,
             )
 

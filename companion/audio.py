@@ -11,6 +11,7 @@ manually using the standard G.711 μ-law companding algorithm.
 
 from __future__ import annotations
 
+import inspect
 import logging
 import math
 import struct
@@ -57,6 +58,13 @@ TX_WAKE_RMS = 0.01
 TX_SLEEP_RMS = 0.005
 TX_WAKE_FRAMES = 3
 TX_PREROLL_FRAMES = 10
+
+# Visualizer spectrum (S7). Bands are log-spaced across the audible range and
+# mapped from a fixed dB full-scale window, so weak input stays visible (S2)
+# without touching the raw RMS that still gates TX (S6).
+SPECTRUM_BANDS = 16
+SPECTRUM_DB_MIN = -70.0
+SPECTRUM_DB_MAX = -20.0
 
 # ---------------------------------------------------------------------------
 # G.711 μ-law encode/decode (replaces deprecated audioop)
@@ -198,7 +206,9 @@ class AudioEngine:
 
         # Callbacks
         self.on_tx_audio: Optional[Callable[[bytes], None]] = None
-        self.on_levels: Optional[Callable[[float, list[float]], None]] = None
+        # Receives (rms, spectrum) or (rms, spectrum, direction). The extra
+        # argument is optional so pre-existing two-argument hooks keep working.
+        self.on_levels: Optional[Callable[..., None]] = None
         self.on_tx_state: Optional[Callable[[str], None]] = None
 
     # -- Lifecycle --
@@ -541,6 +551,11 @@ class AudioEngine:
         ulaw_payload: Optional[bytes] = self._jitter_buffer.pop()
 
         if ulaw_payload is not None and len(ulaw_payload) == frames:
+            # Feed the visualizer from the received payload before playback.
+            # RX levels travel through the same on_levels hook as TX, tagged
+            # with a direction; input-silence tracking stays TX-only.
+            self._emit_levels(ulaw_payload, direction="rx")
+
             # Convert ulaw -> PCM int16 (mono)
             pcm_bytes = ulaw2lin(ulaw_payload)
             mono_data = np.frombuffer(pcm_bytes, dtype=np.int16).reshape(-1, 1)
@@ -557,66 +572,143 @@ class AudioEngine:
 
     # -- Level computation --
 
-    def _emit_levels(self, ulaw_payload: bytes) -> float:
-        """Compute RMS/spectrum, track input silence and fire callback."""
+    def _emit_levels(self, ulaw_payload: bytes, direction: str = "tx") -> float:
+        """Compute RMS/spectrum, track input silence on TX and fire callback.
+
+        Both directions share this path so the existing on_levels hook remains
+        the single level source for main.py; only the direction tag differs.
+        """
         rms, spectrum = self._compute_levels(ulaw_payload)
 
         # A stalled callback is already covered by AUDIO_CALLBACK_STALL_S, but
         # a sleeping device can keep firing with all-zero frames. Track that
         # separately so check_health() can re-resolve the available devices.
-        if rms >= SILENT_INPUT_RMS:
-            self._input_silent_since = 0.0
-        elif self._input_silent_since == 0.0:
-            self._input_silent_since = time.monotonic()
+        # RX playback delivers received audio, so it must never affect the
+        # microphone's silence timer.
+        if direction == "tx":
+            if rms >= SILENT_INPUT_RMS:
+                self._input_silent_since = 0.0
+            elif self._input_silent_since == 0.0:
+                self._input_silent_since = time.monotonic()
 
         if self.on_levels is None:
             return rms
 
         try:
-            self.on_levels(rms, spectrum)
+            self._call_on_levels(self.on_levels, rms, spectrum, direction)
         except Exception:
             pass  # Don't crash audio thread on callback errors
         return rms
 
     @staticmethod
-    def _compute_levels(ulaw_payload: bytes) -> tuple[float, list[float]]:
-        """Compute RMS and 4-bin spectrum from ulaw audio data.
+    def _call_on_levels(
+        callback: Callable[..., None],
+        rms: float,
+        spectrum: list[float],
+        direction: str,
+    ) -> None:
+        """Invoke on_levels with every supported arity.
 
-        Returns (rms, [bin1, bin2, bin3, bin4]) where each bin is 0..1.
+        Older hooks take ``(rms, spectrum)`` (or just ``(rms)``); newer hooks
+        also accept ``direction``. Inspection avoids misreading an exception
+        raised inside the callback as a signature mismatch and calling it
+        twice. Introspection failures fall back to the legacy two-argument
+        call.
         """
+        try:
+            params = inspect.signature(callback).parameters.values()
+            positional = [
+                p for p in params
+                if p.kind in (
+                    inspect.Parameter.POSITIONAL_ONLY,
+                    inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                )
+            ]
+            accepts_varargs = any(
+                p.kind is inspect.Parameter.VAR_POSITIONAL for p in params
+            )
+        except (TypeError, ValueError):
+            positional = []
+            accepts_varargs = False
+
+        if accepts_varargs or len(positional) >= 3:
+            callback(rms, spectrum, direction)
+        elif len(positional) == 1:
+            callback(rms)
+        elif len(positional) == 0:
+            callback()
+        else:
+            callback(rms, spectrum)
+
+    @staticmethod
+    def _compute_levels(ulaw_payload: bytes) -> tuple[float, list[float]]:
+        """Compute raw linear RMS and a real 16-band spectrum from ulaw audio.
+
+        Returns ``(rms, spectrum)``. ``rms`` stays the raw linear 0..1 value
+        that drives TX wake/sleep (S6); ``spectrum`` holds 16 log-spaced
+        frequency bands in 0..1, mapped from a fixed -70..-20 dBFS window so a
+        weak tone remains visible without any adaptive scaling (S2, S7).
+        """
+        empty_spectrum = [0.0] * SPECTRUM_BANDS
         if not ulaw_payload:
-            return 0.0, [0.0, 0.0, 0.0, 0.0]
+            return 0.0, empty_spectrum
 
         # Decode ulaw -> s16 PCM
         try:
             pcm = ulaw2lin(ulaw_payload)
         except Exception:
-            return 0.0, [0.0, 0.0, 0.0, 0.0]
+            return 0.0, empty_spectrum
 
-        # Compute RMS
         samples = struct.unpack(f"<{len(pcm) // 2}h", pcm)
         if not samples:
-            return 0.0, [0.0, 0.0, 0.0, 0.0]
+            return 0.0, empty_spectrum
 
+        # Raw linear RMS. This formula is deliberately byte-for-byte the one
+        # used before the FFT work: display scaling must not leak into TX gating.
         sum_sq = sum(s * s for s in samples)
         rms = math.sqrt(sum_sq / len(samples)) / 32768.0
         rms = min(rms, 1.0)
 
-        # Simple 4-bin spectrum via fixed decimation
-        bin_size = len(samples) // 4
-        spectrum: list[float] = []
-        for i in range(4):
-            if bin_size == 0:
-                spectrum.append(0.0)
-                continue
-            chunk = samples[i * bin_size : (i + 1) * bin_size]
-            if chunk:
-                energy = sum(abs(s) for s in chunk) / len(chunk)
-                spectrum.append(min(energy / 32768.0, 1.0))
-            else:
-                spectrum.append(0.0)
+        n = len(samples)
+        # Hann window limits leakage so a single tone lights its own band
+        # instead of smearing across all 16. The real FFT is already provided
+        # by numpy, which the companion requires.
+        values = np.frombuffer(pcm, dtype="<i2").astype(np.float64)
+        window = np.hanning(n)
+        magnitudes = np.abs(np.fft.rfft(values * window))
 
-        return rms, spectrum
+        # Normalize by the window's coherent gain so a full-scale sine reads
+        # ~32768 counts (0 dBFS). The dB window is fixed, not adaptive.
+        coherent_gain = float(window.sum()) / 2.0
+        if coherent_gain <= 0.0:
+            return rms, empty_spectrum
+        amplitude = magnitudes / coherent_gain
+        dbfs = 20.0 * np.log10(np.maximum(amplitude / 32768.0, 1e-12))
+
+        # Map each FFT bin to one log-spaced band. Skip DC (bin 0) so a DC
+        # offset cannot light the lowest band. A per-band max keeps a tone
+        # visible even when its band spans several bins.
+        resolution_hz = RATE / n
+        min_hz = max(resolution_hz, 1.0)
+        max_hz = max(min_hz * 2.0, RATE / 2.0)
+        edges = np.geomspace(min_hz, max_hz, num=SPECTRUM_BANDS + 1)
+        freqs = np.fft.rfftfreq(n, d=1.0 / RATE)
+        band_index = np.searchsorted(edges, freqs, side="right") - 1
+
+        bands = np.full(SPECTRUM_BANDS, -np.inf)
+        for bin_idx in range(1, len(freqs)):
+            band = int(band_index[bin_idx])
+            if 0 <= band < SPECTRUM_BANDS:
+                bands[band] = max(bands[band], float(dbfs[bin_idx]))
+
+        spectrum = np.clip(
+            (bands - SPECTRUM_DB_MIN) / (SPECTRUM_DB_MAX - SPECTRUM_DB_MIN),
+            0.0,
+            1.0,
+        )
+        # -inf (empty band) clips to 0; nan_to_num keeps the contract total.
+        spectrum = np.nan_to_num(spectrum, nan=0.0, neginf=0.0, posinf=1.0)
+        return rms, [float(value) for value in spectrum]
 
     # -- Helpers --
 

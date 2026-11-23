@@ -194,12 +194,19 @@ class WSServer:
         })
         await self._broadcast(msg)
 
-    async def broadcast_audio_level(self, rms: float, spectrum: list[float]) -> None:
-        """Send audio level metadata to all connected peers for visualizer."""
+    async def broadcast_audio_level(
+        self, rms: float, spectrum: list[float], direction: str = "tx"
+    ) -> None:
+        """Send audio level metadata to all connected peers for visualizer.
+
+        ``dir`` is additive (S7); existing fields keep their names and types,
+        and the default keeps two-argument callers working.
+        """
         msg = json.dumps({
             "type": MSG_AUDIO_LEVEL,
             "rms": rms,
             "spectrum": spectrum,
+            "dir": direction,
         })
         await self._broadcast(msg)
 
