@@ -63,8 +63,8 @@ TX_PREROLL_FRAMES = 10
 # mapped from a fixed dB full-scale window, so weak input stays visible (S2)
 # without touching the raw RMS that still gates TX (S6).
 SPECTRUM_BANDS = 16
-SPECTRUM_DB_MIN = -70.0
-SPECTRUM_DB_MAX = -20.0
+SPECTRUM_DB_MIN = -82.0
+SPECTRUM_DB_MAX = -24.0
 
 # ---------------------------------------------------------------------------
 # G.711 μ-law encode/decode (replaces deprecated audioop)
@@ -711,6 +711,9 @@ class AudioEngine:
         )
         # -inf (empty band) clips to 0; nan_to_num keeps the contract total.
         spectrum = np.nan_to_num(spectrum, nan=0.0, neginf=0.0, posinf=1.0)
+        # Perceptual lift: voice has low energy per band on short 20ms frames.
+        # Keep 0/1 endpoints, but make quiet speech visible.
+        spectrum = np.sqrt(spectrum)
         return rms, [float(value) for value in spectrum]
 
     # -- Helpers --

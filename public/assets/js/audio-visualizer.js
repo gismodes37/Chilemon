@@ -18,37 +18,34 @@
  */
 
 const BAND_COUNT = 16;
-const BAR_COUNT = 32;
+const BAR_COUNT = 48;
 
-// Display window: -70 dB (adaptive floor) up to -12 dB, with at least
-// 48 dB of dynamic range above the floor so loud audio never clips.
-const DEFAULT_FLOOR_DB = -70;
-const CEILING_DB = -12;
-const MIN_SPAN_DB = 48;
+// Display window: keep weak speech visible but avoid clipping loud bursts.
+const DEFAULT_FLOOR_DB = -78;
+const CEILING_DB = -10;
+const MIN_SPAN_DB = 42;
 
-// The floor follows slow ambient changes inside a 24 dB window but ignores
-// vocal bursts. Separate coefficients make it fall slower than it rises.
-const FLOOR_WINDOW_DB = 24;
-const FLOOR_RISE = 0.01;
-const FLOOR_FALL = 0.004;
+// The floor follows slow ambient changes but ignores vocal bursts.
+const FLOOR_WINDOW_DB = 20;
+const FLOOR_RISE = 0.018;
+const FLOOR_FALL = 0.003;
 
 // Time constants (ms) for the rAF-driven attack/decay envelope.
-const ATTACK_MS = 60;
-const DECAY_MS = 320;
-const PEAK_HOLD_MS = 500;
-const PEAK_DECAY_MS = 900;
+const ATTACK_MS = 45;
+const DECAY_MS = 360;
+const PEAK_HOLD_MS = 450;
+const PEAK_DECAY_MS = 850;
 const IDLE_MS = 250;
 
-// Needle profile: slim 2-4 CSS px lit width with a visible gap. When the
-// canvas is too narrow for 32 needles, reduce the rendered count instead.
-const MIN_LIT_CSS_PX = 2;
-const MAX_LIT_CSS_PX = 4;
-const LIT_RATIO = 0.4;
+// Needle profile: present bars, small gap. Reduce count only on narrow canvases.
+const MIN_LIT_CSS_PX = 3;
+const MAX_LIT_CSS_PX = 6;
+const LIT_RATIO = 0.62;
 const MIN_GAP_CSS_PX = 1;
 
 const PALETTES = {
-    rx: { primary: '#22d3ee', secondary: '#2dd4bf', rgb: '34,211,238' },
-    tx: { primary: '#f59e0b', secondary: '#fbbf24', rgb: '245,158,11' },
+    rx: { primary: '#22d3ee', secondary: '#67e8f9', hot: '#eaffff', rgb: '34,211,238' },
+    tx: { primary: '#f59e0b', secondary: '#fcd34d', hot: '#fff7d6', rgb: '245,158,11' },
 };
 
 class AudioVisualizer {
@@ -269,14 +266,16 @@ class AudioVisualizer {
 
         // Spectrum level is scaled by the dB-mapped RMS so quiet audio still
         // moves the bars, while loud audio keeps its full dynamic range.
-        const gain = 0.4 + 0.6 * this._level;
+        const gain = 0.55 + 0.75 * this._level;
         for (let b = 0; b < this.barCount; b++) {
             const pos = this._bandPositions[b];
             const lo = Math.floor(pos);
             const hi = Math.min(lo + 1, BAND_COUNT - 1);
             const frac = pos - lo;
             const value = this._bands[lo] * (1 - frac) + this._bands[hi] * frac;
-            this._targetBars[b] = this._clamp(value * gain);
+            // Perceptual lift keeps weak speech visible without clipping peaks.
+            const lifted = Math.pow(this._clamp(value), 0.72) * gain;
+            this._targetBars[b] = this._clamp(lifted);
         }
     }
 
@@ -445,9 +444,10 @@ class AudioVisualizer {
         ctx.fillRect(0, h - glowH, w, glowH);
 
         const barGradient = ctx.createLinearGradient(0, h, 0, 0);
-        barGradient.addColorStop(0, `rgba(${rgb},0.5)`);
-        barGradient.addColorStop(0.4, palette.primary);
-        barGradient.addColorStop(1, palette.secondary);
+        barGradient.addColorStop(0, `rgba(${rgb},0.55)`);
+        barGradient.addColorStop(0.45, palette.primary);
+        barGradient.addColorStop(0.82, palette.secondary);
+        barGradient.addColorStop(1, palette.hot || '#ffffff');
         ctx.fillStyle = barGradient;
 
         const usableH = h - 2;
@@ -463,7 +463,6 @@ class AudioVisualizer {
             ctx.fillRect(needleX(r), h - 1 - barH, litDevice, barH);
         }
 
-        ctx.fillStyle = `rgba(${rgb},0.8)`;
         for (let r = 0; r < count; r++) {
             const from = Math.floor((r * this.barCount) / count);
             const to = Math.max(from + 1, Math.ceil(((r + 1) * this.barCount) / count));
@@ -471,9 +470,13 @@ class AudioVisualizer {
             for (let i = from; i < to; i++) {
                 if (this._peaks[i] > peak) peak = this._peaks[i];
             }
-            const peakY = h - 1 - Math.min(peak, 1) * usableH;
+            const peakNorm = Math.min(peak, 1);
+            const peakY = h - 1 - peakNorm * usableH;
             if (peakY > 1 && peak > 0.01) {
-                ctx.fillRect(needleX(r), peakY - 1, litDevice, 1);
+                const alpha = 0.45 + 0.45 * peakNorm;
+                ctx.fillStyle = peakNorm > 0.75 ? (palette.hot || '#ffffff')
+                    : `rgba(${rgb},${alpha.toFixed(3)})`;
+                ctx.fillRect(needleX(r), peakY - 1, litDevice, 2);
             }
         }
     }

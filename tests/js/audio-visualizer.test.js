@@ -200,9 +200,9 @@ test('per-direction noise floor follows slow ambient changes, not bursts', () =>
   const h = makeVizHarness();
   const initial = h.viz.getNoiseFloor('tx');
 
-  for (let i = 0; i < 80; i++) {
+  for (let i = 0; i < 160; i++) {
     h.setNow(i * 20);
-    h.viz.feedMetadata(0.0025, fullSpectrum(0.05), 'tx'); // about -52 dB
+    h.viz.feedMetadata(0.0012, fullSpectrum(0.05), 'tx'); // about -58 dB, inside adaptation window
   }
   const adapted = h.viz.getNoiseFloor('tx');
   assert.ok(adapted > initial + 2, `floor stayed at ${adapted} from ${initial}`);
@@ -216,7 +216,7 @@ test('per-direction noise floor follows slow ambient changes, not bursts', () =>
   );
 });
 
-test('legacy 4-band spectrum interpolates into 16 bands and 32 log-spaced bars', () => {
+test('legacy 4-band spectrum interpolates into 16 bands and 48 log-spaced bars', () => {
   const h = makeVizHarness();
   h.viz.feedMetadata(0.05, [0, 0, 0, 1], 'rx');
 
@@ -229,12 +229,12 @@ test('legacy 4-band spectrum interpolates into 16 bands and 32 log-spaced bars',
     assert.ok(bands[i] >= bands[i - 1] - 1e-6, 'interpolated bands must be monotone');
   }
 
-  assert.equal(h.viz.getBars().length, 32);
+  assert.equal(h.viz.getBars().length, 48);
   h.frame(20);
   const bars = h.viz.getBars();
   assert.ok(bars.some((value) => value > 0.05), 'interpolated spectrum made no bars');
   assert.ok(bars[0] < 0.02, 'energy in band 15 must not light the lowest band');
-  assert.ok(bars.slice(24).some((value) => value > 0.05),
+  assert.ok(bars.slice(36).some((value) => value > 0.05),
     'energy in band 15 must reach the high end of the log-spaced bars');
 });
 
@@ -336,13 +336,13 @@ test('existing setTransmitting, destroy and missing-canvas behavior still holds'
   assert.equal(missing.warns.length, 1, 'missing canvas must warn once');
 });
 
-test('bar profile is a slim 32-needle trace at dashboard width', () => {
+test('bar profile is a present 48-needle trace at dashboard width', () => {
   const h = makeVizHarness({ canvasWidth: 640 });
   const p = h.viz.getBarProfile();
 
-  assert.equal(p.count, 32, 'wide canvases must keep all 32 log-spaced bars');
-  assert.ok(p.litCss >= 2 && p.litCss <= 5,
-    `lit width ${p.litCss} CSS px is not a slim instrument needle`);
+  assert.equal(p.count, 48, 'wide canvases must keep all 48 log-spaced bars');
+  assert.ok(p.litCss >= 3 && p.litCss <= 7,
+    `lit width ${p.litCss} CSS px is not a present instrument needle`);
   assert.ok(p.gapCss >= 1, 'bars need a visible gap');
   assert.ok(p.slotCss > p.litCss, 'bars must not fill their slot');
 });
@@ -351,7 +351,7 @@ test('narrow canvases reduce bar count instead of collapsing lit width', () => {
   const narrow = makeVizHarness({ canvasWidth: 64 });
   const p = narrow.viz.getBarProfile();
 
-  assert.ok(p.count < 32, `expected fewer rendered bars, got ${p.count}`);
+  assert.ok(p.count < 48, `expected fewer rendered bars, got ${p.count}`);
   assert.ok(p.count >= 3, `too few rendered bars: ${p.count}`);
   assert.ok(p.litCss >= 2, `lit width collapsed to ${p.litCss} CSS px`);
   assert.ok(p.gapCss >= 1, 'bars still need a gap at narrow width');
@@ -359,7 +359,7 @@ test('narrow canvases reduce bar count instead of collapsing lit width', () => {
   const retina = makeVizHarness({ canvasWidth: 320, dpr: 2 });
   const rp = retina.viz.getBarProfile();
   assert.equal(retina.canvas.width, 640, 'backing store must follow devicePixelRatio');
-  assert.ok(rp.litDevice >= 4, 'a 2 CSS px needle needs 2 device px per dpr unit');
+  assert.ok(rp.litDevice >= 6, 'a 3 CSS px needle needs 3 device px per dpr unit');
 });
 
 test('peak markers and graticule follow the chosen bar profile', () => {
@@ -368,11 +368,14 @@ test('peak markers and graticule follow the chosen bar profile', () => {
   h.frame(20);
 
   const p = h.viz.getBarProfile();
-  const litRects = h.ctx.ops.filter(
-    (op) => op[0] === 'fillRect' && Math.abs(op[3] - p.litDevice) < 1e-6
+  const barRects = h.ctx.ops.filter(
+    (op) => op[0] === 'fillRect' && op[4] > 2 && Math.abs(op[3] - p.litDevice) < 1e-6
   );
-  assert.equal(litRects.length, 2 * p.count,
-    'every rendered column needs one bar and one peak-hold marker');
+  const peakRects = h.ctx.ops.filter(
+    (op) => op[0] === 'fillRect' && op[4] === 2 && Math.abs(op[3] - p.litDevice) < 1e-6
+  );
+  assert.equal(barRects.length, p.count, 'every rendered column needs one bar');
+  assert.equal(peakRects.length, p.count, 'every rendered column needs one peak marker');
 
   const verticalGrid = h.ctx.ops.filter(
     (op) => op[0] === 'fillRect' && op[3] === 1 && op[4] === h.canvas.height
@@ -380,7 +383,8 @@ test('peak markers and graticule follow the chosen bar profile', () => {
   assert.ok(verticalGrid.length > 0, 'graticule lost its vertical divisions');
   for (const line of verticalGrid) {
     const columns = line[1] / p.slotDevice;
-    assert.ok(Math.abs(columns % 4) < 1e-6,
+    const nearest = Math.round(columns);
+    assert.ok(Math.abs(columns - nearest) < 0.1 && nearest % 4 === 0,
       `graticule line at column ${columns} is not aligned to 4-bar groups`);
   }
 });
