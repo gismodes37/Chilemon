@@ -1433,6 +1433,9 @@ function checkForUpdate(openModalOnResult) {
         badge.classList.remove("btn-outline-secondary");
         badge.classList.add("btn-outline-info");
         if (icon) icon.className = "bi bi-check-circle";
+        if (openModalOnResult) {
+          alert(json && json.error ? json.error : "No se pudo verificar actualizaciones.");
+        }
         return;
       }
 
@@ -1452,6 +1455,10 @@ function checkForUpdate(openModalOnResult) {
         badge.classList.add("btn-outline-info");
         if (icon) icon.className = "bi bi-check-circle";
         badge.setAttribute("title", "Versión actualizada. Hacé clic para verificar.");
+
+        if (openModalOnResult) {
+          alert("Ya tenés la versión más reciente.");
+        }
       }
     })
     .catch(function (e) {
@@ -1461,6 +1468,9 @@ function checkForUpdate(openModalOnResult) {
       badge.classList.remove("btn-outline-secondary", "btn-outline-warning", "btn-update-available");
       badge.classList.add("btn-outline-info");
       if (icon) icon.className = "bi bi-check-circle";
+      if (openModalOnResult) {
+        alert("No se pudo verificar actualizaciones: " + e.message);
+      }
     });
 }
 

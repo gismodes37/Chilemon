@@ -17,6 +17,7 @@ const DASHBOARD_JS = path.join(
 
 function loadDashboard(overrides = {}) {
   const calls = [];
+  const alerts = [];
   const classes = new Set();
   const badge = {
     classList: {
@@ -57,7 +58,7 @@ function loadDashboard(overrides = {}) {
     window,
     document,
     console: { log() {}, warn() {}, error() {}, debug() {} },
-    alert() {},
+    alert(message) { alerts.push(String(message)); },
     confirm() { return true; },
     setTimeout: overrides.setTimeout || (() => {}),
     setInterval: overrides.setInterval || (() => {}),
@@ -80,7 +81,7 @@ function loadDashboard(overrides = {}) {
   context.afterNodeActionLive = () => {};
   context.postForm = async () => {};
 
-  return { context, calls, classes, resultEl, confirmBtn };
+  return { context, calls, alerts, classes, resultEl, confirmBtn };
 }
 
 const flush = () => new Promise((resolve) => setImmediate(resolve));
@@ -104,6 +105,32 @@ async function testClickOpensModal() {
 
   assert.equal(calls.filter((c) => c[0] === 'modalShow').length, 1,
     'explicit badge click did not open the modal');
+}
+
+async function testClickWithNoUpdateShowsFeedback() {
+  const { context, calls, alerts } = loadDashboard();
+  context.getJson = async () => ({ ok: true, update_available: false });
+
+  await context.checkForUpdate(true);
+  await flush();
+
+  assert.equal(calls.filter((c) => c[0] === 'modalShow').length, 0,
+    'no update must not open the modal');
+  assert.equal(alerts.length, 1,
+    'explicit click with no update gave no feedback');
+  assert.match(alerts[0], /versi.n m.s reciente/,
+    'feedback must state the installation is current');
+}
+
+async function testPollingWithNoUpdateStaysSilent() {
+  const { context, alerts } = loadDashboard();
+  context.getJson = async () => ({ ok: true, update_available: false });
+
+  await context.checkForUpdate(false);
+  await flush();
+
+  assert.equal(alerts.length, 0,
+    'background polling must not show an alert');
 }
 
 async function testPollingCallbacksPassFalse() {
@@ -146,9 +173,11 @@ async function testApplyClearsStaleRedError() {
 (async () => {
   await testPollingDoesNotOpenModal();
   await testClickOpensModal();
+  await testClickWithNoUpdateShowsFeedback();
+  await testPollingWithNoUpdateStaysSilent();
   await testPollingCallbacksPassFalse();
   await testApplyClearsStaleRedError();
-  console.log('update modal behavior: 4 passed');
+  console.log('update modal behavior: 6 passed');
 })().catch((err) => {
   console.error(err.message);
   process.exitCode = 1;
