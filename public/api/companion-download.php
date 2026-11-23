@@ -8,7 +8,8 @@ declare(strict_types=1);
  *
  * Flujo:
  *   1. Valida sesión
- *   2. Descubre el host IAX2 desde la request (Host, luego SERVER_ADDR) y el secreto IAX2
+ *   2. Descubre el host IAX2 desde la request (IP literal del Host, IP LAN detectada
+ *      si el Host es un hostname, luego SERVER_ADDR) y el secreto IAX2
  *   3. Genera config.toml con esos valores
  *   4. Rellena la plantilla versionada del instalador .bat y la entrega
  *

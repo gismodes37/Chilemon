@@ -10,9 +10,10 @@ use InvalidArgumentException;
  *
  * The installer is a public download: the address must come from how the node
  * was reached for this request, never from a per-installation pinned value.
- * The browser-facing Host header is preferred because it is the address that
- * actually worked for the client; SERVER_ADDR is only a fallback because it
- * can reflect a different local interface on a multi-homed node.
+ * A literal IP in the browser-facing Host header wins. A hostname is not safe
+ * for IAX2 on a multi-homed node: DNS can point to a secondary interface while
+ * Asterisk answers from its primary one, so the client drops every reply. In
+ * that case the node's own detected LAN address is used instead.
  */
 final class CompanionHost
 {
@@ -20,28 +21,43 @@ final class CompanionHost
 
     /**
      * @param array<string, mixed> $server PHP's $_SERVER for the download request
+     * @param string|null $detectedIp Overrides LAN detection; used by tests
      */
-    public static function fromRequest(array $server): string
+    public static function fromRequest(array $server, ?string $detectedIp = null): string
     {
-        $detected = trim((string) gethostbyname((string) gethostname()));
+        $detected = trim((string) ($detectedIp ?? gethostbyname((string) gethostname())));
+        $hostHeader = self::normalize((string) ($server['HTTP_HOST'] ?? ''));
+        $serverAddress = self::normalize((string) ($server['SERVER_ADDR'] ?? ''));
+        $hostIsLoopback = $hostHeader !== null && in_array(strtolower($hostHeader), self::LOOPBACK, true);
+
+        // A hostname may resolve to a secondary interface on the same node;
+        // Asterisk replies from its primary one and IAX2 drops those packets.
+        // Prefer the detected LAN IP whenever the browser used a hostname.
+        if ($hostHeader !== null && !$hostIsLoopback && !self::isIpLiteral($hostHeader)) {
+            if ($detected !== '' && self::isValid($detected) && !in_array(strtolower($detected), self::LOOPBACK, true)) {
+                return $detected;
+            }
+        }
 
         return self::resolve([
-            (string) ($server['HTTP_HOST'] ?? ''),
-            (string) ($server['SERVER_ADDR'] ?? ''),
+            $hostIsLoopback ? '' : ($hostHeader ?? ''),
+            $serverAddress ?? '',
             $detected,
         ]);
     }
 
     /**
-     * Returns the first routable candidate, falling back to loopback only when
-     * nothing else is available. Invalid candidates are skipped, so a malformed
-     * header degrades to the next source instead of breaking the download.
+     * Returns the first routable IP literal, then the first hostname, falling
+     * back to loopback only when nothing else is available. Invalid candidates
+     * are skipped, so a malformed header degrades to the next source instead of
+     * breaking the download.
      *
      * @param list<string> $candidates
      */
     public static function resolve(array $candidates): string
     {
         $loopback = null;
+        $hostname = null;
 
         foreach ($candidates as $candidate) {
             $host = self::normalize((string) $candidate);
@@ -52,8 +68,16 @@ final class CompanionHost
                 $loopback ??= $host;
                 continue;
             }
+            if (!self::isIpLiteral($host)) {
+                $hostname ??= $host;
+                continue;
+            }
 
             return $host;
+        }
+
+        if ($hostname !== null) {
+            return $hostname;
         }
 
         if ($loopback !== null) {
@@ -72,6 +96,15 @@ final class CompanionHost
         // Hostnames, IPv4 and bracketed IPv6 only. Quotes, whitespace, slashes
         // and control characters would break the generated TOML.
         return preg_match('/^[A-Za-z0-9._:\-\[\]]+$/', $host) === 1;
+    }
+
+    private static function isIpLiteral(string $host): bool
+    {
+        if (str_starts_with($host, '[') && str_ends_with($host, ']')) {
+            return filter_var(substr($host, 1, -1), FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false;
+        }
+
+        return filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false;
     }
 
     private static function normalize(string $candidate): ?string

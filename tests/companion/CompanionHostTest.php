@@ -39,14 +39,35 @@ final class CompanionHostTest extends TestCase
     }
 
     #[Test]
-    public function hostnameFromBrowserIsAccepted(): void
+    public function hostnameFromBrowserUsesDetectedLanIp(): void
     {
         self::assertSame(
-            'node494780.local',
+            '192.168.0.110',
             CompanionHost::fromRequest([
                 'HTTP_HOST' => 'node494780.local:443',
                 'SERVER_ADDR' => '192.168.0.108',
-            ])
+            ], '192.168.0.110')
+        );
+    }
+
+    #[Test]
+    public function hostnameFallsBackToServerAddressWhenDetectionFails(): void
+    {
+        self::assertSame(
+            '192.168.0.110',
+            CompanionHost::fromRequest([
+                'HTTP_HOST' => 'node494780.local',
+                'SERVER_ADDR' => '192.168.0.110',
+            ], '')
+        );
+    }
+
+    #[Test]
+    public function hostnameIsKeptWhenNoIpIsAvailable(): void
+    {
+        self::assertSame(
+            'node494780.local',
+            CompanionHost::fromRequest(['HTTP_HOST' => 'node494780.local'], '')
         );
     }
 
