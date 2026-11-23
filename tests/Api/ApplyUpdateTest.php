@@ -83,7 +83,7 @@ final class ApplyUpdateTest extends TestCase
         $result = UpdateService::parsePullOutput($output);
 
         $this->assertFalse($result['success']);
-        $this->assertSame('Git pull failed.', $result['message']);
+        $this->assertStringContainsString('error: could not apply', $result['message']);
     }
 
     #[Test]

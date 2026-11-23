@@ -32,6 +32,16 @@ require_node_id() {
     fi
 }
 
+# Git 2.35+ refuses repositories whose owner differs from the running user.
+# The wrapper runs as root via sudo while /opt/chilemon may be owned by the
+# deploy user, so register it before any git verb. Idempotent by design.
+ensure_safe_directory() {
+    if ! git config --global --get-all safe.directory 2>/dev/null \
+        | grep -qxF '/opt/chilemon'; then
+        git config --global --add safe.directory /opt/chilemon 2>/dev/null || true
+    fi
+}
+
 case "$CMD" in
     nodes|stats)
         require_node_id 'local' "$LOCAL"
@@ -54,11 +64,13 @@ case "$CMD" in
 
     git-fetch)
         # Obtiene refs remotas desde GitHub (no mergea)
+        ensure_safe_directory
         cd /opt/chilemon && git fetch origin 2>&1
         ;;
 
     git-compare)
         # Compara HEAD local con origin/main
+        ensure_safe_directory
         cd /opt/chilemon \
             && echo "LOCAL:$(git rev-parse HEAD)" \
             && echo "REMOTE:$(git rev-parse origin/main)" \
@@ -66,13 +78,18 @@ case "$CMD" in
         ;;
 
     git-pull)
-        # Stash tracked, limpiar untracked que conflictean, pull y restore
-        cd /opt/chilemon \
-            && git stash push -m "chilemon-auto-stash-$(date +%s)" 2>/dev/null \
-            && git clean -fd 2>/dev/null \
-            && git pull origin main 2>&1 \
-            && git stash pop 2>/dev/null; \
-        echo "STASHED:$?"
+        # Stash tracked, limpiar untracked que conflictean, pull y restore.
+        # El exit code reportado debe ser el de git pull, no el de toda la
+        # cadena (stash pop podria fallar despues de un pull exitoso).
+        ensure_safe_directory
+        cd /opt/chilemon || exit 1
+        git stash push -m "chilemon-auto-stash-$(date +%s)" 2>/dev/null
+        git clean -fd 2>/dev/null
+        git pull origin main 2>&1
+        PULL_RC=$?
+        git stash pop 2>/dev/null
+        echo "STASHED:$PULL_RC"
+        exit "$PULL_RC"
         ;;
 
     sys-restart-webrtc)

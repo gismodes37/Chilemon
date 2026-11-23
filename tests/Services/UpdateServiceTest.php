@@ -178,7 +178,8 @@ final class UpdateServiceTest extends TestCase
         $result = UpdateService::parsePullOutput($output);
 
         $this->assertFalse($result['success']);
-        $this->assertSame('Git pull failed.', $result['message']);
+        $this->assertStringStartsWith('Git pull failed.', $result['message']);
+        $this->assertStringContainsString('CONFLICT', $result['message']);
         $this->assertFalse($result['stashed']);
         $this->assertSame('', $result['commit']);
     }
@@ -191,7 +192,31 @@ final class UpdateServiceTest extends TestCase
         $result = UpdateService::parsePullOutput($output);
 
         $this->assertFalse($result['success']);
-        $this->assertSame('Git pull failed.', $result['message']);
+        $this->assertStringContainsString('fatal: not a git repository', $result['message']);
+    }
+
+    #[Test]
+    public function parsePullOutputSurfacesDubiousOwnership(): void
+    {
+        $output = "fatal: detected dubious ownership in repository at '/opt/chilemon'\n"
+                . "To add an exception for this directory, call:\n"
+                . "\n"
+                . "    git config --global --add safe.directory /opt/chilemon\n"
+                . "STASHED:128";
+
+        $result = UpdateService::parsePullOutput($output);
+
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('dubious ownership', $result['message']);
+    }
+
+    #[Test]
+    public function parsePullOutputReportsExitCodeWithoutErrorText(): void
+    {
+        $result = UpdateService::parsePullOutput("STASHED:2");
+
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('exit code 2', $result['message']);
     }
 
     #[Test]

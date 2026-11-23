@@ -151,8 +151,10 @@ final class UpdateService
      *   [git pull output...]
      *   STASHED:<exit_code>
      *
-     * Donde STASHED captura el exit code de git pull origin main.
-     * 0 = pull exitoso, != 0 = pull falló.
+     * Donde STASHED captura unicamente el exit code de git pull origin main
+     * (no el de stash pop). 0 = pull exitoso, != 0 = pull falló. En caso de
+     * error se incluyen las lineas fatal/error/CONFLICT en el mensaje para
+     * que el modal muestre la causa real en lugar de un texto generico.
      *
      * @param string $output Salida cruda del wrapper
      * @return array{success: bool, action: string, message: string, stashed: bool, commit: string}
@@ -164,6 +166,7 @@ final class UpdateService
         $commit         = '';
         $alreadyUpToDate = false;
         $pullFailed     = false;
+        $errorLines     = [];
 
         foreach ($lines as $line) {
             $trimmed = trim($line);
@@ -184,6 +187,9 @@ final class UpdateService
                 || stripos($trimmed, 'CONFLICT') !== false
             ) {
                 $pullFailed = true;
+                if (count($errorLines) < 8 && $trimmed !== '') {
+                    $errorLines[] = $trimmed;
+                }
             }
         }
 
@@ -201,10 +207,18 @@ final class UpdateService
         }
 
         if ($pullFailed || !$pullExitOk) {
+            $message = 'Git pull failed.';
+
+            if ($errorLines !== []) {
+                $message .= ' ' . implode(' | ', $errorLines);
+            } elseif (!$pullExitOk && $stashedCode !== '') {
+                $message .= " (exit code {$stashedCode})";
+            }
+
             return [
                 'success' => false,
                 'action'  => 'apply-update',
-                'message' => 'Git pull failed.',
+                'message' => $message,
                 'stashed' => false,
                 'commit'  => '',
             ];
