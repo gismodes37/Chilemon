@@ -296,11 +296,13 @@ class AudioVisualizer {
 
         for (let i = 0; i < this.barCount; i++) {
             const target = idle ? 0 : this._targetBars[i];
+            if (idle) {
+                // Let silence decay from the rendered trace, not from a frozen
+                // spectrum target that makes decay frame-rate dependent.
+                this._targetBars[i] = this._bars[i];
+            }
             this._bars[i] += (target - this._bars[i])
                 * this._envelope(dt, target, this._bars[i], ATTACK_MS, DECAY_MS);
-            // Freeze the target once reached: without a fresh feed the trace
-            // holds instead of slowly climbing towards an old spectrum.
-            this._targetBars[i] = this._bars[i];
 
             if (this._bars[i] > this._peaks[i]) {
                 this._peaks[i] = this._bars[i];

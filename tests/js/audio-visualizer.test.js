@@ -282,8 +282,9 @@ test('silence decay is driven by elapsed time, not the number of frames', () => 
     const before = h.viz.getBars()[0];
     assert.ok(before > 0.05, 'setup did not raise a bar');
 
+    // After the last feed ages past IDLE_MS, bars must decay by elapsed time.
     for (let i = 1; i <= steps; i++) {
-      h.frame(10 + i * stepMs);
+      h.frame(500 + i * stepMs);
     }
     return { after: h.viz.getBars()[0], before };
   }
