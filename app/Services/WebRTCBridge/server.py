@@ -338,9 +338,10 @@ class WebRTCBridgeApp:
         await self._broadcast_status()
 
     async def _ptt_unkey(self) -> None:
-        """Unkey the transmitter via DTMF * (simplex toggle).
+        """Force the transmitter off via DTMF #.
 
-        In Simplex Dumb Phone (S) mode, * toggles PTT on/off.
+        '*' toggles in mode S, so a missed key/unkey can leave the node keyed.
+        '#' forces app_rpt TX off regardless of the toggle state.
         """
         if not self._ptt_active:
             return
