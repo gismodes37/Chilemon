@@ -96,9 +96,11 @@ Un periodo de gracia de 30 segundos evita un bucle de reinicios cuando el dispos
 
 ### Modo reposo del micrófono
 
-El stream de entrada permanece abierto, pero los frames IAX2 dejan de enviarse después de 120 segundos sin voz (`TX_REST_S`). Hablar durante tres frames consecutivos de 20 ms por encima de `0.01` de RMS, o apretar PTT, despierta el micrófono. Al despertar se envía primero un pre-roll de 200 ms para no perder la primera sílaba. Mientras está en reposo se suspende la verificación de silencio de 15 segundos —el silencio es intencional—, pero se mantienen la detección de cambio de dispositivo y de callback detenido.
+El PTT es una compuerta de transmisión estricta. Los frames del micrófono llegan a IAX2 sólo mientras el PTT está apretado; al soltarlo se descartan todos los frames y se envía DTMF `#` para apagar el transmisor con fuerza. Cerrar la pestaña del panel o perder el WebSocket también suelta el PTT de inmediato. Esto importa en un nodo AllStar semidúplex (`duplex=0`): su VOX keya el transmisor con cualquier audio del canal, así que enviar frames del mic con el PTT suelto volvería a keyar el nodo y alimentaría un lazo parlante→mic que el remoto escucha como un zumbido constante.
 
-El reposo **no** keya el transmisor: el PTT sigue siendo un toggle DTMF `*` explícito desde el panel. El estado se muestra como `Mic en reposo - listo para transmitir`; es un estado normal de disponibilidad, no un error. Todos los umbrales se configuran en `[tx]` de `config.toml`.
+El stream de entrada permanece abierto con el PTT suelto para que el visualizador siga funcionando, y el micrófono entra en reposo después de 120 segundos sin voz (`TX_REST_S`). Hablar durante tres frames consecutivos de 20 ms por encima de `0.01` de RMS actualiza el temporizador y el pre-roll de 200 ms, pero nunca transmite por sí solo: sólo lo hace un PTT explícito. Mientras está en reposo se suspende la verificación de silencio de 15 segundos —el silencio es intencional—, pero se mantienen la detección de cambio de dispositivo y de callback detenido.
+
+El estado se muestra como `Mic en reposo - listo para transmitir`; es un estado normal de disponibilidad, no un error. Todos los umbrales se configuran en `[tx]` de `config.toml`. Usá auriculares: reproducir el audio recibido por un parlante al lado del micrófono todavía puede generar realimentación acústica mientras el PTT está apretado.
 
 Para un usuario no técnico, `start-companion.bat` ahora inicia la aplicación minimizada y escribe los diagnósticos en `%USERPROFILE%\.chilemon\companion.log` en lugar de mostrar una terminal con texto desplazándose. Los fallos anteriores a la configuración del logging se capturan en `companion-startup.log`.
 

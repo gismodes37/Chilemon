@@ -96,9 +96,11 @@ A 30-second cooldown prevents a restart loop when the device stays broken. This 
 
 ### Mic rest mode
 
-The input stream stays open, but IAX2 frames stop after 120 seconds without voice (`TX_REST_S`). Speaking for three consecutive 20 ms frames above `0.01` RMS, or pressing PTT, wakes the mic. A 200 ms pre-roll is flushed on wake so the first syllable is not clipped. While resting, the 15-second silence health check is suspended — the silence is intentional — but device-change and callback-stall detection stay active.
+PTT is a hard transmit gate. Mic frames only reach IAX2 while PTT is held; releasing PTT drops every frame and sends DTMF `#` to force the transmitter off. Closing the dashboard tab or losing the WebSocket also releases PTT immediately. This matters on a half-duplex (`duplex=0`) AllStar node: its VOX keys the transmitter from any audio on the channel, so forwarding mic frames with PTT up would re-key the node and feed a speaker-to-mic loop to the remote end as a constant tone.
 
-Resting does **not** key the transmitter: PTT remains an explicit DTMF `*` toggle from the dashboard. The status line reads `Mic en reposo - listo para transmitir`; it is a normal ready state, not a failure. All thresholds are configurable in `[tx]` of `config.toml`.
+The input stream stays open while PTT is released so the visualizer keeps working, and the mic rests after 120 seconds without voice (`TX_REST_S`). Speaking for three consecutive 20 ms frames above `0.01` RMS refreshes the rest timer and the 200 ms pre-roll, but it never transmits by itself — only an explicit PTT press does. While resting, the 15-second silence health check is suspended — the silence is intentional — but device-change and callback-stall detection stay active.
+
+The status line reads `Mic en reposo - listo para transmitir`; it is a normal ready state, not a failure. All thresholds are configurable in `[tx]` of `config.toml`. Use headphones: playing received audio through a speaker next to the mic can still cause acoustic feedback while PTT is held.
 
 For a non-technical user, `start-companion.bat` now launches the app minimized and writes diagnostics to `%USERPROFILE%\.chilemon\companion.log` instead of showing a scrolling terminal. Failures before logging is configured are captured in `companion-startup.log`.
 

@@ -135,6 +135,14 @@ class WSServer:
         finally:
             self._peers.discard(ws)
             logger.info("WS client disconnected: %s (%d peers)", peer, len(self._peers))
+            # A tab close or network drop delivers no 'ptt unkey' message. If
+            # this was the last dashboard, release PTT immediately so the node
+            # does not stay keyed with a hot mic feeding the remote end.
+            if not self._peers and self.on_ptt_unkey:
+                try:
+                    await self.on_ptt_unkey()
+                except Exception as exc:
+                    logger.warning("Failed to unkey on WS disconnect: %s", exc)
 
         return ws
 

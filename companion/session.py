@@ -263,11 +263,16 @@ class CompanionSession:
         await self._emit_status()
 
     async def ptt_unkey(self) -> None:
-        """Unkey the transmitter via DTMF * (simplex toggle)."""
+        """Force the transmitter off via DTMF # (simplex hard unkey).
+
+        '*' toggles in mode S, so a missed key/unkey leaves the node keyed
+        and the remote end hears a constant carrier. '#' forces app_rpt TX
+        off regardless of the toggle state.
+        """
         if not self.ptt_active:
             return
         if self._session is not None:
-            self._session.send_dtmf("*")
+            self._session.send_dtmf("#")
         self.ptt_active = False
         await self._emit_status()
 
@@ -286,8 +291,19 @@ class CompanionSession:
     # -- Audio --
 
     def send_audio(self, ulaw_payload: bytes) -> bool:
-        """Send ulaw audio frames — called from audio.py."""
-        if self._session is not None and self._in_call:
+        """Send ulaw audio frames — called from audio.py.
+
+        PTT is a real transmit gate, not just dashboard state. On a duplex=0
+        node AllStar keys the transmitter from any audio on the channel, so
+        forwarding mic frames with PTT up re-keys the node and feeds a speaker
+        -> mic feedback loop to the remote end. Drop every frame unless the
+        operator is actively keyed.
+        """
+        if (
+            self._session is not None
+            and self._in_call
+            and self.ptt_active
+        ):
             return self._session.send_voice(ulaw_payload)
         return False
 

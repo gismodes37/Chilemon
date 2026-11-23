@@ -345,9 +345,9 @@ class WebRTCBridgeApp:
         if not self._ptt_active:
             return
 
-        logger.debug("PTT unkey: sending * (simplex toggle OFF)")
+        logger.debug("PTT unkey: sending # (force transmitter off)")
         if self._active_call:
-            self._active_call.send_dtmf("*")
+            self._active_call.send_dtmf("#")
         self._ptt_active = False
 
         await self._broadcast_status()
@@ -581,6 +581,11 @@ class WebRTCBridgeApp:
             # Actual hangup happens only after _ws_grace_period seconds.
             if not self._ws_peers:
                 self._cancel_reoriginate()
+                # A tab close / network drop delivers no 'ptt unkey' message.
+                # Releasing TX first also lets the grace-period branch below
+                # run instead of leaving the call keyed forever.
+                if self._ptt_active:
+                    await self._ptt_unkey()
                 if self._active_call and not self._ptt_active:
                     logger.info(
                         "Last WS peer gone — starting %.0fs grace period for callno=%d",
@@ -626,9 +631,15 @@ class WebRTCBridgeApp:
         elif msg_type == "audio_tx":
             # Transmit audio: hex-encoded float32 PCM 16 kHz from browser
             rate = payload.get("rate", 16000)
-            logger.info("audio_tx received: rate=%s, dataLen=%s, active_call=%s",
+            logger.info("audio_tx received: rate=%s, dataLen=%s, active_call=%s, ptt=%s",
                         rate, len(payload.get("data", "")),
-                        self._active_call is not None)
+                        self._active_call is not None, self._ptt_active)
+            # PTT is a transmit gate, not just dashboard state. On a duplex=0
+            # node any audio on the channel keys the transmitter, so browser
+            # mic frames must be dropped unless the operator is actively keyed.
+            if not self._ptt_active:
+                logger.debug("audio_tx dropped: PTT not active")
+                return
             if not self._active_call:
                 logger.debug("audio_tx dropped: no active IAX2 call")
                 return
