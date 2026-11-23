@@ -52,6 +52,25 @@ final class AuthTest extends TestCase
         $this->assertFalse(Auth::validateCsrf('this-is-not-the-correct-token'));
     }
 
+    /**
+     * The dashboard reads the CSRF token once from a static <meta> tag and
+     * reuses it for every AJAX call. Rotating on each validation made the
+     * second call fail with HTTP 400 (e.g. save favorite -> connect). The
+     * token is per-session and is already rotated at login and logout.
+     */
+    #[Test]
+    public function validateCsrfKeepsTokenStableForReuse(): void
+    {
+        $token = Auth::csrfToken();
+
+        $this->assertTrue(Auth::validateCsrf($token));
+        $this->assertSame($token, Auth::csrfToken(), 'CSRF token must not rotate on validation');
+        $this->assertTrue(
+            Auth::validateCsrf($token),
+            'the same page token must remain valid for a second AJAX call',
+        );
+    }
+
     #[Test]
     public function validateCsrfRejectsEmptyPostedToken(): void
     {

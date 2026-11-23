@@ -267,10 +267,13 @@ final class Auth
     }
 
     /**
-     * Valida token CSRF (timing-safe) y lo rota tras validación exitosa.
+     * Valida token CSRF (timing-safe). El token es estable durante la sesión.
      *
-     * La rotación post-validación previene ataques de reutilización de token:
-     * si un token es interceptado, solo sirve para UNA solicitud.
+     * El dashboard lee el token UNA vez del <meta name="csrf-token"> y lo
+     * reenvía en cada petición AJAX. Rotar aquí hacía que la segunda acción
+     * (por ejemplo guardar un favorito y luego conectar) devolviera HTTP 400.
+     * La rotación real ocurre en los límites de autenticación: login.php tras
+     * iniciar sesión y logout.php al destruirla.
      */
     public static function validateCsrf(string $token): bool
     {
@@ -281,14 +284,7 @@ final class Auth
             return false;
         }
 
-        $valid = hash_equals($sessionToken, $token);
-
-        // Rotar token después de cada validación exitosa
-        if ($valid) {
-            $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-        }
-
-        return $valid;
+        return hash_equals($sessionToken, $token);
     }
 
     // ---------------------------------------------------------------
