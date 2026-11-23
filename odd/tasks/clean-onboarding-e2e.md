@@ -42,7 +42,7 @@ S13 — User wants a full clean-install test report: what worked, what failed, a
 | T6 | S8 | inline | done | `18ecbbc`, `029a659` |
 | T7 | S9 | inline | done | `9d9ee49` — PTT gate, `#` force-unkey, WS-disconnect unkey, EN/ES docs |
 | T8 | S10, S11 | inline (remote) | done | `0fb2783` — stable CSRF token; Pi patched and verified; access restored |
-| T9 | S12 | inline (remote) | done | `c14ac22` — favorites connect without confirm; node_events schema fixed; Pi patched and E2E verified |
+| T9 | S12 | inline (remote) | done | `f284292` — favorites connect without confirm; node_events schema fixed; Pi patched and E2E verified |
 
 ## Log
 
