@@ -8,7 +8,7 @@ declare(strict_types=1);
  *
  * Flujo:
  *   1. Valida sesión
- *   2. Resuelve el host IAX2 (companion_iax_host o SERVER_ADDR) y el secreto IAX2
+ *   2. Descubre el host IAX2 desde la request (Host, luego SERVER_ADDR) y el secreto IAX2
  *   3. Genera config.toml con esos valores
  *   4. Rellena la plantilla versionada del instalador .bat y la entrega
  *
@@ -32,17 +32,17 @@ if (!Auth::isLoggedIn()) {
     exit;
 }
 
-// Host IAX2 anunciado al Companion. La config explícita gana siempre:
-// SERVER_ADDR depende de la request HTTP y puede apuntar a otra máquina.
-$configuredHost = defined('IAX_COMPANION_HOST') ? (string) IAX_COMPANION_HOST : '';
+// Host IAX2 descubierto desde la propia descarga. El instalador es público:
+// debe apuntar a la dirección con la que el cliente llegó a este nodo, no a
+// una dirección fija guardada en la Pi.
 try {
-    $pi_ip = CompanionHost::resolve($configuredHost, (string)($_SERVER['SERVER_ADDR'] ?? ''));
+    $pi_ip = CompanionHost::fromRequest($_SERVER);
 } catch (\InvalidArgumentException $e) {
     http_response_code(503);
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode([
         'success' => false,
-        'error'   => 'Invalid companion IAX host configuration.',
+        'error'   => 'Could not determine a valid IAX host for this download.',
     ]);
     exit;
 }
