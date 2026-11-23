@@ -1,6 +1,6 @@
 # Clean onboarding E2E (new Pi + clean PC)
 
-Objective: make `main` the installable default, fix the README step-by-step for a non-technical user, provide a Windows companion clean-uninstall `.bat`, and run a full clean E2E test on the new Raspberry Pi and the PC. Branch: `main` (work lands as reviewed work-unit commits and is pushed; `main` is the permanent download/install point). Delivery: commits `513c273`, `ac53712`, `2097dc3`, `82ddd50`, `595dcff`, `18ecbbc`, `029a659`, `0a9c769`. Runners: `python -m pytest tests/ -q`, `node tests/js/*.test.js`, `bash -n install/install_chilemon.sh`, `git diff --check`, plus live Pi and live Windows verification.
+Objective: make `main` the installable default, fix the README step-by-step for a non-technical user, provide a Windows companion clean-uninstall `.bat`, and run a full clean E2E test on the new Raspberry Pi and the PC. Branch: `main` (work lands as reviewed work-unit commits and is pushed; `main` is the permanent download/install point). Delivery: commits `513c273`, `ac53712`, `2097dc3`, `82ddd50`, `595dcff`, `18ecbbc`, `029a659`, `0a9c769`, `9d9ee49`, `0fb2783`, `f284292`, `e55800f`, `943aadb`. Runners: `python -m pytest tests/ -q`, `node tests/js/*.test.js`, `bash -n install/install_chilemon.sh`, `git diff --check`, plus live Pi and live Windows verification.
 
 ## Specs
 
@@ -40,7 +40,7 @@ S13 — User wants a full clean-install test report: what worked, what failed, a
 | T4 | S1, S3, S5 | inline (remote) | done | `82ddd50`, `595dcff`, `18ecbbc`, `029a659` |
 | T5 | S2, S5 | inline (remote) | done | verified on 2026-11-22, no code change |
 | T6 | S8 | inline | done | `18ecbbc`, `029a659` |
-| T7 | S9 | inline | done | `9d9ee49` — PTT gate, `#` force-unkey, WS-disconnect unkey, EN/ES docs |
+| T7 | S9 | inline | done | `9d9ee49` + `943aadb` — PTT gate, `#` force-unkey, WS-disconnect unkey, EN/ES docs; AST behavioral unkey-order probe |
 | T8 | S10, S11 | inline (remote) | done | `0fb2783` — stable CSRF token; Pi patched and verified; access restored |
 | T9 | S12 | inline (remote) | done | `f284292` — favorites connect without confirm; node_events schema fixed; Pi patched and E2E verified |
 
@@ -81,3 +81,7 @@ L16 — 2026-11-22. User: "registre el favorito pero el boton de conectar no fun
 L17 — 2026-11-22. User requested a full installation-test report (what worked / what failed / remaining details) and confirmed the loop: repeat the clean install test until all details are fixed. Yesterday's TX/RX success is acknowledged; remaining work is detail adjustments only.
 
 L18 — 2026-11-23. User chose to start today with the commits and added verbatim: "vamos primero con el numero 1. y dejemos completamente actualizado la rama main, esa sera siempre el punto de descarga e instalacion de chilemon". This explicitly authorizes work-unit commits on `main` and a push to `main`; `main` stays the permanent download/install point. No live TX to the remote node until separately authorized.
+
+L19 — 2026-11-23. Work units committed on `main` above base `0a9c769`: `9d9ee49` (T7 PTT gate), `0fb2783` (T8 stable CSRF token), `f284292` (T9 favorites connect + node_events schema), `e55800f` (doc evidence), `943aadb` (AST behavioral unkey-order regression + corrected `_ptt_unkey` docstring). Independent verifiers: T7 PASS (S9; RED on baseline, 8 passed on change, custom async-ordering probe PASS) and T8 PASS (S10/S11; `hash_equals` retained, rotation only at login/logout, 134 tests green). Local checks re-run: `python -m pytest tests/ -q` → 136 passed, 1 skipped (after the AST probe); `git diff --check` → 0. PHP/phpunit unavailable on the Windows host (CSRF verified live on the Pi 2026-11-22). `public/api/log-call.php` remains untracked and was deliberately excluded (pre-existing, unrelated). Native RDD review of the full slice: consent granted; reviewer transport hook refused (`opencode_review_transport_relay_refused`), so the three reviewer JSONs were relayed via `review.capture-result --input`; all admitted `completed`; Go native reduction → **approved** with 5 informational findings (CSRF reuse is the requested fix; PTT changes are safety hardening; no BLOCKER/CRITICAL, no correction). Exact `review.acknowledge-approved` executed → `gentle-ai.review-acknowledged/v1`, authority burned. Lineage `review-bdf98609f596c18b`.
+
+L20 — 2026-11-23. Push pending at the time of this entry; remote `main` was `0a9c769`, local 5 commits ahead with a clean fast-forward (0 behind). Push decision explicitly authorized by the user in L18.
