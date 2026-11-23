@@ -261,6 +261,19 @@ test('direction switches palette, chip and activity class; missing dir defaults 
   assert.equal(h.chip.textContent, 'TX');
 });
 
+test('R2-LEVEL-TARGET: displayed level keeps chasing the target between feeds', () => {
+  const h = makeVizHarness();
+  h.viz.feedMetadata(0.1, fullSpectrum(1), 'rx');
+  h.frame(0);
+  h.frame(16);
+  const early = h.viz._displayLevel;
+  h.frame(32);
+  h.frame(48);
+  const late = h.viz._displayLevel;
+  assert.ok(early > 0.15, `level did not rise on first frame: ${early}`);
+  assert.ok(late > early + 0.15, `level stalled between feeds: early=${early} late=${late}`);
+});
+
 test('silence decay is driven by elapsed time, not the number of frames', () => {
   function decay(steps, stepMs) {
     const h = makeVizHarness();

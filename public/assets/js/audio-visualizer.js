@@ -290,10 +290,9 @@ class AudioVisualizer {
         this._lastFrame = now;
 
         const idle = now - this._lastFeed > IDLE_MS;
-        const targetLevel = idle ? 0 : this._levelTarget;
+        const targetLevel = idle ? 0 : this._level;
         this._displayLevel += (targetLevel - this._displayLevel)
             * this._envelope(dt, targetLevel, this._displayLevel, ATTACK_MS, DECAY_MS);
-        this._levelTarget = this._displayLevel;
 
         for (let i = 0; i < this.barCount; i++) {
             const target = idle ? 0 : this._targetBars[i];

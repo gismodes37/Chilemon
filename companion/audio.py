@@ -628,15 +628,18 @@ class AudioEngine:
                 p.kind is inspect.Parameter.VAR_POSITIONAL for p in params
             )
         except (TypeError, ValueError):
-            positional = []
-            accepts_varargs = False
+            logger.debug(
+                "Could not inspect on_levels callback %r; falling back to legacy "
+                "two-argument call",
+                callback,
+            )
+            callback(rms, spectrum)
+            return
 
         if accepts_varargs or len(positional) >= 3:
             callback(rms, spectrum, direction)
         elif len(positional) == 1:
             callback(rms)
-        elif len(positional) == 0:
-            callback()
         else:
             callback(rms, spectrum)
 

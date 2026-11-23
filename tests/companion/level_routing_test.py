@@ -99,6 +99,31 @@ def test_on_levels_stays_backwards_compatible() -> None:
     assert three_arg == ["rx"]
 
 
+def test_on_levels_inspection_failure_falls_back_to_legacy_call(
+    monkeypatch: Any,
+) -> None:
+    """R4-01: a non-introspectable hook must not be called with zero args."""
+    engine = AudioEngine()
+    calls: list[tuple[float, list[float]]] = []
+
+    def legacy_hook(rms: float, spectrum: list[float]) -> None:
+        calls.append((rms, spectrum))
+
+    def boom(_callback: object) -> None:
+        raise TypeError("not introspectable")
+
+    monkeypatch.setattr(
+        "companion.audio.inspect.signature", boom, raising=True
+    )
+    engine.on_levels = legacy_hook  # type: ignore[assignment]
+
+    rms = engine._emit_levels(bytes([0x00] * 160), direction="rx")
+
+    assert len(calls) == 1
+    assert calls[0][0] == rms
+    assert len(calls[0][1]) == 16
+
+
 def test_input_callback_still_feeds_raw_rms_to_tx_gate() -> None:
     """S6: raw RMS from _compute_levels must keep driving _handle_tx."""
     engine = AudioEngine()
@@ -116,6 +141,26 @@ def test_input_callback_still_feeds_raw_rms_to_tx_gate() -> None:
     expected, spectrum = AudioEngine._compute_levels(payload)
     assert seen == [expected]
     assert len(spectrum) == 16
+
+
+def test_rx_levels_do_not_touch_mic_silence_timer(monkeypatch: Any) -> None:
+    """R3-1: RX playback must never clear or start the mic silence watchdog."""
+    engine = AudioEngine()
+    engine._running = True
+    monkeypatch.setattr(
+        "companion.audio.time.monotonic", lambda: 100.0, raising=True
+    )
+    engine._input_silent_since = 50.0
+
+    frame = _tone_payload()
+    engine._jitter_buffer = SimpleNamespace(  # type: ignore[assignment]
+        pop=lambda: frame
+    )
+    outdata = np.zeros((160, 1), dtype=np.int16)
+
+    engine._output_callback(outdata, 160, None, None)  # type: ignore[arg-type]
+
+    assert engine._input_silent_since == 50.0
 
 
 def test_level_broadcast_throttled_per_direction(
