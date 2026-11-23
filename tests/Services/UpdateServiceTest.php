@@ -229,6 +229,59 @@ final class UpdateServiceTest extends TestCase
     }
 
     // ---------------------------------------------------------------
+    //  Post-pull reconciliation
+    // ---------------------------------------------------------------
+
+    /**
+     * @return array{success: bool, action: string, message: string, stashed: bool, commit: string}
+     */
+    private function failedPullResult(): array
+    {
+        return [
+            'success' => false,
+            'action'  => 'apply-update',
+            'message' => 'Git pull failed. (exit code 1)',
+            'stashed' => false,
+            'commit'  => '',
+        ];
+    }
+
+    #[Test]
+    public function failedPullIsReconciledWhenRepoReachedRemote(): void
+    {
+        $result = UpdateService::reconcileFailedPull(
+            $this->failedPullResult(),
+            "LOCAL:abc123def\nREMOTE:abc123def\nSUMMARY:\n"
+        );
+
+        $this->assertTrue($result['success']);
+        $this->assertSame('abc123def', $result['commit']);
+        $this->assertStringContainsString('requested commit', $result['message']);
+    }
+
+    #[Test]
+    public function failedPullStaysFailedWhenRepoIsBehindRemote(): void
+    {
+        $result = UpdateService::reconcileFailedPull(
+            $this->failedPullResult(),
+            "LOCAL:old123\nREMOTE:new456\nSUMMARY:1 commit\n"
+        );
+
+        $this->assertFalse($result['success']);
+        $this->assertSame('Git pull failed. (exit code 1)', $result['message']);
+        $this->assertSame('', $result['commit']);
+    }
+
+    #[Test]
+    public function failedPullStaysFailedWhenCompareOutputIsUnusable(): void
+    {
+        $result = UpdateService::reconcileFailedPull($this->failedPullResult(), '');
+
+        $this->assertFalse($result['success']);
+        $this->assertFalse($result['stashed']);
+    }
+
+    // ---------------------------------------------------------------
     //  Windows Mock
     // ---------------------------------------------------------------
 

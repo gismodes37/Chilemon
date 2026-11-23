@@ -75,6 +75,18 @@ final class UpdateService
         $output = $this->run('git-pull');
         $result = self::parsePullOutput($output);
 
+        // Los wrapper instalados antes de ff3b75a reportan el exit code de
+        // `git stash pop`, no el de `git pull`. Si el repo ya alcanzó el commit
+        // remoto, el update se aplicó y el marcador es viejo: verificar el
+        // estado real antes de mostrar un error al usuario.
+        if (!$result['success']) {
+            try {
+                $result = self::reconcileFailedPull($result, $this->run('git-compare'));
+            } catch (RuntimeException $e) {
+                // Sin comparación confiable se conserva el fallo original.
+            }
+        }
+
         // Step 2: reiniciar servicios solo si el pull fue exitoso
         if ($result['success']) {
             $messages = [];
@@ -231,6 +243,31 @@ final class UpdateService
             'stashed' => ($stashedCode === '0'), // true = pull succeeded OR stash was applied; best-effort
             'commit'  => $commit,
         ];
+    }
+
+    /**
+     * Reconcilia un pull marcado como fallido con el estado real del repo.
+     *
+     * @param array{success: bool, action: string, message: string, stashed: bool, commit: string} $result
+     * @return array{success: bool, action: string, message: string, stashed: bool, commit: string}
+     */
+    public static function reconcileFailedPull(array $result, string $compareOutput): array
+    {
+        $compare = self::parseCheckOutput($compareOutput);
+        $local   = $compare['local_commit'];
+        $remote  = $compare['remote_commit'];
+
+        if ($local === '' || $remote === '' || $local !== $remote) {
+            return $result;
+        }
+
+        $result['success'] = true;
+        $result['commit']  = $local;
+        $result['stashed'] = false;
+        $result['message'] = 'Update applied successfully. The wrapper reported a failure, '
+            . 'but the repository is at the requested commit.';
+
+        return $result;
     }
 
     // ---------------------------------------------------------------
