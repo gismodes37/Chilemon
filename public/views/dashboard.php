@@ -180,10 +180,27 @@ $systemInfo = $systemInfo ?? [
          Audio Spectrum Visualizer
          ========================================= -->
     <div class="card audio-visualizer-card mb-3">
-        <div class="card-body p-0">
+        <div class="audio-visualizer-header">
+            <span class="audio-visualizer-wordmark">CHILEMON <span class="audio-visualizer-dot">•</span> SPECTRUM</span>
+            <span class="audio-visualizer-header-right">
+                <span class="audio-visualizer-direction" id="audio-direction-chip" data-dir="tx">TX</span>
+                <span class="audio-visualizer-state" id="audio-state-readout" data-state="silence">SIN SEÑAL</span>
+                <span class="audio-visualizer-db" id="audio-db-readout">-- dB</span>
+            </span>
+        </div>
+        <div class="audio-visualizer-screen">
             <canvas id="audio-canvas"
                 class="audio-visualizer-canvas"
-                title="Audio spectrum — TX/RX activity"></canvas>
+                title="Audio spectrum — RX/TX activity"></canvas>
+        </div>
+        <div class="audio-visualizer-footer">
+            <span class="audio-visualizer-legend">
+                <span class="audio-visualizer-legend-item rx"><i></i> RX</span>
+                <span class="audio-visualizer-legend-item tx"><i></i> TX</span>
+            </span>
+            <span class="audio-visualizer-scale">
+                <span>-60</span><span>-36</span><span>-12 dB</span>
+            </span>
         </div>
     </div>
 

@@ -90,10 +90,6 @@ class PTTWidget {
     _initVisualizer() {
         if (typeof AudioVisualizer !== 'undefined' && document.getElementById('audio-canvas')) {
             this._visualizer = new AudioVisualizer('audio-canvas');
-            // Override feedPCM to accept companion metadata instead
-            this._visualizer.feedPCM = (samples) => {
-                // Metadata arrived via audio_level WS message — handled in _handleAudioLevel
-            };
         }
     }
 
@@ -261,12 +257,13 @@ class PTTWidget {
 
     _handleAudioLevel(msg) {
         const rms = msg.rms || 0;
-        this._pushVolume(rms);
 
-        // Forward to visualizer if available
+        // The visualizer applies the dB mapping first so the PTT meter can
+        // reuse the exact same level (dir is optional on older companions).
         if (this._visualizer && typeof this._visualizer.feedMetadata === 'function') {
-            this._visualizer.feedMetadata(rms, msg.spectrum || []);
+            this._visualizer.feedMetadata(rms, msg.spectrum || [], msg.dir);
         }
+        this._pushVolume(rms);
     }
 
     // ---------------------------------------------------------------
@@ -370,13 +367,16 @@ class PTTWidget {
             this.volumeSamples.shift();
         }
 
-        let sum = 0;
-        for (const s of this.volumeSamples) {
-            sum += s;
+        // Use the visualizer's dB-mapped level when it is present. Without a
+        // canvas, apply the same window locally: -70..-12 dB to 0..1.
+        let level;
+        if (this._visualizer && typeof this._visualizer.getLevel === 'function') {
+            level = this._visualizer.getLevel();
+        } else {
+            const db = 20 * Math.log10(Math.max(Number.isFinite(rms) ? rms : 0, 1e-6));
+            level = Math.min(1, Math.max(0, (db - (-70)) / 58));
         }
-        const avg = sum / this.volumeSamples.length;
-        const display = Math.min(1.0, avg * 4);
-        const pct = Math.round(display * 100);
+        const pct = Math.round(Math.min(1, Math.max(0, level)) * 100);
 
         if (this.volumeFill) {
             this.volumeFill.style.width = pct + '%';

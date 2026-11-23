@@ -1,31 +1,62 @@
 /**
  * public/assets/js/audio-visualizer.js
  * -----------------------------------------------
- * AudioVisualizer — Spectrum analyzer for the
+ * AudioVisualizer — Radio telemetry spectrum console for the
  * ChileMon dashboard.
  *
- * Renders frequency bars (like an equalizer) on a
- * dark canvas with colored glow. Receives raw PCM
- * float32 data from both RX and TX audio paths and
- * computes a real FFT for frequency-domain display.
+ * Renders 32 bars from the 16 log-spaced spectrum bands emitted by
+ * the Companion. RMS is mapped through dB with a per-direction
+ * adaptive noise floor so weak signals stay visible. No audio
+ * processing happens here: the Companion owns the FFT.
  *
  * Usage:
  *   const viz = new AudioVisualizer('audio-canvas');
- *   viz.feedPCM(samples);  // Float32Array from RX/TX
+ *   viz.feedMetadata(rms, spectrum, dir);  // dir: 'rx' | 'tx'
  *
  * Styles expected: .audio-visualizer-card, #audio-canvas
  * -----------------------------------------------
  */
+
+const BAND_COUNT = 16;
+const BAR_COUNT = 32;
+
+// Display window: -70 dB (adaptive floor) up to -12 dB, with at least
+// 48 dB of dynamic range above the floor so loud audio never clips.
+const DEFAULT_FLOOR_DB = -70;
+const CEILING_DB = -12;
+const MIN_SPAN_DB = 48;
+
+// The floor follows slow ambient changes inside a 24 dB window but ignores
+// vocal bursts. Separate coefficients make it fall slower than it rises.
+const FLOOR_WINDOW_DB = 24;
+const FLOOR_RISE = 0.01;
+const FLOOR_FALL = 0.004;
+
+// Time constants (ms) for the rAF-driven attack/decay envelope.
+const ATTACK_MS = 60;
+const DECAY_MS = 320;
+const PEAK_HOLD_MS = 500;
+const PEAK_DECAY_MS = 900;
+const IDLE_MS = 250;
+
+// Needle profile: slim 2-4 CSS px lit width with a visible gap. When the
+// canvas is too narrow for 32 needles, reduce the rendered count instead.
+const MIN_LIT_CSS_PX = 2;
+const MAX_LIT_CSS_PX = 4;
+const LIT_RATIO = 0.4;
+const MIN_GAP_CSS_PX = 1;
+
+const PALETTES = {
+    rx: { primary: '#22d3ee', secondary: '#2dd4bf', rgb: '34,211,238' },
+    tx: { primary: '#f59e0b', secondary: '#fbbf24', rgb: '245,158,11' },
+};
 
 class AudioVisualizer {
 
     /**
      * @param {string} canvasId  ID of the <canvas> element
      * @param {Object} [opts]
-     * @param {number} [opts.barCount=48]       Number of vertical bars
-     * @param {number} [opts.fftSize=1024]      FFT size (power of 2)
-     * @param {number} [opts.decayRate=0.88]    Per-frame decay multiplier
-     * @param {number} [opts.smoothFactor=0.65] Smoothing (0=instant, 1=no change)
+     * @param {number} [opts.barCount=32] Number of vertical bars
      */
     constructor(canvasId, opts = {}) {
         this.canvas = document.getElementById(canvasId);
@@ -35,153 +66,292 @@ class AudioVisualizer {
         }
         this.ctx = this.canvas.getContext('2d');
 
-        this.barCount = opts.barCount || 48;
-        this.fftSize = opts.fftSize || 1024;
-        this.decayRate = opts.decayRate || 0.88;
-        this.smoothFactor = opts.smoothFactor || 0.55;
+        this.barCount = opts.barCount || BAR_COUNT;
 
-        /** @type {Float32Array} Current bar heights (0..1) */
-        this.bars = new Float32Array(this.barCount);
+        /** @type {Float32Array} Resampled 16-band spectrum (target) */
+        this._bands = new Float32Array(BAND_COUNT);
+        /** @type {Float32Array} Per-bar spectrum targets */
+        this._targetBars = new Float32Array(this.barCount);
+        /** @type {Float32Array} Rendered bar heights (0..1) */
+        this._bars = new Float32Array(this.barCount);
+        /** @type {Float32Array} Peak-hold markers */
+        this._peaks = new Float32Array(this.barCount);
+        /** @type {Float64Array} When each peak starts falling (rAF clock) */
+        this._peakHeldUntil = new Float64Array(this.barCount);
+        /** @type {Float32Array} Fractional band index for each bar */
+        this._bandPositions = new Float32Array(this.barCount);
 
-        /** @type {Float32Array} Peak dots */
-        this.peaks = new Float32Array(this.barCount);
+        /** @type {{rx: number, tx: number}} Adaptive noise floor in dB */
+        this._noiseFloor = { rx: DEFAULT_FLOOR_DB, tx: DEFAULT_FLOOR_DB };
+        this._direction = 'tx';
+        this._level = 0;
+        this._displayLevel = 0;
+        this._transmitting = false;
+        this._lastFeed = -Infinity;
+        this._lastFrame = 0;
 
-        /** @type {number} Timestamp of last feedPCM call */
-        this._lastFeed = 0;
-
-        /** @type {number} FFT half length */
-        this._half = this.fftSize >>> 1;
-
-        // Pre-allocate FFT buffers (reused across frames to avoid GC)
-        this._re = new Float64Array(this.fftSize);
-        this._im = new Float64Array(this.fftSize);
-
-        // Build bar→bin mapping: which FFT bins map to each bar
-        // Logarithmic mapping — more bars for low frequencies
-        this._binMap = new Uint16Array(this.barCount);
-        const logMin = Math.log2(1);
-        const logMax = Math.log2(this._half);
+        // More bars per low band: band positions grow exponentially while the
+        // incoming bands are already log-spaced in frequency.
+        const bandScale = Math.log2(BAND_COUNT);
         for (let b = 0; b < this.barCount; b++) {
-            const t = b / this.barCount;
-            const binIdx = Math.round(Math.pow(2, logMin + t * (logMax - logMin)));
-            this._binMap[b] = Math.min(binIdx, this._half - 1);
+            const t = this.barCount > 1 ? b / (this.barCount - 1) : 0;
+            this._bandPositions[b] = Math.pow(2, t * bandScale) - 1;
         }
 
-        // Card element for border glow
         this._card = this.canvas.closest('.audio-visualizer-card');
+        this._chip = document.getElementById('audio-direction-chip');
+        this._status = document.getElementById('audio-state-readout');
+        this._dbReadout = document.getElementById('audio-db-readout');
 
-        // Resize canvas backing store to match CSS size
+        this._reducedMotion = typeof window !== 'undefined'
+            && typeof window.matchMedia === 'function'
+            && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
         this._resize();
-        window.addEventListener('resize', () => this._resize());
+        this._onResize = () => this._resize();
+        window.addEventListener('resize', this._onResize);
+        this._updateDom();
 
-        // Start the render loop
-        this._running = true;
-        this._draw();
+        this._running = !this._reducedMotion;
+        if (this._running) {
+            this._draw();
+        } else {
+            this._render();
+        }
     }
 
     /** Stop the animation loop and clean up. */
     destroy() {
         this._running = false;
+        if (this._onResize && typeof window.removeEventListener === 'function') {
+            window.removeEventListener('resize', this._onResize);
+        }
     }
 
     /**
      * Mark whether the node is currently transmitting (TX active).
-     * Changes the card border glow color: yellow for TX, green for RX.
+     * Keeps the card border hooks: .active for RX, .transmitting for TX.
      * @param {boolean} active
      */
     setTransmitting(active) {
-        this._transmitting = active;
+        this._transmitting = Boolean(active);
+        if (this._reducedMotion) {
+            this._updateActivity(this._level > 0.04);
+            this._render();
+        }
     }
 
     /**
-     * Feed pre-computed spectrum metadata from companion app.
-     * Call this when receiving audio_level WS messages.
-     * @param {number} rms  RMS level 0..1
-     * @param {number[]} spectrum  Array of 4 bin levels 0..1
+     * Feed pre-computed metadata from the Companion audio_level message.
+     *
+     * @param {number} rms        Raw linear RMS 0..1 (unmodified from source)
+     * @param {number[]} spectrum 16 bands (4 during mixed-version rollout)
+     * @param {'rx'|'tx'} [dir]   Direction, defaults to 'tx'
      */
-    feedMetadata(rms, spectrum) {
-        this._lastFeed = Date.now();
-        const bins = spectrum || [0, 0, 0, 0];
+    feedMetadata(rms, spectrum, dir = 'tx') {
+        if (!this.canvas) return;
 
-        // Map the 4 companion bins across the 48 visualizer bars
-        for (let b = 0; b < this.barCount; b++) {
-            const t = b / this.barCount;
-            // Interpolate from 4 bins to barCount bars
-            const binIdx = Math.min(Math.floor(t * bins.length), bins.length - 1);
-            const frac = (t * bins.length) - binIdx;
-            const nextIdx = Math.min(binIdx + 1, bins.length - 1);
-            const value = bins[binIdx] * (1 - frac) + bins[nextIdx] * frac;
+        const raw = Number.isFinite(rms) ? Math.max(0, rms) : 0;
+        const db = 20 * Math.log10(Math.max(raw, 1e-6));
+        this._direction = dir === 'rx' ? 'rx' : 'tx';
 
-            // Smooth towards target (same smoothing as FFT path)
-            const prev = this.bars[b];
-            this.bars[b] = prev + (value - prev) * (1 - this.smoothFactor);
+        const floor = this._adaptFloor(db, this._noiseFloor[this._direction]);
+        this._noiseFloor[this._direction] = floor;
+        const ceiling = Math.max(CEILING_DB, floor + MIN_SPAN_DB);
+        this._level = this._clamp((db - floor) / (ceiling - floor));
 
-            // Update peak
-            if (this.bars[b] > this.peaks[b]) {
-                this.peaks[b] = this.bars[b];
+        this._lastFeed = this._now();
+        this._levelTarget = this._level;
+        this._resampleSpectrum(spectrum);
+        this._updateDom(db);
+
+        if (this._reducedMotion) {
+            this._displayLevel = this._level;
+            for (let i = 0; i < this.barCount; i++) {
+                this._bars[i] = this._targetBars[i];
+                this._peaks[i] = this._bars[i];
             }
+            this._updateActivity(this._level > 0.04);
+            this._render();
         }
+    }
 
-        // Optionally use rms for a brightness/scale factor
-        this._rms = rms;
+    /** @return {number} Latest dB-mapped level (0..1). */
+    getLevel() {
+        return this._level;
+    }
+
+    /** @return {'rx'|'tx'} Latest direction. */
+    getDirection() {
+        return this._direction;
+    }
+
+    /** @return {number[]} Resampled 16-band spectrum. */
+    getBands() {
+        return Array.from(this._bands);
+    }
+
+    /** @return {number[]} Current rendered bar heights. */
+    getBars() {
+        return Array.from(this._bars);
+    }
+
+    /** @return {number} Adaptive floor (dB) for a direction. */
+    getNoiseFloor(dir) {
+        return this._noiseFloor[dir === 'rx' ? 'rx' : 'tx'];
+    }
+
+    /** @return {{primary: string, secondary: string, rgb: string}} */
+    getPalette() {
+        return { ...(PALETTES[this._direction] || PALETTES.tx) };
     }
 
     /**
-     * Feed raw PCM float32 samples into the visualizer.
-     * Call this from your audio RX/TX handlers.
-     * @param {Float32Array|Array<number>} samples
+     * Rendered needle profile. The spectrum keeps 32 log-spaced bars, but a
+     * narrow canvas drops rendered columns before a needle loses its 2 px.
+     * @return {{count: number, slotCss: number, litCss: number, gapCss: number,
+     *           slotDevice: number, litDevice: number, gapDevice: number}}
      */
-    feedPCM(samples) {
-        if (!samples || samples.length < 4) return;
-        this._lastFeed = Date.now();
-
-        const n = this.fftSize;
-
-        // Copy into FFT buffers (zero-pad if smaller)
-        const len = Math.min(samples.length, n);
-        for (let i = 0; i < len; i++) {
-            this._re[i] = samples[i];
-            this._im[i] = 0;
+    getBarProfile() {
+        if (!this._profile) {
+            const dpr = window.devicePixelRatio || 1;
+            this._profile = this._computeProfile(this.canvas ? this.canvas.width : 0, dpr);
         }
-        for (let i = len; i < n; i++) {
-            this._re[i] = 0;
-            this._im[i] = 0;
-        }
-
-        // Apply Hann window
-        for (let i = 0; i < n; i++) {
-            this._re[i] *= 0.5 * (1 - Math.cos((2 * Math.PI * i) / (n - 1)));
-        }
-
-        // In-place radix-2 FFT
-        this._fft(this._re, this._im);
-
-        // Compute magnitudes (first half) and map to bars
-        for (let b = 0; b < this.barCount; b++) {
-            const binIdx = this._binMap[b];
-            const mag = Math.sqrt(
-                this._re[binIdx] * this._re[binIdx] +
-                this._im[binIdx] * this._im[binIdx]
-            );
-            // Normalize: divide by fftSize, clamp to ~1.0
-            // Higher multiplier = more sensitive bars
-            let normalized = (mag / this.fftSize) * 20;
-            if (normalized > 1) normalized = 1;
-
-            // Smooth towards target
-            const prev = this.bars[b];
-            this.bars[b] = prev + (normalized - prev) * (1 - this.smoothFactor);
-
-            // Update peak
-            if (this.bars[b] > this.peaks[b]) {
-                this.peaks[b] = this.bars[b];
-            }
-        }
+        return { ...this._profile };
     }
 
     // ---------------------------------------------------------------
     //  Internal
     // ---------------------------------------------------------------
+
+    _now() {
+        return typeof performance !== 'undefined' && typeof performance.now === 'function'
+            ? performance.now()
+            : Date.now();
+    }
+
+    _clamp(value) {
+        return value < 0 ? 0 : (value > 1 ? 1 : value);
+    }
+
+    _adaptFloor(db, floor) {
+        // Speech and telemetry bursts are well above ambient: never let them
+        // drag the floor up and desensitise the display afterwards.
+        if (db > floor + FLOOR_WINDOW_DB) return floor;
+        const rate = db < floor ? FLOOR_FALL : FLOOR_RISE;
+        return floor + (db - floor) * rate;
+    }
+
+    /** Resample any incoming spectrum length into the internal 16 bands. */
+    _resampleSpectrum(spectrum) {
+        const values = Array.isArray(spectrum) ? spectrum : [];
+        const len = values.length;
+
+        for (let i = 0; i < BAND_COUNT; i++) {
+            let value;
+            if (len === 0) {
+                // Mixed-version silence/metadata gap: keep a level-shaped
+                // envelope instead of a dead flat line.
+                value = this._level * (1 - i / BAND_COUNT) * 0.6;
+            } else if (len === 1) {
+                value = Number.isFinite(values[0]) ? values[0] : 0;
+            } else {
+                const pos = (i * (len - 1)) / (BAND_COUNT - 1);
+                const lo = Math.floor(pos);
+                const hi = Math.min(lo + 1, len - 1);
+                const frac = pos - lo;
+                const a = Number.isFinite(values[lo]) ? values[lo] : 0;
+                const b = Number.isFinite(values[hi]) ? values[hi] : 0;
+                value = a * (1 - frac) + b * frac;
+            }
+            this._bands[i] = this._clamp(value);
+        }
+
+        // Spectrum level is scaled by the dB-mapped RMS so quiet audio still
+        // moves the bars, while loud audio keeps its full dynamic range.
+        const gain = 0.4 + 0.6 * this._level;
+        for (let b = 0; b < this.barCount; b++) {
+            const pos = this._bandPositions[b];
+            const lo = Math.floor(pos);
+            const hi = Math.min(lo + 1, BAND_COUNT - 1);
+            const frac = pos - lo;
+            const value = this._bands[lo] * (1 - frac) + this._bands[hi] * frac;
+            this._targetBars[b] = this._clamp(value * gain);
+        }
+    }
+
+    /** Render loop. All envelope changes use the rAF timestamp. */
+    _draw(timestamp) {
+        if (!this._running) return;
+        requestAnimationFrame((ts) => this._draw(ts));
+
+        const now = Number.isFinite(timestamp) ? timestamp : this._now();
+        const dt = Math.max(0, Math.min(now - this._lastFrame, 250));
+        this._lastFrame = now;
+
+        const idle = now - this._lastFeed > IDLE_MS;
+        const targetLevel = idle ? 0 : this._levelTarget;
+        this._displayLevel += (targetLevel - this._displayLevel)
+            * this._envelope(dt, targetLevel, this._displayLevel, ATTACK_MS, DECAY_MS);
+        this._levelTarget = this._displayLevel;
+
+        for (let i = 0; i < this.barCount; i++) {
+            const target = idle ? 0 : this._targetBars[i];
+            this._bars[i] += (target - this._bars[i])
+                * this._envelope(dt, target, this._bars[i], ATTACK_MS, DECAY_MS);
+            // Freeze the target once reached: without a fresh feed the trace
+            // holds instead of slowly climbing towards an old spectrum.
+            this._targetBars[i] = this._bars[i];
+
+            if (this._bars[i] > this._peaks[i]) {
+                this._peaks[i] = this._bars[i];
+                this._peakHeldUntil[i] = now + PEAK_HOLD_MS;
+            } else if (now > this._peakHeldUntil[i]) {
+                this._peaks[i] += (this._bars[i] - this._peaks[i])
+                    * this._envelope(dt, this._bars[i], this._peaks[i], ATTACK_MS, PEAK_DECAY_MS);
+                if (this._peaks[i] < 0.002) this._peaks[i] = 0;
+            }
+        }
+
+        this._updateActivity(!idle && this._displayLevel > 0.04);
+        this._render();
+    }
+
+    _envelope(dt, target, current, attackMs, decayMs) {
+        const tau = target > current ? attackMs : decayMs;
+        return 1 - Math.exp(-dt / tau);
+    }
+
+    _updateActivity(hasSignal) {
+        if (!this._card) return;
+        const tx = this._transmitting || this._direction === 'tx';
+        this._card.classList.toggle('active', hasSignal && !tx);
+        this._card.classList.toggle('transmitting', hasSignal && tx);
+    }
+
+    _updateDom(db) {
+        if (this._chip) {
+            this._chip.textContent = this._direction.toUpperCase();
+            this._chip.dataset.dir = this._direction;
+        }
+        if (this._status) {
+            let label = 'SIN SEÑAL';
+            let key = 'silence';
+            if (this._level >= 0.55) {
+                label = 'VOZ';
+                key = 'voice';
+            } else if (this._level >= 0.08) {
+                label = 'RUIDO';
+                key = 'noise';
+            }
+            this._status.textContent = label;
+            this._status.dataset.state = key;
+        }
+        if (this._dbReadout) {
+            const shown = Number.isFinite(db) && db > -100 ? Math.round(db) : '--';
+            this._dbReadout.textContent = shown + ' dB';
+        }
+    }
 
     /** Resize canvas backing store for crisp rendering. */
     _resize() {
@@ -193,155 +363,116 @@ class AudioVisualizer {
             this.canvas.width = w;
             this.canvas.height = h;
         }
+        this._profile = this._computeProfile(w, dpr);
     }
 
-    /** Main render loop. */
-    _draw() {
-        if (!this._running) return;
-        requestAnimationFrame(() => this._draw());
+    /** Choose a slim needle geometry that stays legible at this width. */
+    _computeProfile(w, dpr) {
+        const cssW = w / dpr;
+        let count = Math.max(1, Math.min(
+            this.barCount,
+            Math.floor(cssW / (MIN_LIT_CSS_PX + MIN_GAP_CSS_PX))
+        ));
+        let litCss = MIN_LIT_CSS_PX;
 
-        const now = Date.now();
-        const idle = (now - this._lastFeed) > 300; // no data in 300ms
-
-        if (idle) {
-            // Decay all bars
-            for (let i = 0; i < this.barCount; i++) {
-                this.bars[i] *= this.decayRate;
-                if (this.bars[i] < 0.002) this.bars[i] = 0;
+        while (count > 1) {
+            const slotCss = cssW / count;
+            const candidate = Math.max(MIN_LIT_CSS_PX, Math.min(
+                MAX_LIT_CSS_PX,
+                Math.round(slotCss * LIT_RATIO)
+            ));
+            if (slotCss - candidate >= MIN_GAP_CSS_PX) {
+                litCss = candidate;
+                break;
             }
+            count--;
         }
 
-        // Decay peaks (faster than bars for the falling-dot effect)
-        for (let i = 0; i < this.barCount; i++) {
-            this.peaks[i] *= 0.92;
-            if (this.peaks[i] < this.bars[i]) {
-                this.peaks[i] = this.bars[i];
-            }
+        if (count === 1) {
+            litCss = Math.max(MIN_LIT_CSS_PX, Math.min(MAX_LIT_CSS_PX, cssW));
         }
 
-        // Card border glow — green for RX, yellow for TX
-        if (this._card) {
-            const hasSignal = !idle && this.bars.some(v => v > 0.02);
-            this._card.classList.toggle('active', hasSignal && !this._transmitting);
-            this._card.classList.toggle('transmitting', hasSignal && this._transmitting);
-        }
-
-        this._render();
+        const slotCss = cssW / count;
+        const slotDevice = w / count;
+        const litDevice = Math.max(2, Math.round(litCss * dpr));
+        return {
+            count,
+            slotCss,
+            litCss,
+            gapCss: slotCss - litCss,
+            slotDevice,
+            litDevice,
+            gapDevice: slotDevice - litDevice,
+        };
     }
-
-    /** Paint the canvas. */
-    _render() {
-        const w = this.canvas.width;
-        const h = this.canvas.height;
-        const ctx = this.ctx;
-
-        // Clear
-        ctx.clearRect(0, 0, w, h);
-
-        if (w < 10 || h < 10) return;
-
-        const barGap = 2; // px gap between bars
-        const barTotal = w / this.barCount;
-        const barW = Math.max(2, barTotal - barGap);
-        const marginBottom = 3; // px from bottom
-
-        // Pre-multiply height to avoid per-frame division
-        const hScale = (h - marginBottom);
-
-        for (let i = 0; i < this.barCount; i++) {
-            const barH = Math.min(this.bars[i], 1) * hScale;
-            if (barH < 0.2) continue;
-
-            const x = i * barTotal;
-
-            // Color: green (low amp) → yellow (mid) → red (high amp)
-            // Thresholds shifted lower so colors appear sooner
-            const t = this.bars[i];
-            let r, g, b;
-            if (t < 0.15) {
-                // Green → Yellow
-                const p = t / 0.15;
-                r = Math.floor(p * 255);
-                g = 255;
-                b = 40;
-            } else {
-                // Yellow → Red
-                const p = (t - 0.15) / 0.85;
-                r = 255;
-                g = Math.floor((1 - p) * 255);
-                b = Math.floor((1 - p) * 40);
-            }
-
-            // Glow
-            ctx.shadowBlur = 18;
-            ctx.shadowColor = `rgb(${r},${g},${b})`;
-
-            // Bar
-            ctx.fillStyle = `rgb(${r},${g},${b})`;
-            ctx.fillRect(x, h - marginBottom - barH, barW, barH);
-
-            // Reset shadow before peak dot
-            ctx.shadowBlur = 0;
-
-            // Peak dot (2px tall)
-            const peakY = h - marginBottom - this.peaks[i] * hScale;
-            if (peakY > marginBottom) {
-                ctx.fillStyle = `rgba(${r},${g},${b},0.7)`;
-                ctx.fillRect(x, peakY - 1, barW, 2);
-            }
-        }
-    }
-
-    // ---------------------------------------------------------------
-    //  Radix-2 Cooley-Tukey FFT (in-place)
-    // ---------------------------------------------------------------
 
     /**
-     * In-place FFT using bit-reversal + Cooley-Tukey.
-     * @param {Float64Array} re  Real part (modified in-place)
-     * @param {Float64Array} im  Imaginary part (modified in-place)
+     * Paint the console: fine graticule, one soft glow layer, gradient bars,
+     * peak-hold markers. No per-bar shadowBlur: one gradient keeps 60fps cheap.
      */
-    _fft(re, im) {
-        const n = re.length;
-        if (n <= 1) return;
+    _render() {
+        if (!this.ctx) return;
+        const ctx = this.ctx;
+        const w = this.canvas.width;
+        const h = this.canvas.height;
 
-        // Bit-reversal permutation
-        const bits = Math.round(Math.log2(n));
-        for (let i = 1; i < n; i++) {
-            let j = 0;
-            let m = i;
-            for (let b = 0; b < bits; b++) {
-                j = (j << 1) | (m & 1);
-                m >>= 1;
-            }
-            if (j > i) {
-                let tmp = re[i]; re[i] = re[j]; re[j] = tmp;
-                tmp = im[i]; im[i] = im[j]; im[j] = tmp;
-            }
+        ctx.clearRect(0, 0, w, h);
+        if (w < 10 || h < 10) return;
+
+        const palette = PALETTES[this._direction] || PALETTES.tx;
+        const rgb = palette.rgb;
+
+        const profile = this.getBarProfile();
+        const { count, slotDevice, litDevice } = profile;
+        const needleX = (r) => Math.round(r * slotDevice + (slotDevice - litDevice) / 2);
+
+        // Fine graticule — amplitude divisions and 4-needle time groups.
+        ctx.fillStyle = `rgba(${rgb},0.07)`;
+        for (let i = 1; i < 4; i++) {
+            ctx.fillRect(0, Math.round((h * i) / 4), w, 1);
+        }
+        for (let r = 4; r < count; r += 4) {
+            ctx.fillRect(Math.round(r * slotDevice), 0, 1, h);
         }
 
-        // Butterfly
-        for (let len = 2; len <= n; len <<= 1) {
-            const half = len >>> 1;
-            const ang = (2 * Math.PI) / len;
-            const wRe = Math.cos(ang);
-            const wIm = -Math.sin(ang);
-            for (let i = 0; i < n; i += len) {
-                let curRe = 1;
-                let curIm = 0;
-                for (let j = 0; j < half; j++) {
-                    const uRe = re[i + j];
-                    const uIm = im[i + j];
-                    const vRe = re[i + j + half] * curRe - im[i + j + half] * curIm;
-                    const vIm = re[i + j + half] * curIm + im[i + j + half] * curRe;
-                    re[i + j] = uRe + vRe;
-                    im[i + j] = uIm + vIm;
-                    re[i + j + half] = uRe - vRe;
-                    im[i + j + half] = uIm - vIm;
-                    const nxtRe = curRe * wRe - curIm * wIm;
-                    curIm = curRe * wIm + curIm * wRe;
-                    curRe = nxtRe;
-                }
+        // One soft glow layer behind the whole trace.
+        const glowH = Math.max(8, h * (0.15 + 0.85 * this._displayLevel));
+        const glow = ctx.createLinearGradient(0, h, 0, h - glowH);
+        glow.addColorStop(0, `rgba(${rgb},0.16)`);
+        glow.addColorStop(1, `rgba(${rgb},0)`);
+        ctx.fillStyle = glow;
+        ctx.fillRect(0, h - glowH, w, glowH);
+
+        const barGradient = ctx.createLinearGradient(0, h, 0, 0);
+        barGradient.addColorStop(0, `rgba(${rgb},0.5)`);
+        barGradient.addColorStop(0.4, palette.primary);
+        barGradient.addColorStop(1, palette.secondary);
+        ctx.fillStyle = barGradient;
+
+        const usableH = h - 2;
+        for (let r = 0; r < count; r++) {
+            const from = Math.floor((r * this.barCount) / count);
+            const to = Math.max(from + 1, Math.ceil(((r + 1) * this.barCount) / count));
+            let value = 0;
+            for (let i = from; i < to; i++) {
+                if (this._bars[i] > value) value = this._bars[i];
+            }
+            const barH = Math.min(value, 1) * usableH;
+            if (barH < 0.5) continue;
+            ctx.fillRect(needleX(r), h - 1 - barH, litDevice, barH);
+        }
+
+        ctx.fillStyle = `rgba(${rgb},0.8)`;
+        for (let r = 0; r < count; r++) {
+            const from = Math.floor((r * this.barCount) / count);
+            const to = Math.max(from + 1, Math.ceil(((r + 1) * this.barCount) / count));
+            let peak = 0;
+            for (let i = from; i < to; i++) {
+                if (this._peaks[i] > peak) peak = this._peaks[i];
+            }
+            const peakY = h - 1 - Math.min(peak, 1) * usableH;
+            if (peakY > 1 && peak > 0.01) {
+                ctx.fillRect(needleX(r), peakY - 1, litDevice, 1);
             }
         }
     }
