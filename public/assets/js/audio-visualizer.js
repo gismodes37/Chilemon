@@ -21,9 +21,13 @@ const BAND_COUNT = 16;
 const BAR_COUNT = 48;
 
 // Display window: keep weak speech visible but avoid clipping loud bursts.
-const DEFAULT_FLOOR_DB = -78;
-const CEILING_DB = -10;
-const MIN_SPAN_DB = 42;
+const DIR_CONFIG = {
+    rx: { floor: -78, ceiling: -10, span: 42, gain: 1.0 },
+    tx: { floor: -84, ceiling: -8, span: 40, gain: 1.18 },
+};
+const DEFAULT_FLOOR_DB = DIR_CONFIG.rx.floor;
+const CEILING_DB = DIR_CONFIG.rx.ceiling;
+const MIN_SPAN_DB = DIR_CONFIG.rx.span;
 
 // The floor follows slow ambient changes but ignores vocal bursts.
 const FLOOR_WINDOW_DB = 20;
@@ -151,11 +155,12 @@ class AudioVisualizer {
         const raw = Number.isFinite(rms) ? Math.max(0, rms) : 0;
         const db = 20 * Math.log10(Math.max(raw, 1e-6));
         this._direction = dir === 'rx' ? 'rx' : 'tx';
+        const cfg = DIR_CONFIG[this._direction] || DIR_CONFIG.rx;
 
         const floor = this._adaptFloor(db, this._noiseFloor[this._direction]);
         this._noiseFloor[this._direction] = floor;
-        const ceiling = Math.max(CEILING_DB, floor + MIN_SPAN_DB);
-        this._level = this._clamp((db - floor) / (ceiling - floor));
+        const ceiling = Math.max(cfg.ceiling, floor + cfg.span);
+        this._level = this._clamp(((db - floor) / (ceiling - floor)) * cfg.gain);
 
         this._lastFeed = this._now();
         this._levelTarget = this._level;
