@@ -93,6 +93,12 @@ A host message that actually changes the endpoint also triggers a full reconnect
 
 `place_call()` is idempotent: it hangs up any existing call first and derives the caller ID from the local node digits. Hangup sends DTMF `#` first and calls `audio.reset()` so buffered audio does not play after the call ends. `CALL_IDLE_TIMEOUT = 60.0` seconds causes an automatic hangup when no RX audio arrives; the check runs every five seconds. This is why a healthy WS with no active call is normal after a reload — press **Reconectar** to reopen the channel explicitly. Automatic WS reconnects never re-key the repeater.
 
+### Hangup vs node unlink
+
+`linkAndCallNode()` in `public/assets/js/dashboard.js` performs two separate actions: it links the node through `api/connect.php`, then opens the IAX2 call through the local WebSocket. A WS `call` message with `action: "hangup"` only tears down the IAX2 channel; it does **not** unlink the node in `app_rpt`. If the node stays linked, its carrier or telemetry can keep producing audio that sounds like a constant hum. Use the dashboard's disconnect action when finishing a test.
+
+PTT is still a hard transmit gate: `send_audio()` drops every mic frame unless the session is in a call and PTT is active. A hum observed with `ptt=false` is therefore received/node audio, not the Companion transmitting. Live evidence from 2026-11-24: after the endpoint switched to `192.168.0.125`, a call to `54614` reached `received=1911`, `played=1909`, `dropped=0`; a later parrot test on `55553` reached `frames_received=4770` with `ptt=false` and `frames_dropped=0`.
+
 ### Audio and device handling
 
 Sample rate is 8 kHz with 160-frame (20 ms) buffers. An empty or unmatched `input_device`/`output_device` follows the real OS default; a numeric ID or a name substring pins a device. Use `python -m companion.main --list-devices` to enumerate them.
