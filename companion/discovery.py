@@ -21,11 +21,12 @@ Usage:
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import json
 import logging
 import socket
 import struct
-from typing import Optional
+from typing import Awaitable, Callable, Iterable, Optional
 
 logger = logging.getLogger("companion.discovery")
 
@@ -44,6 +45,163 @@ BROADCAST_ADDRESSES = [
     "192.168.1.255",    # Alternative home network
     "10.0.0.255",       # Class A private
 ]
+
+# IAX2 endpoint verification. A hostname is not enough: on a multi-homed node
+# DNS may point at a secondary interface while Asterisk answers from the primary
+# one. Only the address that actually sends a PONG is a usable IAX2 endpoint.
+IAX_TYPE_IAX = 0x06
+IAX_CMD_PING = 0x02
+IAX_CMD_PONG = 0x03
+PING_CALLNO = 0x12AB  # Dedicated call number; never shared with user calls.
+PING_TIMEOUT = 0.7
+
+Resolver = Callable[[str], Awaitable[list[str]]]
+Probe = Callable[[str, int, float], Awaitable[Optional[str]]]
+
+
+def build_iax2_ping_frame(ts: int = 0) -> bytes:
+    """Build a 12-byte full IAX2 PING frame (Asterisk F=1 convention)."""
+    return struct.pack(
+        "!HHIBBBB",
+        0x8000 | (PING_CALLNO & 0x7FFF),
+        0,
+        ts & 0xFFFFFFFF,
+        0,
+        0,
+        IAX_TYPE_IAX,
+        IAX_CMD_PING,
+    )
+
+
+def is_iax2_pong(data: bytes) -> bool:
+    """True only for a full IAX control PONG frame."""
+    if len(data) < 12:
+        return False
+    first, _dest, _ts, _oseq, _iseq, frametype, subclass = struct.unpack(
+        "!HHIBBBB", data[:12]
+    )
+    return (
+        bool(first & 0x8000)
+        and frametype == IAX_TYPE_IAX
+        and (subclass & 0x7F) == IAX_CMD_PONG
+    )
+
+
+def _usable_address(value: str) -> bool:
+    """Reject loopback/unspecified addresses; a remote Pi cannot live there."""
+    try:
+        address = ipaddress.ip_address(value.strip("[]"))
+    except ValueError:
+        return False
+    return not (address.is_loopback or address.is_unspecified)
+
+
+async def resolve_host_addresses(
+    host: str, resolver: Optional[Resolver] = None
+) -> list[str]:
+    """Resolve a host to unique, routable IPv4 addresses, preserving order."""
+    name = str(host or "").strip().strip("[]")
+    if not name:
+        return []
+
+    if resolver is not None:
+        candidates = await resolver(name)
+    else:
+        try:
+            infos = await asyncio.get_running_loop().getaddrinfo(
+                name, None, family=socket.AF_INET, type=socket.SOCK_DGRAM
+            )
+        except (OSError, UnicodeError) as exc:
+            logger.debug("Could not resolve %s: %s", name, exc)
+            return []
+        candidates = [info[4][0] for info in infos]
+
+    result: list[str] = []
+    for candidate in candidates:
+        address = str(candidate).strip()
+        if _usable_address(address) and address not in result:
+            result.append(address)
+    return result
+
+
+async def probe_iax2_endpoint(
+    host: str, port: int = 4569, timeout: float = PING_TIMEOUT
+) -> Optional[str]:
+    """Send an IAX2 PING and return the IP that sends back a PONG.
+
+    Returns None when nothing answers. The responding address is returned
+    instead of the queried one so a multi-homed Asterisk cannot be reached
+    through the interface DNS happens to advertise.
+    """
+    targets = await resolve_host_addresses(host)
+    if not targets:
+        return None
+
+    loop = asyncio.get_running_loop()
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.setblocking(False)
+    frame = build_iax2_ping_frame()
+    try:
+        for target in targets:
+            sock.sendto(frame, (target, port))
+        deadline = loop.time() + timeout
+        while True:
+            remaining = deadline - loop.time()
+            if remaining <= 0:
+                return None
+            try:
+                data, addr = await asyncio.wait_for(
+                    loop.sock_recvfrom(sock, 256), remaining
+                )
+            except asyncio.TimeoutError:
+                return None
+            if is_iax2_pong(data) and addr[0] in targets:
+                logger.debug("IAX2 PONG from %s:%d", addr[0], addr[1])
+                return addr[0]
+    except OSError as exc:
+        logger.debug("IAX2 probe failed for %s: %s", host, exc)
+        return None
+    finally:
+        sock.close()
+
+
+async def find_reachable_pi(
+    configured_host: str,
+    port: int = 4569,
+    extra_hosts: Iterable[str] = (),
+    *,
+    resolve: Optional[Resolver] = None,
+    probe: Optional[Probe] = None,
+    timeout: float = PING_TIMEOUT,
+) -> Optional[str]:
+    """Return the first candidate that answers an IAX2 PING, or None.
+
+    ``configured_host`` is tried first, then the hostnames supplied by the
+    dashboard. A candidate with no PONG is never returned: that false-positive
+    is exactly what kept a stale IP alive after a DHCP change.
+    """
+    probe_fn: Probe = probe or probe_iax2_endpoint
+    seen_hosts: set[str] = set()
+    seen_addresses: set[str] = set()
+
+    for candidate in [configured_host, *extra_hosts]:
+        name = str(candidate or "").strip()
+        if not name or name.lower() in seen_hosts:
+            continue
+        seen_hosts.add(name.lower())
+
+        for address in await resolve_host_addresses(name, resolver=resolve):
+            if address in seen_addresses:
+                continue
+            seen_addresses.add(address)
+            responder = await probe_fn(address, port, timeout)
+            if responder:
+                logger.info(
+                    "Reachable IAX2 endpoint %s (candidate %s)", responder, name
+                )
+                return responder
+
+    return None
 
 
 class DiscoveryClient:
