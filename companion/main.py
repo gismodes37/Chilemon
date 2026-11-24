@@ -27,7 +27,7 @@ from typing import Any, Optional
 from companion.session import CompanionSession
 from companion.audio import AudioEngine
 from companion.ws_server import WSServer
-from companion.discovery import discover_pi
+from companion.discovery import find_reachable_pi, probe_local_subnet
 
 # Windows Firewall check (optional — best-effort, never blocks startup)
 try:
@@ -81,6 +81,16 @@ class CompanionApp:
         audio_cfg = config.get("audio", {})
         tx_cfg = config.get("tx", {})
         ws_cfg = config.get("ws", {})
+        discovery_cfg = config.get("discovery", {})
+
+        try:
+            self._scan_prefix = int(discovery_cfg.get("subnet_prefix", 24))
+        except (TypeError, ValueError):
+            self._scan_prefix = 24
+
+        # Stable node name from the dashboard config. Used as a candidate when
+        # the pinned IP stops answering after a DHCP lease change.
+        self._node_host = str(ast_cfg.get("node_host", "")).strip()
 
         # Session
         self.session = CompanionSession(
@@ -123,6 +133,10 @@ class CompanionApp:
 
         # Session -> WS: status updates
         self.session.on_status = self._on_session_status
+        self.session.on_rediscover = self._rediscover_endpoint
+
+        # Browser -> Companion: host used to reach the dashboard
+        self.ws_server.on_host = self._on_dashboard_host
 
         # Audio -> Session: TX audio forwarding
         self.audio.on_tx_audio = self._on_audio_tx
@@ -229,50 +243,64 @@ class CompanionApp:
 
         logger.info("All components started — ready")
 
-    async def _ensure_pi_connection(self) -> None:
-        """Ensure we can reach the ChileMon Pi.
-        
-        If the configured host is unreachable, try UDP auto-discovery.
+    async def _ensure_pi_connection(self, extra_hosts: tuple[str, ...] = ()) -> None:
+        """Verify the Pi endpoint with IAX2 and switch to a reachable one.
+
+        The configured address is only a hint: after a DHCP change it silently
+        stops answering. Hostnames from the config and from the dashboard are
+        tried too, and the address that actually sends an IAX2 PONG wins.
         """
-        config_host = self.session._host
-        config_port = self.session._port
-        
-        logger.info("Checking connection to Pi at %s:%d...", config_host, config_port)
-        
-        # Quick connectivity check (UDP ping)
-        try:
-            import socket
-            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            sock.settimeout(1.0)
-            # IAX2 requires ≥4 bytes per frame — 1-byte "midget" packets
-            # are silently rejected by Asterisk ("midget packet received").
-            sock.sendto(b'\x00\x00\x00\x00', (config_host, config_port))
-            sock.close()
-            logger.info("Pi reachable at %s:%d", config_host, config_port)
-            return
-        except Exception as e:
-            logger.warning("Cannot reach Pi at %s:%d: %s", config_host, config_port, e)
-        
-        # Pi unreachable — try auto-discovery
-        logger.info("Attempting UDP auto-discovery...")
-        pi_info = await discover_pi(timeout=5.0)
-        
-        if pi_info:
-            logger.info(
-                "Auto-discovered Pi at %s:%d — updating session",
-                pi_info["ip"], pi_info["port"]
+        configured_host = self.session._host
+        port = self.session._port
+        candidates = [self._node_host, *extra_hosts]
+        logger.info(
+            "Verifying IAX2 endpoint (configured=%s:%d, candidates=%s)",
+            configured_host, port, candidates,
+        )
+
+        reachable = await find_reachable_pi(configured_host, port, candidates)
+        if reachable is None:
+            logger.warning(
+                "No IAX2 reply at %s or %s — scanning local subnet /%d",
+                configured_host, candidates, self._scan_prefix,
             )
-            # Update session with discovered IP
-            self.session._host = pi_info["ip"]
-            self.session._port = pi_info["port"]
-            
-            # Save updated config for next time
-            await self._save_config(pi_info["ip"], pi_info["port"])
-        else:
+            reachable = await probe_local_subnet(port, prefix=self._scan_prefix)
+
+        if reachable is None:
             logger.error(
-                "Could not find ChileMon Pi. "
-                "Please ensure the Pi is on the same network and running ChileMon."
+                "No ChileMon Pi answered an IAX2 probe at %s, %s or on the local "
+                "subnet. Check that the Pi is on the same network and Asterisk "
+                "is running.",
+                configured_host, candidates,
             )
+            return
+
+        if reachable == configured_host:
+            logger.info("IAX2 endpoint confirmed at %s:%d", reachable, port)
+            return
+
+        logger.info(
+            "Pi moved from %s to %s — switching IAX2 endpoint",
+            configured_host, reachable,
+        )
+        await self.session.set_endpoint(reachable, port)
+        await self._save_config(reachable, port)
+
+    async def _on_dashboard_host(self, host: str) -> None:
+        """Re-verify using the address the dashboard was reached through."""
+        candidate = str(host or "").strip()
+        if (
+            not candidate
+            or len(candidate) > 253
+            or any(char in candidate for char in "/\\?@# ")
+        ):
+            logger.warning("Ignoring invalid dashboard host %r", candidate)
+            return
+        await self._ensure_pi_connection((candidate,))
+
+    async def _rediscover_endpoint(self) -> None:
+        """Re-run discovery before a reconnect so a moved Pi is found."""
+        await self._ensure_pi_connection()
 
     async def stop(self) -> None:
         """Graceful shutdown of all components."""
@@ -353,7 +381,11 @@ class CompanionApp:
                 
                 f.write("[asterisk]\n")
                 f.write(f'host = "{pi_ip}"\n')
-                f.write(f"port = {pi_port}\n\n")
+                f.write(f"port = {pi_port}\n")
+                node_host = str(config["asterisk"].get("node_host", "")).replace('"', '\\"')
+                if node_host:
+                    f.write(f'node_host = "{node_host}"\n')
+                f.write("\n")
                 
                 f.write("[peer]\n")
                 f.write('username = "companion-app"\n')

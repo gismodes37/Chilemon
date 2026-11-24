@@ -124,6 +124,19 @@ class PTTWidget {
             this.reconnectAttempts = 0;
             this._wsFailed = false;
             this._setStatus('connected', 'Companion Connected');
+
+            // The dashboard knows how the browser reached the Pi. Sharing that
+            // host lets the Companion re-verify IAX2 after a DHCP address change
+            // without reinstalling or guessing a pinned IP.
+            const dashboardHost = window.location && window.location.hostname;
+            if (dashboardHost && this.ws.readyState === WebSocket.OPEN) {
+                try {
+                    this.ws.send(JSON.stringify({ type: 'host', host: dashboardHost }));
+                } catch (e) {
+                    // Host announcement is best effort; calls remain available.
+                }
+            }
+
             // Keep the button available so the user can force a reconnect
             // without waiting for the automatic backoff to fire.
             if (this.connectBtn) {

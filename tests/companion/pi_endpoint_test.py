@@ -2,7 +2,7 @@
 
 A stale configured address must never be reported as reachable: UDP ``sendto``
 does not prove anything. Candidates are resolved and verified with an IAX2
-PING/PONG exchange, and the address that actually replies is the one we use.
+REGREQ probe, and the address that actually replies is the one we use.
 
 Run with: python -m pytest tests/companion/pi_endpoint_test.py -v
 """
@@ -21,43 +21,45 @@ if str(ROOT) not in sys.path:
 from companion import discovery  # noqa: E402
 
 
-def _pong(src_callno: int = 1, dest_callno: int = 0) -> bytes:
+def _probe_reply(dest_callno: int = discovery.PROBE_CALLNO, subclass: int = 0x10) -> bytes:
     return struct.pack(
         "!HHIBBBB",
-        0x8000 | (src_callno & 0x7FFF),
+        0x8001,  # Asterisk full-frame convention
         dest_callno & 0x7FFF,
         1,
         0,
-        0,
+        1,
         0x06,  # IAX_TYPE_IAX
-        0x03,  # IAX_CMD_PONG
+        subclass,  # IAX_CMD_REGREJ by default
     )
 
 
-def test_ping_frame_is_a_valid_full_iax_control_frame() -> None:
-    frame = discovery.build_iax2_ping_frame(ts=0x01020304)
+def test_probe_frame_is_a_valid_full_iax_control_frame() -> None:
+    frame = discovery.build_iax2_probe_frame(ts=0x01020304)
     first, second, ts, oseqno, iseqno, frametype, subclass = struct.unpack(
         "!HHIBBBB", frame
     )
 
     assert len(frame) == 12
-    assert first == 0x8000 | discovery.PING_CALLNO
+    assert first == 0x8000 | discovery.PROBE_CALLNO
     assert second == 0
     assert ts == 0x01020304
     assert (oseqno, iseqno) == (0, 0)
     assert frametype == 0x06
-    assert subclass == 0x02
+    assert subclass == 0x0D  # REGREQ: Asterisk answers even for unknown peers
 
 
-def test_only_full_iax_pong_counts_as_a_reply() -> None:
-    assert discovery.is_iax2_pong(_pong())
-    assert not discovery.is_iax2_pong(b"\x00\x01")  # too short
-    ping = bytearray(_pong())
-    ping[-1] = 0x02
-    assert not discovery.is_iax2_pong(bytes(ping))  # echo of our own PING
-    wrong_type = bytearray(_pong())
+def test_only_addressed_iax_control_replies_count() -> None:
+    assert discovery.is_iax2_probe_reply(_probe_reply())
+    assert not discovery.is_iax2_probe_reply(b"\x00\x01")  # too short
+    echo = bytearray(_probe_reply())
+    echo[-1] = 0x0D
+    assert not discovery.is_iax2_probe_reply(bytes(echo))  # our own request
+    wrong_call = _probe_reply(dest_callno=0x9999)
+    assert not discovery.is_iax2_probe_reply(wrong_call)
+    wrong_type = bytearray(_probe_reply())
     wrong_type[-2] = 0x07
-    assert not discovery.is_iax2_pong(bytes(wrong_type))
+    assert not discovery.is_iax2_probe_reply(bytes(wrong_type))
 
 
 def test_stale_configured_host_is_never_reported_as_reachable() -> None:
@@ -142,6 +144,34 @@ def test_dashboard_host_is_probed_after_a_stale_config_host() -> None:
 
     assert probed == ["192.168.0.110", "192.168.0.114"]
     assert result == "192.168.0.125"
+
+
+def test_local_subnet_scan_finds_the_pi_without_a_pinned_address() -> None:
+    async def probe(host: str, port: int, timeout: float) -> str | None:
+        if host == "192.168.0.125":
+            return host
+        return None
+
+    result = asyncio.run(
+        discovery.probe_local_subnet(local_ip="192.168.0.109", probe=probe)
+    )
+
+    assert result == "192.168.0.125"
+
+
+def test_local_subnet_scan_does_not_probe_our_own_address() -> None:
+    probed: list[str] = []
+
+    async def probe(host: str, port: int, timeout: float) -> str | None:
+        probed.append(host)
+        return None
+
+    asyncio.run(
+        discovery.probe_local_subnet(local_ip="192.168.0.109", probe=probe)
+    )
+
+    assert "192.168.0.109" not in probed
+    assert "192.168.0.125" in probed
 
 
 def test_loopback_and_duplicate_candidates_are_skipped() -> None:

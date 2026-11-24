@@ -26,6 +26,7 @@ MSG_PTT = "ptt"
 MSG_DTMF = "dtmf"
 MSG_STATUS = "status"
 MSG_CALL = "call"
+MSG_HOST = "host"
 
 # Message types (companion -> browser)
 MSG_STATUS_RESP = "status"
@@ -62,6 +63,7 @@ class WSServer:
         self.on_status_request: Optional[Callable[[], dict]] = None
         self.on_call: Optional[Callable[[str], Awaitable[None]]] = None
         self.on_hangup: Optional[Callable[[], Awaitable[None]]] = None
+        self.on_host: Optional[Callable[[str], Awaitable[None]]] = None
 
     # -- Lifecycle --
 
@@ -180,6 +182,11 @@ class WSServer:
                 node = payload.get("node", "")
                 if node and self.on_call:
                     await self.on_call(node)
+
+        elif msg_type == MSG_HOST:
+            host = str(payload.get("host", "")).strip()
+            if host and self.on_host:
+                await self.on_host(host)
 
         elif msg_type == MSG_STATUS:
             await self._send_status(ws)

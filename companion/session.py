@@ -58,6 +58,8 @@ class CompanionSession:
         self.on_audio_rx: Optional[Callable[[bytes, int], Awaitable[None]]] = None
         # Callback: status change (is_registered, in_call, ptt_active, error)
         self.on_status: Optional[Callable[[dict], Awaitable[None]]] = None
+        # Hook: re-resolve the Pi endpoint before a reconnect.
+        self.on_rediscover: Optional[Callable[[], Awaitable[None]]] = None
 
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._reconnecting: bool = False  # guard against concurrent reconnects
@@ -78,6 +80,32 @@ class CompanionSession:
     @property
     def in_call(self) -> bool:
         return self._in_call
+
+    # -- Endpoint --
+
+    async def set_endpoint(self, host: str, port: int) -> bool:
+        """Point the session at a new Pi and drop the stale UDP transport.
+
+        Returns True when the endpoint changed. The next ``start()`` rebuilds
+        the transport against the new address; callers that are already running
+        must trigger a reconnect themselves.
+        """
+        if host == self._host and port == self._port:
+            return False
+
+        previous = f"{self._host}:{self._port}"
+        self._host = host
+        self._port = port
+        if self._session is not None:
+            try:
+                await self._session.close()
+            except Exception:
+                pass
+            self._session = None
+        self._registered = False
+        self._in_call = False
+        logger.info("IAX2 endpoint switched %s -> %s:%d", previous, host, port)
+        return True
 
     # -- Lifecycle --
 
@@ -184,6 +212,10 @@ class CompanionSession:
                 except Exception:
                     pass
                 self._session = None
+
+            # A DHCP change may have moved the Pi since the last probe.
+            if self.on_rediscover is not None:
+                await self.on_rediscover()
 
             # Small delay before reconnect
             await asyncio.sleep(2.0)

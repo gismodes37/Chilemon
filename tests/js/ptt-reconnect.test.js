@@ -85,7 +85,11 @@ function makeWidget(storage = makeStorage()) {
 
   const context = vm.createContext({
     document,
-    window: { addEventListener() {}, removeEventListener() {} },
+    window: {
+      addEventListener() {},
+      removeEventListener() {},
+      location: { hostname: 'node494780.local' },
+    },
     console: { log() {}, warn() {}, error() {} },
     WebSocket: FakeWebSocket,
     sessionStorage: storage,
@@ -115,6 +119,16 @@ function openAndDrop(widget, sockets, timers) {
 }
 
 const { test } = require('node:test');
+
+test('dashboard host is announced when the WebSocket opens', () => {
+  const { widget, sockets } = makeWidget();
+  widget._openWebSocket();
+  const ws = sockets.at(-1);
+  ws.onopen?.();
+
+  const announcements = ws.sent.filter((msg) => msg.type === 'host');
+  assert.deepEqual(announcements, [{ type: 'host', host: 'node494780.local' }]);
+});
 
 test('connect button stays visible and usable after the WebSocket opens', () => {
   const { widget, sockets } = makeWidget();

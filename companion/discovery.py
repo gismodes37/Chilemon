@@ -50,40 +50,43 @@ BROADCAST_ADDRESSES = [
 # DNS may point at a secondary interface while Asterisk answers from the primary
 # one. Only the address that actually sends a PONG is a usable IAX2 endpoint.
 IAX_TYPE_IAX = 0x06
-IAX_CMD_PING = 0x02
-IAX_CMD_PONG = 0x03
-PING_CALLNO = 0x12AB  # Dedicated call number; never shared with user calls.
+IAX_CMD_REGREQ = 0x0D
+# Asterisk ignores PING/LAGRQ from a source it does not know, but always
+# answers a REGREQ. These are the control replies that prove IAX2 is alive.
+IAX_PROBE_REPLIES = {0x06, 0x08, 0x0E, 0x0F, 0x10, 0x28}  # REJECT..CALLTOKEN
+PROBE_CALLNO = 0x12AB  # Dedicated call number; never shared with user calls.
 PING_TIMEOUT = 0.7
 
 Resolver = Callable[[str], Awaitable[list[str]]]
 Probe = Callable[[str, int, float], Awaitable[Optional[str]]]
 
 
-def build_iax2_ping_frame(ts: int = 0) -> bytes:
-    """Build a 12-byte full IAX2 PING frame (Asterisk F=1 convention)."""
+def build_iax2_probe_frame(ts: int = 0) -> bytes:
+    """Build a 12-byte full IAX2 REGREQ probe (Asterisk F=1 convention)."""
     return struct.pack(
         "!HHIBBBB",
-        0x8000 | (PING_CALLNO & 0x7FFF),
+        0x8000 | (PROBE_CALLNO & 0x7FFF),
         0,
         ts & 0xFFFFFFFF,
         0,
         0,
         IAX_TYPE_IAX,
-        IAX_CMD_PING,
+        IAX_CMD_REGREQ,
     )
 
 
-def is_iax2_pong(data: bytes) -> bool:
-    """True only for a full IAX control PONG frame."""
+def is_iax2_probe_reply(data: bytes) -> bool:
+    """True for a full IAX control reply addressed to our probe call number."""
     if len(data) < 12:
         return False
-    first, _dest, _ts, _oseq, _iseq, frametype, subclass = struct.unpack(
+    first, dest, _ts, _oseq, _iseq, frametype, subclass = struct.unpack(
         "!HHIBBBB", data[:12]
     )
     return (
         bool(first & 0x8000)
+        and (dest & 0x7FFF) == PROBE_CALLNO
         and frametype == IAX_TYPE_IAX
-        and (subclass & 0x7F) == IAX_CMD_PONG
+        and (subclass & 0x7F) in IAX_PROBE_REPLIES
     )
 
 
@@ -127,7 +130,7 @@ async def resolve_host_addresses(
 async def probe_iax2_endpoint(
     host: str, port: int = 4569, timeout: float = PING_TIMEOUT
 ) -> Optional[str]:
-    """Send an IAX2 PING and return the IP that sends back a PONG.
+    """Send an IAX2 REGREQ probe and return the IP that answers it.
 
     Returns None when nothing answers. The responding address is returned
     instead of the queried one so a multi-homed Asterisk cannot be reached
@@ -140,7 +143,7 @@ async def probe_iax2_endpoint(
     loop = asyncio.get_running_loop()
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.setblocking(False)
-    frame = build_iax2_ping_frame()
+    frame = build_iax2_probe_frame()
     try:
         for target in targets:
             sock.sendto(frame, (target, port))
@@ -155,8 +158,8 @@ async def probe_iax2_endpoint(
                 )
             except asyncio.TimeoutError:
                 return None
-            if is_iax2_pong(data) and addr[0] in targets:
-                logger.debug("IAX2 PONG from %s:%d", addr[0], addr[1])
+            if is_iax2_probe_reply(data) and addr[0] in targets:
+                logger.debug("IAX2 probe reply from %s:%d", addr[0], addr[1])
                 return addr[0]
     except OSError as exc:
         logger.debug("IAX2 probe failed for %s: %s", host, exc)
@@ -177,8 +180,8 @@ async def find_reachable_pi(
     """Return the first candidate that answers an IAX2 PING, or None.
 
     ``configured_host`` is tried first, then the hostnames supplied by the
-    dashboard. A candidate with no PONG is never returned: that false-positive
-    is exactly what kept a stale IP alive after a DHCP change.
+    dashboard. A candidate with no IAX2 reply is never returned: that
+    false-positive is exactly what kept a stale IP alive after a DHCP change.
     """
     probe_fn: Probe = probe or probe_iax2_endpoint
     seen_hosts: set[str] = set()
@@ -201,6 +204,58 @@ async def find_reachable_pi(
                 )
                 return responder
 
+    return None
+
+
+def detect_local_ipv4() -> Optional[str]:
+    """Return the local address used for outbound traffic, without sending data."""
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        # TEST-NET-1: a documentation address picked only to trigger routing.
+        sock.connect(("192.0.2.1", 9))
+        return str(sock.getsockname()[0])
+    except OSError as exc:
+        logger.debug("Could not detect local IP: %s", exc)
+        return None
+    finally:
+        sock.close()
+
+
+async def probe_local_subnet(
+    port: int = 4569,
+    prefix: int = 24,
+    timeout: float = PING_TIMEOUT,
+    *,
+    local_ip: Optional[str] = None,
+    probe: Optional[Probe] = None,
+) -> Optional[str]:
+    """Last-resort discovery: probe the local subnet for an IAX2 responder.
+
+    The subnet comes from the PC's own DHCP address, never from a pinned Pi IP.
+    Probes run in small concurrent batches so a /24 completes in a few seconds.
+    """
+    address = local_ip or detect_local_ipv4()
+    if not address:
+        return None
+
+    try:
+        network = ipaddress.ip_network(f"{address}/{prefix}", strict=False)
+    except ValueError as exc:
+        logger.warning("Invalid discovery subnet prefix %s: %s", prefix, exc)
+        return None
+
+    probe_fn: Probe = probe or probe_iax2_endpoint
+    targets = [str(host) for host in network.hosts() if str(host) != address]
+    for start in range(0, len(targets), 64):
+        batch = targets[start:start + 64]
+        results = await asyncio.gather(
+            *(probe_fn(target, port, timeout) for target in batch),
+            return_exceptions=True,
+        )
+        for result in results:
+            if isinstance(result, str) and result:
+                logger.info("Found ChileMon Pi at %s", result)
+                return result
     return None
 
 
