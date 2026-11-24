@@ -293,7 +293,7 @@ After installation, open `http://<your-pi-ip>/chilemon` and log in with the admi
 
 1. In the dashboard, click **Companion App** to download `chilemon-companion-install.bat`.
 2. On the Windows PC, double-click that file from Downloads. Requires Python 3.11+ and internet access.
-3. The installer downloads the companion source from GitHub, installs `numpy`, `sounddevice` and `aiohttp`, writes the generated config to `%USERPROFILE%\.chilemon\config.toml`, registers logon autostart and starts the companion.
+3. The installer downloads the companion source from GitHub, installs `numpy`, `sounddevice` and `aiohttp`, writes the generated config to `%USERPROFILE%\.chilemon\config.toml`, registers logon autostart and starts the companion. The generated `host` is a hint: the Companion verifies the reachable IAX2 endpoint at startup and after an IP change.
 4. The dashboard then shows **Companion Connected**. Press **Reconectar** to open the IAX2 call.
 
 To remove the companion completely — for a clean test or a different PC — run `%USERPROFILE%\.chilemon\src\companion\uninstall-companion.bat`.

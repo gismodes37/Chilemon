@@ -2,12 +2,12 @@
 
 El Companion es una pequeña aplicación Python que se ejecuta en la PC del operador. Proporciona al navegador un WebSocket local para PTT y niveles de audio, además de un enlace IAX2 con Asterisk en la Raspberry Pi. Esta guía explica qué se instala y dónde, cómo se conectan las piezas, qué supuestos de seguridad se aplican y si el botón **Companion App** del panel puede servir como instalador para otros usuarios.
 
-> Estado: actualizado para el inicio automático idempotente en la rama `feat/companion-autostart-task`. Los elementos marcados como **Verificar** presentan contradicciones en el repositorio y deben confirmarse en la Pi antes de considerarlos válidos.
+> Estado: actualizado para `main` tras la detección dinámica del endpoint IAX2 y la verificación de audio en vivo. Los elementos marcados como **Verificar** presentan contradicciones en el repositorio y deben confirmarse en la Pi antes de considerarlos válidos.
 
 ## Ruta rápida (una sola acción en Windows)
 
 1. En la Pi, ejecutar `install/install_chilemon.sh`. El script genera un secreto IAX2 aleatorio y lo escribe en `config/local.php`.
-2. En el panel, presionar **Companion App**. El `chilemon-companion-install.bat` descargado ya contiene la IP de la Pi y ese secreto (en base64).
+2. En el panel, presionar **Companion App**. El `chilemon-companion-install.bat` descargado ya contiene la dirección de la Pi como pista inicial y ese secreto (en base64); el Companion vuelve a verificar el endpoint IAX2 real al arrancar y después de un cambio de IP.
 3. En la PC con Windows, hacer doble clic en ese archivo desde Descargas. Descarga el código del companion desde GitHub, instala `numpy`/`sounddevice`/`aiohttp`, valida la config con `companion.install_config`, registra el inicio automático y arranca el companion. Requiere Python 3.11+ e internet; el ref del código es `main` salvo que `CHILEMON_COMPANION_REF` fije otra rama o tag.
 4. En el panel, confirmar **Companion Connected** y luego presionar **Reconectar** para abrir el canal IAX2. El PTT sigue siendo explícito: conectá un nodo antes de transmitir.
 
@@ -54,7 +54,7 @@ El orden de búsqueda de la configuración es `--config`, luego `~/.chilemon/con
 `install/install_chilemon.sh` realiza la configuración principal:
 
 - Genera `iax_companion_secret` con `openssl rand -hex 24` y lo guarda en `config/local.php` (permisos `640`).
-- El instalador `.bat` del dashboard descubre el host IAX2 desde la propia descarga: primero el `Host` que usó el navegador y después `SERVER_ADDR`. No se guarda ninguna dirección en la configuración, así que un mismo instalador sirve para cualquier dirección con la que se llegue al nodo en funcionamiento.
+- El instalador `.bat` del dashboard descubre el host IAX2 desde la propia descarga: primero el `Host` que usó el navegador y después `SERVER_ADDR`. Escribe esa dirección como pista `host` y guarda el nombre mDNS del nodo como `node_host`; la plantilla `companion/config.toml` del repo deja ambos vacíos, así que un mismo instalador sirve para cualquier dirección con la que se llegue al nodo en funcionamiento.
 - Detecta la CIDR de la red local, con `127.0.0.1/32` como respaldo si no puede determinarla.
 - Escribe el peer `[companion-app]` desde `install/asterisk/iax-companion.conf`, sustituyendo el secreto y la ACL de la red local.
 - Restringe el peer con `deny=0.0.0.0/0.0.0.0` más `permit=<LAN>` y un `calltokenoptional` limitado a la subred.
@@ -73,15 +73,31 @@ El contexto `[radio-companion]` lo instala el propio instalador de la Pi y es id
 
 | Dirección | Transporte | Detalles |
 | --- | --- | --- |
-| Navegador → Companion | WS `/ws` | `ptt` (`key`/`unkey`), `dtmf`, `call` (`node` o `action:hangup`), `status` |
+| Navegador → Companion | WS `/ws` | `ptt` (`key`/`unkey`), `dtmf`, `call` (`node` o `action:hangup`), `status`, `host` (`hostname` usado para llegar al panel) |
 | Companion → navegador | WS `/ws` | `status`, `audio_level` (`rms`, cuatro bandas del espectro), `error` |
 | Prueba de salud | HTTP `GET /health` | `{"status":"ok","peers":N}` |
 
-El WebSocket escucha en `127.0.0.1:9093` por defectro. IAX2 usa UDP `4569` hacia el host de la Pi configurado.
+El WebSocket escucha en `127.0.0.1:9093` por defecto. IAX2 usa UDP `4569` hacia el host de la Pi detectado, no necesariamente el que quedó escrito en la configuración.
+
+### Detección dinámica del endpoint
+
+El `host` de `config.toml` es una pista, no un contrato. Un `sendto()` sobre un socket UDP nunca demostró alcanabilidad, así que una IP vieja podía quedar configurada para siempre mientras las llamadas fallaban con `Call setup timeout (no NEWACK)`. Al arrancar, al reconectar y al recibir el mensaje `host` del panel, el Companion resuelve candidatos y envía una sonda IAX2 REGREQ: usa la dirección que responde. Asterisk ignora PING de un peer desconocido pero responde REGREQ, y la sonda nunca abre una llamada.
+
+Orden de candidatos: el host configurado, `[asterisk].node_host` (el nombre mDNS del nodo en la config generada), el hostname del panel y luego un escaneo acotado de la subred DHCP de la PC (`[discovery].subnet_prefix`, por defecto `/24`). No se fija ninguna IP de la Pi y no hace falta ningún daemon en la Pi. Un hostname nunca se confía por sí solo: en un nodo con varias interfaces se usa la IP que responde, evitando que DNS anuncie una secundaria mientras Asterisk responde desde la primaria. La respuesta se acepta desde la IP consultada o desde otra dirección de la misma `/24`, y se rechaza desde otras subredes para que la sonda no pueda redirigirse fuera de la LAN.
+
+Un mensaje `host` que cambia realmente el endpoint también dispara una reconexión completa. `set_endpoint()` cierra el transporte UDP viejo; sin esa reconexión un Companion en vivo quedaría sin registrar hasta que apareciera otra falla.
+
+**Verificar:** una host vieja debe producir `No IAX2 reply ... scanning local subnet` en `companion.log`, seguido de `IAX2 endpoint switched`, y `place_call()` debe informar `received > 0`. «Companion Connected» solo significa que el WebSocket local está arriba; la actividad de red del panel no prueba audio IAX2.
 
 ### Ciclo de la llamada
 
 `place_call()` es idempotente: primero corta cualquier llamada existente y deriva el identificador de llamada a partir de los dígitos del nodo local. El corte envía primero DTMF `#` y llama a `audio.reset()` para que no se reproduzca audio pendiente después de finalizar. `CALL_IDLE_TIMEOUT = 60.0` segundos provoca el corte automático cuando no llega audio de RX; la verificación se ejecuta cada cinco segundos. Por eso es normal que, tras recargar la página, el WS esté sano pero no haya llamada activa: presionar **Reconectar** abre el canal explícitamente. Las reconexiones automáticas del WS nunca vuelven a abrir la emisión hacia el repetidor.
+
+### Cortar la llamada vs des-enlazar el nodo
+
+`linkAndCallNode()` en `public/assets/js/dashboard.js` hace dos acciones separadas: enlaza el nodo mediante `api/connect.php` y después abre la llamada IAX2 por el WebSocket local. Un mensaje WS `call` con `action: "hangup"` solo cierra el canal IAX2; **no** des-enlaza el nodo en `app_rpt`. Si el nodo sigue enlazado, su portadora o telemetría puede seguir generando audio que se escucha como un zumbido constante. Usá la acción de desconectar del panel al terminar una prueba.
+
+El PTT sigue siendo una compuerta estricta: `send_audio()` descarta cada frame del mic salvo que haya una llamada y el PTT esté activo. Un zumbido con `ptt=false` es por lo tanto audio recibido/del nodo, no transmisión del Companion. Evidencia en vivo del 2026-11-24: tras el cambio de endpoint a `192.168.0.125`, una llamada a `54614` alcanzó `received=1911`, `played=1909`, `dropped=0`; una prueba posterior con el parrot `55553` alcanzó `frames_received=4770` con `ptt=false` y `frames_dropped=0`.
 
 ### Audio y dispositivos
 
@@ -138,6 +154,8 @@ Consideraciones pendientes:
 - [ ] El panel dice **Companion Connected**, no *Companion no detectado*. Ese mensaje significa que falló el handshake del WebSocket, es decir, no hay ningún proceso escuchando.
 - [ ] Tras reiniciar, `schtasks /query /tn "ChileMon Companion"` o `reg query "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" /v "ChileMon Companion"` muestra el registro de inicio automático, y el companion arranca sin una ventana esperando `pause`.
 - [ ] El `status` del WS informa `connected: true` para IAX2; presionar **Reconectar** si `call_active: false`.
+- [ ] Tras un cambio de IP de la Pi, `companion.log` muestra `IAX2 endpoint switched` y una llamada nueva informa `received > 0`; no confiar solo en «Companion Connected».
+- [ ] Después de cortar la llamada IAX2, des-enlazar el nodo desde el panel para liberar la portadora; el `hangup` del WS no lo des-enlaza.
 - [ ] El RMS de `audio_level` está claramente por encima de `0.0005`; un valor casi nulo con callbacks activos indica un dispositivo silencioso obsoleto, que `check_health()` debería reabrir.
 - [ ] El secreto del peer en la Pi coincide con `config/local.php`; un secreto rotado rompe la autenticación sin aviso.
 

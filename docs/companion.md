@@ -2,12 +2,12 @@
 
 The Companion is a small Python audio app that runs on the operator's PC. It gives the browser a local WebSocket for PTT and audio levels, and an IAX2 link to Asterisk on the Raspberry Pi. This guide explains what gets installed where, how the pieces connect, what security assumptions apply, and whether the dashboard's **Companion App** button can serve as an installer for other users.
 
-> Status: updated for the idempotent logon autostart on branch `feat/companion-autostart-task`. Items marked **Verify** are contradictory in the repository and must be confirmed on the Pi before being treated as fact.
+> Status: current for `main` after dynamic IAX2 endpoint detection and live audio verification. Items marked **Verify** are contradictory in the repository and must be confirmed on the Pi before being treated as fact.
 
 ## Quick path (one action on Windows)
 
 1. On the Pi, run `install/install_chilemon.sh`. It generates a random IAX2 secret and writes it to `config/local.php`.
-2. In the dashboard, click **Companion App**. The downloaded `chilemon-companion-install.bat` already contains the Pi IP and that secret (base64-encoded).
+2. In the dashboard, click **Companion App**. The downloaded `chilemon-companion-install.bat` already contains the Pi address as a starting hint and that secret (base64-encoded); the Companion re-checks the real IAX2 endpoint at startup and after an IP change.
 3. On the Windows PC, double-click that file from Downloads. It downloads the companion source from GitHub, installs `numpy`/`sounddevice`/`aiohttp`, validates the config via `companion.install_config`, registers logon autostart and starts the companion. Python 3.11+ and internet access are required; the source ref is `main` unless `CHILEMON_COMPANION_REF` pins another branch or tag.
 4. In the dashboard, confirm **Companion Connected**, then press **Reconectar** to open the IAX2 channel. PTT stays explicit: connect a node before keying.
 
@@ -54,7 +54,7 @@ The configuration search order is `--config`, then `~/.chilemon/config.toml`, th
 `install/install_chilemon.sh` does the authoritative setup:
 
 - Generates `iax_companion_secret` with `openssl rand -hex 24` and stores it in `config/local.php` (mode `640`).
-- The dashboard's `.bat` installer discovers the initial IAX2 host from the download request: the browser-facing `Host` header first, then `SERVER_ADDR`. It also records the node's mDNS name as `node_host`; no fixed Pi address is shipped, so one installer works for any address used to reach a running node.
+- The dashboard's `.bat` installer discovers the initial IAX2 host from the download request: the browser-facing `Host` header first, then `SERVER_ADDR`. It writes that address as the `host` hint and records the node's mDNS name as `node_host`; the shipped `companion/config.toml` leaves both empty, so one installer works for any address used to reach a running node.
 - Detects the LAN CIDR, falling back to `127.0.0.1/32` if it cannot.
 - Writes the `[companion-app]` peer from `install/asterisk/iax-companion.conf`, substituting the secret and the LAN ACL.
 - Restricts the peer with `deny=0.0.0.0/0.0.0.0` plus `permit=<LAN>` and scoped `calltokenoptional`.
