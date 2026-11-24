@@ -69,6 +69,17 @@ $repo_ref = defined('CHILEMON_COMPANION_REF')
     ? (string) constant('CHILEMON_COMPANION_REF')
     : 'main';
 
+// Host estable del nodo: la IP de la request es solo el punto de partida.
+// Si el Pi cambia de dirección por DHCP, el Companion usa este nombre como
+// candidato adicional (siempre verificado con IAX2) antes de escanear la LAN.
+$hostname = trim((string) gethostname());
+$node_host = defined('CHILEMON_NODE_HOST')
+    ? trim((string) constant('CHILEMON_NODE_HOST'))
+    : ($hostname !== ''
+        ? (str_ends_with(strtolower($hostname), '.local') ? $hostname : $hostname . '.local')
+        : '');
+$node_host = preg_replace('/[^A-Za-z0-9._-]/', '', $node_host) ?? '';
+
 // Generar config.toml
 $config = <<<TOML
 # ChileMon Companion App Configuration
@@ -77,6 +88,7 @@ $config = <<<TOML
 [asterisk]
 host = "{$pi_ip}"
 port = {$iax_port}
+node_host = "{$node_host}"
 
 [peer]
 username = "companion-app"

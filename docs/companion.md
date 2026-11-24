@@ -54,7 +54,7 @@ The configuration search order is `--config`, then `~/.chilemon/config.toml`, th
 `install/install_chilemon.sh` does the authoritative setup:
 
 - Generates `iax_companion_secret` with `openssl rand -hex 24` and stores it in `config/local.php` (mode `640`).
-- The dashboard's `.bat` installer discovers the IAX2 host from the download request: the browser-facing `Host` header first, then `SERVER_ADDR`. No host address is stored in config, so one installer works for any address used to reach a running node.
+- The dashboard's `.bat` installer discovers the initial IAX2 host from the download request: the browser-facing `Host` header first, then `SERVER_ADDR`. It also records the node's mDNS name as `node_host`; no fixed Pi address is shipped, so one installer works for any address used to reach a running node.
 - Detects the LAN CIDR, falling back to `127.0.0.1/32` if it cannot.
 - Writes the `[companion-app]` peer from `install/asterisk/iax-companion.conf`, substituting the secret and the LAN ACL.
 - Restricts the peer with `deny=0.0.0.0/0.0.0.0` plus `permit=<LAN>` and scoped `calltokenoptional`.
@@ -73,11 +73,19 @@ The `[radio-companion]` context is installed by the Pi installer itself and is i
 
 | Direction | Transport | Details |
 | --- | --- | --- |
-| Browser → Companion | WS `/ws` | `ptt` (`key`/`unkey`), `dtmf`, `call` (`node` or `action:hangup`), `status` |
+| Browser → Companion | WS `/ws` | `ptt` (`key`/`unkey`), `dtmf`, `call` (`node` or `action:hangup`), `status`, `host` (`hostname` used to reach the dashboard) |
 | Companion → browser | WS `/ws` | `status`, `audio_level` (`rms`, four spectrum bins), `error` |
 | Health probe | HTTP `GET /health` | `{"status":"ok","peers":N}` |
 
-The WebSocket binds `127.0.0.1:9093` by default. IAX2 uses UDP `4569` to the configured Pi host.
+The WebSocket binds `127.0.0.1:9093` by default. IAX2 uses UDP `4569` to the discovered Pi host.
+
+### Dynamic endpoint detection
+
+The `host` in `config.toml` is a hint, not a contract. A `sendto()` on a UDP socket never proved reachability, so a stale IP could stay configured forever while calls died with `Call setup timeout (no NEWACK)`. Startup, reconnect and the `host` message from the dashboard now resolve candidates and send a small IAX2 REGREQ probe: the address that answers is the one used. Asterisk ignores PING from an unknown peer but answers REGREQ, and the probe never opens a call.
+
+Candidate order: configured host, `[asterisk].node_host` (the node's mDNS name from the generated config), the dashboard hostname, then a bounded scan of the PC's own DHCP subnet (`[discovery].subnet_prefix`, default `/24`). No Pi address is hardcoded and no Pi-side daemon is required. A hostname is never trusted by itself: on a multi-homed node the *replying* IP is used, which avoids the trap where DNS advertises a secondary interface and Asterisk answers from the primary one.
+
+**Verify:** a stale host must produce `No IAX2 reply ... scanning local subnet` in `companion.log`, followed by `IAX2 endpoint switched`, and `place_call()` must then report `received > 0`. "Companion Connected" only means the local WebSocket is up; dashboard network activity is not proof of IAX2 audio.
 
 ### Call lifecycle
 

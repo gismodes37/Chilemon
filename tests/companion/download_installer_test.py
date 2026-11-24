@@ -96,6 +96,21 @@ def test_endpoint_serves_a_bat_not_a_toml() -> None:
     assert "InstallerPayload" in ENDPOINT
 
 
+def test_generated_config_carries_the_node_hostname() -> None:
+    """The Companion needs a stable candidate when the Pi's DHCP IP changes."""
+    assert 'node_host = "{$node_host}"' in ENDPOINT
+    assert "gethostname()" in ENDPOINT
+
+
+def test_shipped_config_has_no_pinned_pi_address() -> None:
+    template = (ROOT / "companion" / "config.toml").read_text(
+        encoding="utf-8", errors="replace"
+    )
+    assert "192.168.0.116" not in template
+    assert 'host = ""' in template
+    assert 'node_host = ""' in template
+
+
 def test_dashboard_download_name_matches_endpoint() -> None:
     assert "chilemon-companion-install.bat" in DASHBOARD
     assert "chilemon-companion-config.toml" not in DASHBOARD

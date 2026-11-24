@@ -2,8 +2,12 @@
 # Copy this file to ~/.chilemon/config.toml and edit.
 
 [asterisk]
-host = "192.168.0.116"
+# Filled by the dashboard-generated config; an empty host is rejected on purpose.
+# No Pi IP is pinned here: after a DHCP change the Companion rediscovers it.
+host = ""
 port = 4569
+# Stable mDNS name of the node, used as a candidate when the IP changes.
+node_host = ""
 # local_port = 4569   # Bind to a fixed local port (requires admin on Windows for <1024).
                        # When set, Asterisk can qualify/reach the companion on this port.
                        # Default (commented out) = ephemeral port assigned by OS.
