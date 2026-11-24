@@ -85,7 +85,7 @@
         <p class="lead opacity-90 mb-4">
           Dashboard moderno para nodos <strong>AllStarLink ASL3</strong> y <strong>EchoLink</strong>, inspirado en el concepto de Supermon,
           pero construido con una base más ordenada, segura, modular e instalable.
-          El release v0.4.0 ya permite <strong>Push-to-Talk desde el navegador, conexión por puente de audio WebRTC, seguridad reforzada y gestión local segura</strong>.
+          El release actual <strong>v0.4.0</strong> ya incluye <strong>PTT desde el navegador, puente WebRTC/IAX2, seguridad reforzada, mapa de instalaciones y Companion de Windows</strong>, con mejoras continuas en la rama <strong>main</strong>.
         </p>
 
         <div class="small opacity-75 mb-3">
@@ -107,7 +107,7 @@
 
         <div class="mt-4 small opacity-75">
           <i class="bi bi-info-circle"></i>
-          Release v0.4.0: PTT desde el navegador, puente de audio WebRTC, seguridad reforzada, roles de usuario, rate limiting y gestión local segura.
+          <strong>Avances en main:</strong> visualizador RX/TX mejorado (sensibilidad, 48 barras, color por intensidad), Companion de Windows con instalador dinámico y documentación de instalación alineada ES/EN para tutoriales.
         </div>
       </div>
 
@@ -117,8 +117,8 @@
             <h2 class="h5 section-title mb-3">Quick start</h2>
 
               <div class="code mb-3">
-              <div><span class="text-secondary">$</span> sudo git clone -b v0.4.0 https://github.com/gismodes37/Chilemon.git /opt/chilemon</div>
-              <div><span class="text-secondary">$</span> cd /opt/chilemon && sudo bash install/install_chilemon.sh</div>
+              <div><span class="text-secondary">$</span> curl -fsSL https://raw.githubusercontent.com/gismodes37/Chilemon/main/install/bootstrap.sh | sudo bash</div>
+              <div class="mt-2 text-secondary" style="font-size:.85em"># Alternativa manual: git clone https://github.com/gismodes37/Chilemon.git /opt/chilemon</div>
             </div>
 
             <div class="d-flex gap-2">
@@ -305,7 +305,7 @@
 
       <div class="alert alert-info mt-4">
         <i class="bi bi-lightbulb"></i>
-        Estado actual: <strong>release v0.4.0</strong>. ChileMon ahora incluye PTT desde el navegador, puente de audio WebRTC, seguridad reforzada, roles de usuario, rate limiting, CSRF y más.
+        <strong>Estado actual:</strong> release <strong>v0.4.0</strong> estable + avances activos en <strong>main</strong>. Ya disponible: PTT WebRTC, seguridad reforzada, roles/rate limiting/CSRF, panel admin, health check, mapa de instalaciones y Companion. <strong>En main ahora:</strong> visualizador RX/TX más sensible y legible. <strong>Próximo foco:</strong> pruebas de despliegue, TURN/STUN, HTTPS/WSS y hardening de producción.
       </div>
     </div>
   </section>
@@ -476,8 +476,7 @@
               <h3 class="h5 mb-3"><i class="bi bi-terminal"></i> Flujo recomendado</h3>
               <div class="code">
                 <div><span class="text-secondary"># Clonar versión estable e instalar</span></div>
-                <div><span class="text-secondary">$</span> sudo git clone -b v0.4.0 https://github.com/gismodes37/Chilemon.git /opt/chilemon</div>
-                <div><span class="text-secondary">$</span> cd /opt/chilemon && sudo bash install/install_chilemon.sh</div>
+                <div><span class="text-secondary">$</span> curl -fsSL https://raw.githubusercontent.com/gismodes37/Chilemon/main/install/bootstrap.sh | sudo bash</div>
               </div>
 
               <div class="mt-3 small text-secondary">
@@ -492,8 +491,7 @@
               <p class="text-secondary small mb-3">Para un sistema limpio y dedicado. Creá una VM con VirtualBox o Proxmox, instalá Debian 13 + ASL3, y después ChileMon.</p>
               <div class="code">
                 <div><span class="text-secondary"># Clonar e instalar</span></div>
-                <div><span class="text-secondary">$</span> sudo git clone -b v0.4.0 https://github.com/gismodes37/Chilemon.git /opt/chilemon</div>
-                <div><span class="text-secondary">$</span> cd /opt/chilemon && sudo bash install/install_chilemon.sh</div>
+                <div><span class="text-secondary">$</span> curl -fsSL https://raw.githubusercontent.com/gismodes37/Chilemon/main/install/bootstrap.sh | sudo bash</div>
               </div>
               <div class="mt-3 small text-secondary">
                 El instalador detecta automáticamente si es sistema nuevo o actualización. El puente WebRTC (PTT desde el navegador) se instala como parte del proceso.
@@ -573,14 +571,62 @@
 
   <section id="milestones" class="py-5 bg-body-tertiary">
     <div class="container">
-      <h2 class="h1 section-title mb-3">Roadmap</h2>
+      <h2 class="h1 section-title mb-3">Avances, etapas y roadmap</h2>
+      <p class="text-secondary mb-4">
+        ChileMon se desarrolla por etapas controladas: primero estabilidad operativa en nodos ASL3 reales, luego audio/seguridad, y después hardening de producción.
+        La rama <strong>main</strong> es la fuente oficial de instalación y también donde aterrizan los avances validados.
+      </p>
 
+      <div class="row g-4 mb-4">
+        <div class="col-lg-4">
+          <div class="card h-100 shadow-sm border-success">
+            <div class="card-body p-4">
+              <h3 class="h5"><i class="bi bi-check-circle-fill text-success"></i> Lo que ya funciona</h3>
+              <ul class="text-secondary mb-0">
+                <li>Dashboard operativo, login/sesión, SQLite y instalador automático.</li>
+                <li>Conectar/desconectar nodos, favoritos, actividad reciente, RX/TX y EchoLink.</li>
+                <li><strong>PTT WebRTC</strong> desde navegador con puente IAX2 compatible con ASL3.</li>
+                <li>Seguridad: CSRF, rate limiting, roles, node whitelist, credenciales fuera del código.</li>
+                <li>Panel admin, health check, mapa de instalaciones y Companion de Windows.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-4">
+          <div class="card h-100 shadow-sm border-primary">
+            <div class="card-body p-4">
+              <h3 class="h5"><i class="bi bi-rocket-takeoff-fill text-primary"></i> Dónde vamos ahora</h3>
+              <ul class="text-secondary mb-0">
+                <li><strong>En main:</strong> visualizador RX/TX mejorado (más sensibilidad, 48 barras, color por intensidad).</li>
+                <li>Mejorar experiencia Companion: diagnóstico, reconexión y claridad de estado.</li>
+                <li>Documentación de instalación alineada ES/EN para tutoriales y onboarding.</li>
+                <li>Validación en nodos reales antes de cerrar el próximo release.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-4">
+          <div class="card h-100 shadow-sm border-warning">
+            <div class="card-body p-4">
+              <h3 class="h5"><i class="bi bi-compass-fill text-warning"></i> Hacia dónde apunta</h3>
+              <ul class="text-secondary mb-0">
+                <li>PTT remoto confiable fuera de la red local (TURN/STUN, HTTPS/WSS).</li>
+                <li>Sesiones multiusuario y mejor control operativo del bridge.</li>
+                <li>CI, pruebas de producción y hardening para un release 1.0 sólido.</li>
+                <li>Mantener la instalación simple: <code>main</code> siempre instalable.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <h3 class="h4 section-title mb-3">Roadmap por etapas</h3>
       <div class="row g-4">
         <div class="col-lg-3">
           <div class="card h-100 shadow-sm">
             <div class="card-body p-4">
-              <h3 class="h5"><span class="badge text-bg-success">v0.1.0</span> Release funcional</h3>
-              <div class="small text-secondary mb-2"><i class="bi bi-calendar3"></i> Marzo 2026</div>
+              <h3 class="h5"><span class="badge text-bg-success">v0.1.0</span> Base operativa</h3>
+              <div class="small text-secondary mb-2"><i class="bi bi-calendar3"></i> Marzo 2026 · Completado</div>
               <ul class="text-secondary mb-0">
                 <li>Dashboard operativo</li>
                 <li>Login + sesión</li>
@@ -597,14 +643,14 @@
         <div class="col-lg-3">
           <div class="card h-100 shadow-sm">
             <div class="card-body p-4">
-              <h3 class="h5"><span class="badge text-bg-success">v0.3.1</span> Favoritos + RX/TX</h3>
-              <div class="small text-secondary mb-2"><i class="bi bi-calendar3"></i> Abril 2026</div>
+              <h3 class="h5"><span class="badge text-bg-success">v0.3.1</span> Operación diaria</h3>
+              <div class="small text-secondary mb-2"><i class="bi bi-calendar3"></i> Abril 2026 · Completado</div>
               <ul class="text-secondary mb-0">
-                <li>Integración Favoritos</li>
-                <li>Alias personalizados</li>
+                <li>Integración de favoritos y alias</li>
                 <li>Toggle rápido en tabla</li>
                 <li>Indicadores RX / TX</li>
                 <li>Soporte EchoLink</li>
+                <li>Docker/dev local y mock de comandos</li>
               </ul>
             </div>
           </div>
@@ -613,15 +659,14 @@
         <div class="col-lg-3">
           <div class="card h-100 shadow-sm border-primary">
             <div class="card-body p-4">
-              <h3 class="h5"><span class="badge text-bg-primary">v0.4.0</span> Release Actual</h3>
-              <div class="small text-secondary mb-2"><i class="bi bi-calendar3"></i> Junio 2026</div>
+              <h3 class="h5"><span class="badge text-bg-primary">v0.4.0</span> Release actual</h3>
+              <div class="small text-secondary mb-2"><i class="bi bi-calendar3"></i> 2026 · Estable + mejoras en main</div>
               <ul class="text-secondary mb-0">
-                <li><strong>PTT Audio Bridge WebRTC</strong></li>
-                <li>Inversión IAX2 (servidor)</li>
-                <li>Overhaul de seguridad</li>
-                <li>Rate limiting, CSRF, roles</li>
-                <li>Panel admin, health check</li>
-                <li>Node whitelist</li>
+                <li><strong>PTT WebRTC</strong> + inversión IAX2/AMI</li>
+                <li>Seguridad: CSRF, rate limiting, roles, SRI, whitelist</li>
+                <li>Panel admin y health check</li>
+                <li>Mapa de instalaciones + registro agente/hub</li>
+                <li>Companion Windows + visualizador RX/TX mejorado en main</li>
               </ul>
             </div>
           </div>
@@ -630,14 +675,14 @@
         <div class="col-lg-3">
           <div class="card h-100 shadow-sm">
             <div class="card-body p-4">
-              <h3 class="h5"><span class="badge text-bg-secondary">v0.5.x</span> Próximo</h3>
-              <div class="small text-secondary mb-2"><i class="bi bi-calendar3"></i> Julio-Agosto 2026</div>
+              <h3 class="h5"><span class="badge text-bg-secondary">v0.5.x / v1.0</span> Próximo</h3>
+              <div class="small text-secondary mb-2"><i class="bi bi-calendar3"></i> Próximo ciclo · Planificado</div>
               <ul class="text-secondary mb-0">
-                <li>Deploy & pruebas en producción</li>
+                <li>Deploy y pruebas en producción</li>
                 <li>TURN/STUN para PTT remoto</li>
                 <li>HTTPS/WSS con Let's Encrypt</li>
-                <li>Sesiones multiusuario en el bridge</li>
-                <li>GitHub Actions CI</li>
+                <li>Sesiones multiusuario y GitHub Actions CI</li>
+                <li><strong>v1.0:</strong> release estable, docs completas, validación comunitaria</li>
               </ul>
             </div>
           </div>
@@ -647,7 +692,7 @@
 
       <div class="alert alert-secondary mt-4 mb-0">
         <i class="bi bi-info-circle"></i>
-        ChileMon avanza por etapas controladas para proteger la estabilidad del nodo ASL3 mientras crecen sus capacidades.
+        Prioridad del proyecto: no romper nodos en producción. Cada etapa se valida en escenarios reales antes de declararse cerrada.
       </div>
     </div>
   </section>
