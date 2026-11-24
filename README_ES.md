@@ -77,6 +77,10 @@ ChileMon actualmente incluye:
 - **Protección CSRF** en todos los formularios
 - **Puente de Audio WebRTC** — Push-to-Talk (PTT) desde el navegador
 - **Inversión de Dirección IAX2** — Bridge como servidor IAX2 para compatibilidad ASL3
+- **🗺️ Mapa de instalaciones** — Mapa comunitario opt-in que muestra todos los nodos ChileMon (Leaflet + OpenStreetMap)
+- **Selector de mapa interactivo** — Clic para fijar coordenadas en el modal de registro con marcador arrastrable
+- **Geocodificación de dirección** — Escribí una dirección y el mapa se posiciona automáticamente vía Nominatim (OpenStreetMap)
+- **Registro cross-origin** — Los nodos agente se registran en el hub sin sesión previa
 
 ---
 
@@ -241,7 +245,7 @@ ChileMon **no reemplaza Supermon**, sino que ofrece una alternativa moderna para
 
 # 🚀 Instalación
 
-ChileMon se instala directamente en un nodo **ASL3**. Se recomienda un sistema basado en Debian (como el oficial de ASL3).
+ChileMon se instala directamente en un nodo **ASL3**. Se recomienda un sistema basado en Debian (como la imagen oficial de ASL3).
 
 ### 📦 Instalación con un solo comando (Recomendada)
 
@@ -271,16 +275,16 @@ El instalador ejecuta **14 pasos**:
 10. Configurar el alias de Apache
 11. Habilitar el proxy WebSocket de Apache
 12. Validar módulos PHP e inicializar la base de datos
-13. **Instalar el puente WebRTC** (PTT desde el navegador — aiohttp, aiortc, websockets, systemd service)
+13. **Instalar el puente WebRTC** (PTT desde el navegador — aiohttp, aiortc, websockets, servicio systemd)
 14. Crear el usuario administrador (NUEVO) o ejecutar la verificación (ACTUALIZACIÓN)
 
-> ⚠️ **Instalación NUEVA**: Ten a mano tu **número de nodo** ASL y la **clave AMI**. La clave AMI es el valor `secret=` del bloque `[admin]` en `/etc/asterisk/manager.conf`. El instalador ya detecta el host, puerto y usuario AMI, así que solo te pide la clave. También pregunta por la IP/host del servidor (ya prellenada), un texto descriptivo del nodo y una URL opcional del mapa comunitario — presioná Enter para aceptar el valor por defecto u omitir.
+> ⚠️ **Instalación NUEVA**: Ten a mano tu **número de nodo** ASL y la **clave AMI**. La clave AMI es el valor `secret=` del bloque `[admin]` en `/etc/asterisk/manager.conf`. El instalador ya detecta el host, puerto y usuario AMI, así que solo te pide la clave. También pregunta por la IP/host del servidor (ya prellenada), una descripción corta para tu nodo y una URL opcional del hub del mapa comunitario — presioná Enter para aceptar el valor por defecto u omitir.
 
 > 💡 **ACTUALIZACIÓN (sistema existente)**: Si ya existe `config/local.php`, el instalador omite las preguntas, preserva tu configuración y solo agrega lo que falta.
 
-> 🗺️ **Mapa comunitario (opcional)**: Durante una instalación NUEVA se te pregunta por una **URL de hub**. Si tenés un hub de ChileMon, ingresá su URL (ej: `http://192.168.0.111`) para registrar el nodo. Si no, presioná Enter.
+> 🗺️ **Mapa de instalaciones (opcional)**: Durante una instalación NUEVA se te pregunta por una **URL de hub**. Si tenés una instancia ChileMon Hub, ingresá su URL (ej: `http://192.168.0.111`) para registrar el nodo en el mapa comunitario. Si no, presioná Enter.
 
-> 🎯 **WebRTC Audio Bridge**: El puente para hablar por radio desde el navegador se instala automáticamente en el paso 13. Los secretos IAX2 y WebRTC los **genera el instalador** y los propaga a `config/local.php`, `iax.conf` y `/etc/default/chilemon-webrtc` — no hace falta editar esos archivos a mano.
+> 🎯 **Puente de Audio WebRTC**: El puente para hablar por radio desde el navegador se instala automáticamente en el paso 13. Los secretos IAX2 y WebRTC los **genera el instalador** y los propaga a `config/local.php`, `iax.conf` y `/etc/default/chilemon-webrtc` — no hace falta editar esos archivos a mano.
 
 Después de instalar, abrí `http://<ip-de-tu-pi>/chilemon` e ingresá con el usuario administrador creado en el paso 14.
 
@@ -303,18 +307,18 @@ Para desinstalar el companion por completo — para una prueba limpia o cambiar 
 
 ## 🖥️ Opción 3: Máquina Virtual con Debian 13 + ASL3 + ChileMon
 
-Para quienes quieren un sistema limpio y dedicado sin tocar su instalación actual. Ideal para probar ChileMon en un entorno aislado o como servidor permanente.
+Para un sistema limpio y dedicado sin tocar tu instalación actual. Ideal para probar ChileMon en un entorno aislado o como servidor permanente.
 
-### 3.1 Crear la Máquina Virtual
+#### 3.1 Crear la Máquina Virtual
 - **VirtualBox**, **Proxmox VE**, o **VMware** — el que prefieras
 - **SO invitado**: Debian 13 (Trixie) — descargar desde [debian.org](https://www.debian.org)
 - **Mínimo**: 1 CPU, 1 GB RAM, 10 GB disco
 - **Red**: Bridged o NAT con reenvío de puertos (80/443 para el dashboard, 4569 para IAX2, 5038 para AMI)
 
-### 3.2 Instalar Debian 13
-Sigue la instalación estándar de Debian 13. Recomendación: solo entorno base (sin desktop) para máxima compatibilidad con ASL3.
+#### 3.2 Instalar Debian 13
+Seguí la instalación estándar de Debian 13. Recomendado: solo entorno base (sin escritorio) para máxima compatibilidad con ASL3.
 
-### 3.3 Instalar ASL3
+#### 3.3 Instalar ASL3
 ```bash
 sudo apt-get update && sudo apt-get upgrade -y
 sudo apt-get install -y wget
@@ -322,13 +326,13 @@ wget https://apt.allstarlink.org/repos/install
 sudo bash install
 ```
 
-### 3.4 Instalar ChileMon
+#### 3.4 Instalar ChileMon
 ```bash
 curl -fsSL https://raw.githubusercontent.com/gismodes37/Chilemon/main/install/bootstrap.sh | sudo bash
 ```
-> El instalador detecta si es sistema nuevo o actualización. En modo NUEVO te pide el número de nodo y la clave AMI, y genera todos los secretos WebRTC.
+> El instalador detecta automáticamente modo NUEVO vs ACTUALIZACIÓN. En modo NUEVO pide el número de nodo y la clave AMI, y genera todos los secretos WebRTC.
 
-### 3.5 Acceder al Dashboard
+#### 3.5 Acceder al Dashboard
 Abrí `http://<ip-de-tu-vm>/chilemon` — PTT desde el navegador incluido 🇨🇱
 
 ---
@@ -368,6 +372,10 @@ Abrí `http://<ip-de-tu-vm>/chilemon` — PTT desde el navegador incluido 🇨�
       │   │   ├── disconnect.php
       │   │   ├── delete_node.php
       │   │   ├── system_action.php
+      │   │   ├── map/          ← Mapa comunitario de instalaciones
+      │   │   │   ├── check.php
+      │   │   │   ├── register.php
+      │   │   │   └── data.php
       │   │   ├── favorites/    ← CRUD favoritos
       │   │   └── ami/          ← AMI status endpoints
       │   └── views/
@@ -390,7 +398,7 @@ Abrí `http://<ip-de-tu-vm>/chilemon` — PTT desde el navegador incluido 🇨�
 
 <img alt="Static Badge" src="https://img.shields.io/badge/Version-0.4.0-brightgreen">
 
-**Release Actual** — Overhaul de seguridad, PTT Audio Bridge, inversión IAX2, rate limiting, CSRF, roles, panel admin, health check
+**Release Actual** — Overhaul de seguridad, PTT Audio Bridge, inversión IAX2, rate limiting, CSRF, roles, panel admin, health check, mapa de instalaciones (hub + registro de agentes), selector de mapa interactivo con geocodificación de direcciones
 
 <img alt="Static Badge" src="https://img.shields.io/badge/Version-0.5.x-blue">
 
