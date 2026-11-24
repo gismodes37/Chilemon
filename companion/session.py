@@ -133,6 +133,10 @@ class CompanionSession:
         await self._register_with_retry()
         self._monitor_task = asyncio.create_task(self._monitor_loop())
 
+    async def reconnect(self) -> None:
+        """Public full reconnect, safe to call after an endpoint switch."""
+        await self._reconnect()
+
     async def stop(self) -> None:
         """Tear down: hang up, unregister, close."""
         if self._monitor_task is not None:

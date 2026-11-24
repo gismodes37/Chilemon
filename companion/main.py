@@ -243,12 +243,15 @@ class CompanionApp:
 
         logger.info("All components started — ready")
 
-    async def _ensure_pi_connection(self, extra_hosts: tuple[str, ...] = ()) -> None:
+    async def _ensure_pi_connection(
+        self, extra_hosts: tuple[str, ...] = ()
+    ) -> bool:
         """Verify the Pi endpoint with IAX2 and switch to a reachable one.
 
         The configured address is only a hint: after a DHCP change it silently
         stops answering. Hostnames from the config and from the dashboard are
-        tried too, and the address that actually sends an IAX2 PONG wins.
+        tried too, and the address that actually sends an IAX2 reply wins.
+        Returns True only when the endpoint changed.
         """
         configured_host = self.session._host
         port = self.session._port
@@ -273,11 +276,11 @@ class CompanionApp:
                 "is running.",
                 configured_host, candidates,
             )
-            return
+            return False
 
         if reachable == configured_host:
             logger.info("IAX2 endpoint confirmed at %s:%d", reachable, port)
-            return
+            return False
 
         logger.info(
             "Pi moved from %s to %s — switching IAX2 endpoint",
@@ -285,6 +288,7 @@ class CompanionApp:
         )
         await self.session.set_endpoint(reachable, port)
         await self._save_config(reachable, port)
+        return True
 
     async def _on_dashboard_host(self, host: str) -> None:
         """Re-verify using the address the dashboard was reached through."""
@@ -296,7 +300,10 @@ class CompanionApp:
         ):
             logger.warning("Ignoring invalid dashboard host %r", candidate)
             return
-        await self._ensure_pi_connection((candidate,))
+        if await self._ensure_pi_connection((candidate,)):
+            # set_endpoint() drops the live transport; without this the session
+            # stays unregistered until an unrelated failure triggers reconnect.
+            await self.session.reconnect()
 
     async def _rediscover_endpoint(self) -> None:
         """Re-run discovery before a reconnect so a moved Pi is found."""

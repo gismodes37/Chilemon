@@ -62,6 +62,56 @@ def test_only_addressed_iax_control_replies_count() -> None:
     assert not discovery.is_iax2_probe_reply(bytes(wrong_type))
 
 
+class FakeSocket:
+    def __init__(self) -> None:
+        self.sent: list[tuple[bytes, tuple[str, int]]] = []
+        self.closed = False
+
+    def setblocking(self, flag: bool) -> None:
+        self.blocking = flag
+
+    def sendto(self, data: bytes, addr: tuple[str, int]) -> None:
+        self.sent.append((data, addr))
+
+    def close(self) -> None:
+        self.closed = True
+
+
+async def _resolve_to_secondary_ip(host: str) -> list[str]:
+    return ["192.168.0.114"]
+
+
+def _run_real_probe(responder: str, monkeypatch: object) -> tuple[str | None, FakeSocket]:
+    async def scenario() -> tuple[str | None, FakeSocket]:
+        loop = asyncio.get_running_loop()
+        sock = FakeSocket()
+
+        async def fake_recvfrom(_sock: object, _size: int) -> tuple[bytes, tuple[str, int]]:
+            return _probe_reply(), (responder, 4569)
+
+        monkeypatch.setattr(discovery, "resolve_host_addresses", _resolve_to_secondary_ip)
+        monkeypatch.setattr(discovery.socket, "socket", lambda *a, **k: sock)
+        monkeypatch.setattr(loop, "sock_recvfrom", fake_recvfrom, raising=False)
+        result = await discovery.probe_iax2_endpoint("pi.local", 4569, 0.2)
+        return result, sock
+
+    return asyncio.run(scenario())
+
+
+def test_real_probe_accepts_a_reply_from_the_primary_interface(monkeypatch: object) -> None:
+    result, sock = _run_real_probe("192.168.0.125", monkeypatch)
+
+    assert result == "192.168.0.125"
+    assert sock.sent[0][1] == ("192.168.0.114", 4569)
+    assert sock.closed is True
+
+
+def test_real_probe_rejects_a_reply_from_another_subnet(monkeypatch: object) -> None:
+    result, _sock = _run_real_probe("10.0.0.5", monkeypatch)
+
+    assert result is None
+
+
 def test_stale_configured_host_is_never_reported_as_reachable() -> None:
     async def resolve(host: str) -> list[str]:
         return [host]

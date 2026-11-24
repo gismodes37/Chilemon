@@ -99,6 +99,32 @@ def _usable_address(value: str) -> bool:
     return not (address.is_loopback or address.is_unspecified)
 
 
+# A multi-homed Asterisk may answer from its primary interface instead of the
+# secondary address that DNS advertised. Accept that reply only when it stays
+# inside the same LAN; this keeps the probe bounded without pinning an IP.
+PROBE_SUBNET_PREFIX = 24
+
+
+def _responder_is_local_to(responder: str, targets: list[str]) -> bool:
+    """True when a reply came from a probed host or its local subnet."""
+    if not _usable_address(responder):
+        return False
+    if responder in targets:
+        return True
+
+    try:
+        reply = ipaddress.ip_address(responder)
+        for target in targets:
+            network = ipaddress.ip_network(
+                f"{target}/{PROBE_SUBNET_PREFIX}", strict=False
+            )
+            if reply.version == network.version and reply in network:
+                return True
+    except ValueError:
+        return False
+    return False
+
+
 async def resolve_host_addresses(
     host: str, resolver: Optional[Resolver] = None
 ) -> list[str]:
@@ -158,7 +184,7 @@ async def probe_iax2_endpoint(
                 )
             except asyncio.TimeoutError:
                 return None
-            if is_iax2_probe_reply(data) and addr[0] in targets:
+            if is_iax2_probe_reply(data) and _responder_is_local_to(addr[0], targets):
                 logger.debug("IAX2 probe reply from %s:%d", addr[0], addr[1])
                 return addr[0]
     except OSError as exc:

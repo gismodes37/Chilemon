@@ -18,6 +18,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from companion import main as companion_main  # noqa: E402
 from companion import ws_server  # noqa: E402
 from companion.session import CompanionSession  # noqa: E402
 
@@ -83,3 +84,76 @@ def test_same_endpoint_is_a_noop() -> None:
     assert changed is False
     assert session._session is transport
     assert transport.closed is False
+
+
+class FakeSession:
+    def __init__(self) -> None:
+        self._host = "192.168.0.110"
+        self._port = 4569
+        self.endpoints: list[tuple[str, int]] = []
+        self.reconnects = 0
+
+    async def set_endpoint(self, host: str, port: int) -> bool:
+        self.endpoints.append((host, port))
+        self._host = host
+        self._port = port
+        return True
+
+    async def reconnect(self) -> None:
+        self.reconnects += 1
+
+
+class FakeApp:
+    def __init__(self) -> None:
+        self._node_host = ""
+        self._scan_prefix = 24
+        self.session = FakeSession()
+        self.saved: list[tuple[str, int]] = []
+
+    async def _save_config(self, host: str, port: int) -> None:
+        self.saved.append((host, port))
+
+    async def _ensure_pi_connection(self, extra_hosts: tuple[str, ...] = ()) -> bool:
+        return await companion_main.CompanionApp._ensure_pi_connection(
+            self, extra_hosts
+        )
+
+
+def test_dashboard_host_switch_restarts_the_session(monkeypatch: object) -> None:
+    async def reachable(_host: str, _port: int, _candidates: object) -> str:
+        return "192.168.0.125"
+
+    monkeypatch.setattr(companion_main, "find_reachable_pi", reachable)
+    app = FakeApp()
+
+    asyncio.run(companion_main.CompanionApp._on_dashboard_host(app, "node494780.local"))
+
+    assert app.session.endpoints == [("192.168.0.125", 4569)]
+    assert app.saved == [("192.168.0.125", 4569)]
+    assert app.session.reconnects == 1
+
+
+def test_invalid_dashboard_host_is_ignored(monkeypatch: object) -> None:
+    async def reachable(_host: str, _port: int, _candidates: object) -> str:
+        return "192.168.0.125"
+
+    monkeypatch.setattr(companion_main, "find_reachable_pi", reachable)
+    app = FakeApp()
+
+    asyncio.run(companion_main.CompanionApp._on_dashboard_host(app, "http://evil.example"))
+
+    assert app.session.endpoints == []
+    assert app.session.reconnects == 0
+
+
+def test_public_reconnect_delegates_to_the_reconnect_sequence(monkeypatch: object) -> None:
+    session = CompanionSession(host="192.168.0.125")
+    seen: list[bool] = []
+
+    async def fake_reconnect() -> None:
+        seen.append(True)
+
+    monkeypatch.setattr(session, "_reconnect", fake_reconnect)
+    asyncio.run(session.reconnect())
+
+    assert seen == [True]
