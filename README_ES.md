@@ -249,11 +249,13 @@ ChileMon se instala directamente en un nodo **ASL3**. Se recomienda un sistema b
 
 ### 📦 Instalación con un solo comando (Recomendada)
 
-Copiá y pegá este comando en la Pi. Instala `git`, descarga el repositorio en `/opt/chilemon` y ejecuta el instalador en un terminal interactivo:
+Copiá y pegá este comando en la Pi. Instala `tmux` y `git`, descarga el repositorio en `/opt/chilemon` y ejecuta el instalador en un terminal interactivo que sobrevive a una desconexión SSH:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/gismodes37/Chilemon/main/install/bootstrap.sh -o /tmp/bootstrap.sh && sudo bash /tmp/bootstrap.sh
+curl -fsSL https://raw.githubusercontent.com/gismodes37/Chilemon/main/install/bootstrap.sh -o /tmp/bootstrap.sh && sudo apt-get update -qq && sudo apt-get install -y -qq tmux && tmux new-session -A -s chilemon 'sudo bash /tmp/bootstrap.sh'
 ```
+
+> Si se cae la conexión SSH, volvé a conectarte y ejecutá `tmux attach -t chilemon` para retomar el instalador.
 
 Alternativa manual (solo si `git` ya está instalado):
 
@@ -328,7 +330,7 @@ sudo bash install
 
 #### 3.4 Instalar ChileMon
 ```bash
-curl -fsSL https://raw.githubusercontent.com/gismodes37/Chilemon/main/install/bootstrap.sh -o /tmp/bootstrap.sh && sudo bash /tmp/bootstrap.sh
+curl -fsSL https://raw.githubusercontent.com/gismodes37/Chilemon/main/install/bootstrap.sh -o /tmp/bootstrap.sh && sudo apt-get update -qq && sudo apt-get install -y -qq tmux && tmux new-session -A -s chilemon 'sudo bash /tmp/bootstrap.sh'
 ```
 > El instalador detecta automáticamente modo NUEVO vs ACTUALIZACIÓN. En modo NUEVO pide el número de nodo y la clave AMI, y genera todos los secretos WebRTC.
 
