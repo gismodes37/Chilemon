@@ -180,7 +180,7 @@ def test_admin_invokes_remove(tmp_path: Path) -> None:  # S4
         is_admin=lambda: True,
     )
     assert code == 0
-    assert any("-Remove" in cmd and "install-firewall.ps1" in cmd for cmd in commands)
+    assert any(u.FIREWALL_RULE in cmd and "Remove-NetFirewallRule" in cmd for cmd in commands)
 
 
 def test_docs_and_wrapper_contract() -> None:  # S5, S6

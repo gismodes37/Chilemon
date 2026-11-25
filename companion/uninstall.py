@@ -243,23 +243,21 @@ def _default_verify_autostart(home: Path) -> list[str]:
     return remaining
 
 
+# The rule is system state, not a file. Removing it directly keeps cleanup
+# independent of any script under the per-user directory that is about to be
+# deleted, and keeps the displayed command and the executed command identical.
+FIREWALL_PS_COMMAND = (
+    f"Remove-NetFirewallRule -DisplayName '{FIREWALL_RULE}' -ErrorAction SilentlyContinue"
+)
+
+
 def firewall_command() -> str:
-    script = Path(__file__).resolve().parents[1] / "install" / "companion" / "install-firewall.ps1"
-    return f'powershell -ExecutionPolicy Bypass -File "{script}" -Remove'
+    return f'powershell -NoProfile -Command "{FIREWALL_PS_COMMAND}"'
 
 
 def _default_run_command(command: str) -> int:
-    script = Path(__file__).resolve().parents[1] / "install" / "companion" / "install-firewall.ps1"
     result = subprocess.run(
-        [
-            "powershell",
-            "-NoProfile",
-            "-ExecutionPolicy",
-            "Bypass",
-            "-File",
-            str(script),
-            "-Remove",
-        ],
+        ["powershell", "-NoProfile", "-Command", FIREWALL_PS_COMMAND],
         capture_output=True,
         text=True,
         check=False,
@@ -338,6 +336,7 @@ def main(
     rows = list(query())
     companion_pids = find_companion_pids(rows)
     unknown_pids = [int(pid) for pid, _ in rows if int(pid) not in companion_pids]
+    unverifiable_pids = [int(pid) for pid, cmd in rows if not str(cmd).strip()]
     if companion_pids:
         say(f"Stopping Companion process(es): {', '.join(map(str, companion_pids))}")
         stop(companion_pids)
@@ -345,29 +344,40 @@ def main(
     removed = remove_startup()
     say(f"Autostart entries removed: {', '.join(removed) if removed else 'none found'}")
 
-    for path in plan.staging_dirs:
-        delete(path)
-    for path in sorted(plan.paths, key=str):
-        delete(path)
-    say("Per-user Companion data removed.")
-
+    # The firewall rule is system state, not a file: remove it before deleting
+    # anything so a complete uninstall cannot leave the rule behind.
+    command = firewall_command()
     if admin_check():
-        if runner(firewall_command()) == 0:
+        if runner(command) == 0:
             say(f"Firewall rule removed: {FIREWALL_RULE}")
         else:
             say(f"WARNING: could not remove firewall rule {FIREWALL_RULE}.")
-            say(f"Run as administrator: {firewall_command()}")
+            say(f"Run as administrator: {command}")
     else:
         say(f"Firewall rule {FIREWALL_RULE} was not removed (administrator rights required).")
-        say(f"Run as administrator if you want it gone: {firewall_command()}")
+        say(f"Run as administrator if you want it gone: {command}")
+
+    failures: list[str] = []
+    for path in [*plan.staging_dirs, *sorted(plan.paths, key=str)]:
+        try:
+            delete(path)
+        except OSError as exc:
+            failures.append(f"{path}: {exc}")
+    if failures:
+        for failure in failures:
+            say(f"ERROR: could not remove {failure}")
+    else:
+        say("Per-user Companion data removed.")
 
     remaining_startup = verify_startup()
     remaining_pids = find_companion_pids(query())
-    if remaining_startup or remaining_pids:
+    if remaining_startup or remaining_pids or unverifiable_pids or failures:
         for label in remaining_startup:
             say(f"ERROR: autostart entry still present: {label}")
         for pid in remaining_pids:
             say(f"ERROR: Companion still listening on port {COMPANION_PORT} (PID {pid})")
+        for pid in unverifiable_pids:
+            say(f"ERROR: could not verify owner of port {COMPANION_PORT} (PID {pid})")
         return 1
 
     say("Deliberately kept (remove manually if you want):")

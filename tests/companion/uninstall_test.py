@@ -9,6 +9,7 @@ Run with: python -m pytest tests/companion/uninstall_test.py -v
 
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 
 from companion.uninstall import (
@@ -146,7 +147,7 @@ def test_admin_removes_firewall_rule(tmp_path: Path) -> None:
         remove_autostart=lambda: [], verify_autostart=lambda: [],
         run_command=lambda cmd: commands.append(cmd) or 0,
     )
-    assert any("-Remove" in cmd and "install-firewall.ps1" in cmd for cmd in commands)
+    assert any(FIREWALL_RULE in cmd and "Remove-NetFirewallRule" in cmd for cmd in commands)
     assert any(FIREWALL_RULE in line for line in out)
 
 
@@ -199,3 +200,65 @@ def test_docs_describe_the_less_invasive_options() -> None:
         text = (repo / "docs" / name).read_text(encoding="utf-8")
         for token in ("--dry-run", "--keep-config", "--yes", FIREWALL_RULE):
             assert token in text, f"{name} is missing {token}"
+
+
+def test_firewall_cleanup_precedes_data_deletion(tmp_path: Path) -> None:
+    """A complete uninstall must not leave the firewall rule behind."""
+    _prepare(tmp_path)
+    calls: list[str] = []
+
+    def runner(cmd: str) -> int:
+        calls.append("firewall")
+        return 0
+
+    def deleter(path: Path) -> None:
+        calls.append("delete")
+        if path.is_dir() and not path.is_symlink():
+            shutil.rmtree(path)
+        elif path.exists():
+            path.unlink()
+
+    code = main(
+        ["--yes"], home=tmp_path / "home", temp=tmp_path / "temp",
+        output=lambda _: None, is_admin=lambda: True,
+        query_processes=lambda: [], stop_process=lambda pids: None,
+        remove_autostart=lambda: [], verify_autostart=lambda: [],
+        run_command=runner, delete_path=deleter,
+    )
+    assert code == 0
+    assert calls[0] == "firewall"
+    assert "delete" in calls
+
+
+def test_deletion_failure_is_reported_and_fails(tmp_path: Path) -> None:
+    """A locked file must not be reported as a complete uninstall."""
+    _prepare(tmp_path)
+    out: list[str] = []
+
+    def locked(path: Path) -> None:
+        raise PermissionError("locked")
+
+    code = main(
+        ["--yes"], home=tmp_path / "home", temp=tmp_path / "temp",
+        output=out.append, is_admin=lambda: False,
+        query_processes=lambda: [], stop_process=lambda pids: None,
+        remove_autostart=lambda: [], verify_autostart=lambda: [],
+        run_command=lambda cmd: 0, delete_path=locked,
+    )
+    assert code == 1
+    assert any("could not remove" in line for line in out)
+    assert not any("Companion fully removed." in line for line in out)
+
+
+def test_unreadable_listener_command_line_fails_closed(tmp_path: Path) -> None:
+    """An unverifiable 9093 owner must not yield a full-success exit."""
+    out: list[str] = []
+    code = main(
+        ["--yes"], home=tmp_path / "home", temp=tmp_path / "temp",
+        output=out.append, is_admin=lambda: False,
+        query_processes=lambda: [(9, "")], stop_process=lambda pids: None,
+        remove_autostart=lambda: [], verify_autostart=lambda: [],
+        run_command=lambda cmd: 0,
+    )
+    assert code == 1
+    assert any("could not verify owner" in line for line in out)
