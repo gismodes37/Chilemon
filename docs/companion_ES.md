@@ -11,6 +11,8 @@ El Companion es una pequeña aplicación Python que se ejecuta en la PC del oper
 3. En la PC con Windows, hacer doble clic en ese archivo desde Descargas. Descarga el código del companion desde GitHub, instala `numpy`/`sounddevice`/`aiohttp`, valida la config con `companion.install_config`, registra el inicio automático y arranca el companion. Requiere Python 3.11+ e internet; el ref del código es `main` salvo que `CHILEMON_COMPANION_REF` fije otra rama o tag.
 4. En el panel, confirmar **Companion Connected** y luego presionar **Reconectar** para abrir el canal IAX2. El PTT sigue siendo explícito: conectá un nodo antes de transmitir.
 
+> ⚠️ **Volvé a ejecutar este instalador de una sola acción después de reinstalar o formatear la Pi.** Una instalación nueva genera un `iax_companion_secret` distinto; el companion de Windows conserva el `config.toml` anterior, por lo que se rechaza el AUTHREP y la llamada muere con `Call setup timeout (no NEWACK)` — sin audio de RX/TX aunque el dashboard siga mostrando **Companion Connected**. Descargar de nuevo `chilemon-companion-install.bat` desde el panel reescribe `%USERPROFILE%\.chilemon\config.toml` con el secreto vigente. Reiniciá el companion después.
+
 ## Qué es el Companion
 
 | Pieza | Función |

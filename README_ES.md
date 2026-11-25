@@ -297,6 +297,8 @@ Después de instalar, abrí `http://<ip-de-tu-pi>/chilemon` e ingresá con el us
 3. El instalador baja el código del companion desde GitHub, instala `numpy`, `sounddevice` y `aiohttp`, guarda la configuración generada en `%USERPROFILE%\.chilemon\config.toml`, registra el inicio automático y arranca el companion. La `host` generada es solo una pista: el Companion verifica el endpoint IAX2 alcanzable al arrancar y después de un cambio de IP.
 4. El dashboard muestra **Companion Connected**. Presioná **Reconectar** para abrir la llamada IAX2.
 
+> ⚠️ **Después de reinstalar o formatear la Pi**, el instalador genera un nuevo secreto IAX2 del companion, pero el companion de Windows conserva su `config.toml` anterior. Las llamadas fallan con `no NEWACK` y no hay audio de RX/TX. Descargá de nuevo `chilemon-companion-install.bat` desde el dashboard, hacé doble clic para reescribir `%USERPROFILE%\.chilemon\config.toml` y reiniciá el companion.
+
 Para desinstalar el companion por completo — para una prueba limpia o cambiar de PC — ejecutá `%USERPROFILE%\.chilemon\src\companion\uninstall-companion.bat`.
 
 ---

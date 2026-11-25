@@ -11,6 +11,8 @@ The Companion is a small Python audio app that runs on the operator's PC. It giv
 3. On the Windows PC, double-click that file from Downloads. It downloads the companion source from GitHub, installs `numpy`/`sounddevice`/`aiohttp`, validates the config via `companion.install_config`, registers logon autostart and starts the companion. Python 3.11+ and internet access are required; the source ref is `main` unless `CHILEMON_COMPANION_REF` pins another branch or tag.
 4. In the dashboard, confirm **Companion Connected**, then press **Reconectar** to open the IAX2 channel. PTT stays explicit: connect a node before keying.
 
+> ⚠️ **Re-run this one-action installer after any Pi reinstall or format.** A fresh install generates a new `iax_companion_secret`; the Windows companion keeps the old `config.toml`, so the AUTHREP is rejected and the call dies with `Call setup timeout (no NEWACK)` — no RX/TX audio even though the dashboard still reports **Companion Connected**. Re-downloading `chilemon-companion-install.bat` from the dashboard rewrites `%USERPROFILE%\.chilemon\config.toml` with the current secret. Restart the companion afterwards.
+
 ## What the Companion is
 
 | Piece | Role |
