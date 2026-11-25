@@ -824,16 +824,17 @@ $systemInfo = $systemInfo ?? [
             </div>
             <div class="modal-body">
                 <p class="small text-muted mb-3">
-                    Estas herramientas se descargan y ejecutan en tu PC. El dashboard solo entrega el archivo: no puede desinstalar nada por vos.
+                    Estas herramientas se descargan y ejecutan en tu PC. El dashboard solo entrega el archivo: no puede desinstalar nada por Usted.
                 </p>
                 <div class="list-group">
                     <div class="list-group-item">
                         <div class="d-flex w-100 justify-content-between">
-                            <h6 class="mb-1"><i class="bi bi-trash3 text-danger"></i> Desinstalar Companion</h6>
+                            <h6 class="mb-1"><i class="bi bi-trash3 text-danger"></i> Desinstalador de la App Companion</h6>
                             <span class="badge text-bg-secondary">PC Windows</span>
                         </div>
                         <p class="small mb-2">
-                            Descarga un <code>.bat</code> autocontenido que muestra el plan con <code>--dry-run</code>, pide confirmación en la PC y recién después borra config, logs, código y autostart.
+                            Se descargará un archivo <code>.bat</code> autocontenido que muestra el plan con <code>--dry-run</code>, le permitira desinstalar la App Companion y
+                            pedirá confirmación en la PC y eliminara todo lo relacionado con Chilemon en su PC: borra config, logs, código y autostart. Para ejecutarlo, dele doble clic y confirme. No requiere permisos de administrador.
                         </p>
                         <button type="button" class="btn btn-sm btn-outline-danger" onclick="downloadCompanionUninstaller()">
                             <i class="bi bi-download"></i> Descargar desinstalador
