@@ -220,6 +220,9 @@ class AudioEngine:
             self._running = False
             return
 
+        # A reconnect must never open a second pair of streams.
+        if self._running:
+            return
         self._running = True
 
         # Resolve device IDs
@@ -286,6 +289,8 @@ class AudioEngine:
 
     def stop(self) -> None:
         """Stop and close audio streams."""
+        if not self._running:
+            return
         self._running = False
 
         if self._input_stream is not None:

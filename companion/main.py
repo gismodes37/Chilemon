@@ -154,7 +154,7 @@ class CompanionApp:
         self.ws_server.on_ptt_unkey = self.session.ptt_unkey
         self.ws_server.on_dtmf = self.session.send_dtmf
         self.ws_server.on_status_request = self._get_full_status
-        self.ws_server.on_call = self.session.place_call
+        self.ws_server.on_call = self._place_call
         self.ws_server.on_hangup = self._hangup
 
     async def _on_session_audio_rx(self, ulaw_payload: bytes, ts_ms: int) -> None:
@@ -162,12 +162,25 @@ class CompanionApp:
         self.audio.play_ulaw(ulaw_payload, ts_ms)
 
     async def _hangup(self) -> None:
-        """Unkey and hang up the call, then drop buffered RX audio."""
+        """Unkey, hang up and close mic/speaker so no audio loop remains."""
         await self.session.hangup_call()
         self.audio.reset()
+        self.audio.stop()
+
+    async def _place_call(self, node: str) -> None:
+        """Reopen audio only when the IAX2 call was actually established."""
+        await self.session.place_call(node)
+        if self.session.in_call:
+            self.audio.start()
 
     async def _on_session_status(self, status: dict) -> None:
-        """Forward session status changes to browser via WS."""
+        """Forward status and keep audio streams tied to the active call."""
+        call_active = bool(status.get("call_active"))
+        if call_active and not self.audio.is_running:
+            self.audio.start()
+        elif not call_active and self.audio.is_running:
+            self.audio.reset()
+            self.audio.stop()
         await self.ws_server.broadcast_status(status)
 
     def _on_audio_tx(self, ulaw_payload: bytes) -> None:
@@ -231,8 +244,8 @@ class CompanionApp:
         # Start WS server first (no IAX2 dependency)
         await self.ws_server.start()
 
-        # Start audio engine
-        self.audio.start()
+        # Audio streams open only while a call is active (see _on_session_status
+        # and _place_call): an idle mic + speaker pair feeds back as a hum.
 
         # Start IAX2 session (registration, etc.)
         await self.session.start()
