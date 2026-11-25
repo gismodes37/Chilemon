@@ -117,7 +117,8 @@
             <h2 class="h5 section-title mb-3">Quick start</h2>
 
               <div class="code mb-3">
-              <div><span class="text-secondary">$</span> curl -fsSL https://raw.githubusercontent.com/gismodes37/Chilemon/main/install/bootstrap.sh | sudo bash</div>
+              <div><span class="text-secondary">$</span> curl -fsSL https://raw.githubusercontent.com/gismodes37/Chilemon/main/install/bootstrap.sh -o /tmp/bootstrap.sh</div>
+              <div><span class="text-secondary">$</span> sudo bash /tmp/bootstrap.sh</div>
               <div class="mt-2 text-secondary" style="font-size:.85em"># Manual alternative: git clone https://github.com/gismodes37/Chilemon.git /opt/chilemon</div>
             </div>
 
@@ -474,7 +475,8 @@
               <h3 class="h5 mb-3"><i class="bi bi-terminal"></i> Recommended workflow</h3>
               <div class="code">
                 <div><span class="text-secondary"># Clone stable version and install</span></div>
-                <div><span class="text-secondary">$</span> curl -fsSL https://raw.githubusercontent.com/gismodes37/Chilemon/main/install/bootstrap.sh | sudo bash</div>
+                <div><span class="text-secondary">$</span> curl -fsSL https://raw.githubusercontent.com/gismodes37/Chilemon/main/install/bootstrap.sh -o /tmp/bootstrap.sh</div>
+                <div><span class="text-secondary">$</span> sudo bash /tmp/bootstrap.sh</div>
               </div>
 
               <div class="mt-3 small text-secondary">
@@ -489,7 +491,8 @@
               <p class="text-secondary small mb-3">For a clean dedicated system. Create a VM with VirtualBox or Proxmox, install Debian 13 + ASL3, then ChileMon.</p>
               <div class="code">
                 <div><span class="text-secondary"># Clone and install</span></div>
-                <div><span class="text-secondary">$</span> curl -fsSL https://raw.githubusercontent.com/gismodes37/Chilemon/main/install/bootstrap.sh | sudo bash</div>
+                <div><span class="text-secondary">$</span> curl -fsSL https://raw.githubusercontent.com/gismodes37/Chilemon/main/install/bootstrap.sh -o /tmp/bootstrap.sh</div>
+                <div><span class="text-secondary">$</span> sudo bash /tmp/bootstrap.sh</div>
               </div>
               <div class="mt-3 small text-secondary">
                 The installer auto-detects NEW vs UPDATE mode. The WebRTC bridge (browser PTT) is installed as part of the process.

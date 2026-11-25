@@ -32,4 +32,17 @@ fi
 
 cd "$TARGET_DIR"
 echo "[INFO] Ejecutando instalador principal..."
-exec bash install/install_chilemon.sh
+
+# El instalador pide nodo, host y clave AMI con `read`. Con
+# `curl ... | sudo bash`, stdin es el pipe del script y `read` recibe EOF de
+# inmediato: bajo `set -e` eso dispara el trap y aborta antes de cualquier
+# pregunta. Si stdin ya es un terminal se respeta; si no, se engancha /dev/tty.
+if [[ -t 0 ]]; then
+    exec bash install/install_chilemon.sh
+elif : </dev/tty 2>/dev/null; then
+    exec bash install/install_chilemon.sh </dev/tty
+else
+    echo "[ERROR] Este instalador necesita un terminal interactivo." >&2
+    echo "[ERROR] Descargá el script y ejecutalo con: sudo bash /tmp/bootstrap.sh" >&2
+    exit 1
+fi

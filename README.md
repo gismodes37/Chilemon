@@ -250,10 +250,11 @@ ChileMon installs directly on an **ASL3** node. A Debian-based system is recomme
 
 ### 📦 One-command install (Recommended)
 
-Copy and paste this single line on the Pi. It installs `git`, downloads the repository into `/opt/chilemon` and runs the installer:
+Copy and paste these two lines on the Pi. They install `git`, download the repository into `/opt/chilemon` and run the installer in an interactive terminal:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/gismodes37/Chilemon/main/install/bootstrap.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/gismodes37/Chilemon/main/install/bootstrap.sh -o /tmp/bootstrap.sh
+sudo bash /tmp/bootstrap.sh
 ```
 
 Manual alternative (only if `git` is already installed):
@@ -329,7 +330,8 @@ sudo bash install
 
 #### 3.4 Install ChileMon
 ```bash
-curl -fsSL https://raw.githubusercontent.com/gismodes37/Chilemon/main/install/bootstrap.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/gismodes37/Chilemon/main/install/bootstrap.sh -o /tmp/bootstrap.sh
+sudo bash /tmp/bootstrap.sh
 ```
 > The installer detects NEW vs UPDATE mode automatically. In NEW mode it asks for the node number and AMI password and generates all WebRTC secrets.
 
