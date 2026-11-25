@@ -106,3 +106,24 @@ def test_final_banner_health_command_expands_webrtc_port(tmp_path: Path) -> None
     assert result.returncode == 0, result.stdout + result.stderr
     assert "curl http://localhost:9091/health" in result.stdout
     assert "${WEBRTC_PORT" not in result.stdout
+
+
+def test_final_banner_shows_version_and_copyable_url(tmp_path: Path) -> None:
+    """A fresh install must end with a welcome, version and a paste-ready URL."""
+    # The harness sources the installer from <repo>/install/, so REPO_DIR is
+    # tmp_path when the harness lives in tmp_path/repo.
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (tmp_path / "public").mkdir()
+    (tmp_path / "public" / "index.php").write_text(
+        "<?php\ndefine('APP_VERSION', '9.9.9');\n", encoding="utf-8"
+    )
+    result = _run_shell(
+        repo,
+        "git() { echo abc1234; }\n"
+        'print_final_banner "494780" "192.168.0.109" "admin" "admin" "http"',
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "¡Bienvenido a ChileMon!" in result.stdout
+    assert "Versión ChileMon : 9.9.9 (commit abc1234)" in result.stdout
+    assert "http://192.168.0.109/chilemon" in result.stdout.splitlines()

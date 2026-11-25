@@ -1066,6 +1066,17 @@ run_verification() {
 }
 
 
+detect_app_version() {
+    local file version=""
+    for file in "$REPO_DIR/config/app.php" "$PUBLIC_DIR/index.php"; do
+        [[ -r "$file" ]] || continue
+        version="$(sed -n "s/.*define('APP_VERSION',[[:space:]]*'\\([^']*\\)').*/\\1/p" "$file" | head -n 1)"
+        [[ -n "$version" ]] && break
+    done
+    printf '%s' "${version:-desconocida}"
+}
+
+
 print_final_banner() {
     local local_node="$1"
     local server_host="$2"
@@ -1073,6 +1084,10 @@ print_final_banner() {
     local web_user="${4:-no definido}"
     local web_proto="${5:-http}"
     local web_pass="${6:-}"
+
+    local app_version commit
+    app_version="$(detect_app_version)"
+    commit="$(git -C "$REPO_DIR" rev-parse --short HEAD 2>/dev/null || printf 'desconocido')"
 
     echo
     echo -e "${C_CYAN}================================================================${C_RESET}"
@@ -1087,6 +1102,11 @@ print_final_banner() {
     echo -e "${C_YELLOW}                     ChileMon instalado correctamente${C_RESET}"
     echo -e "${C_CYAN}================================================================${C_RESET}"
     echo
+    echo -e "${C_WHITE}¡Bienvenido a ChileMon!${C_RESET}"
+    echo
+    echo -e " ${C_GREEN}Versión ChileMon :${C_RESET} ${app_version} (commit ${commit})"
+    echo -e " ${C_GREEN}Modo            :${C_RESET} ${INSTALL_MODE}"
+    echo
     echo -e "${C_WHITE}Tome nota de los siguientes datos importantes:${C_RESET}"
     echo
     echo -e " ${C_GREEN}Nodo ASL local :${C_RESET} ${local_node}"
@@ -1094,6 +1114,9 @@ print_final_banner() {
     echo
     echo -e " ${C_GREEN}Dirección nodo :${C_RESET} ${web_proto}://${server_host}"
     echo -e " ${C_GREEN}Acceso ChileMon:${C_RESET} ${web_proto}://${server_host}/chilemon"
+    echo
+    echo -e "${C_WHITE}Copiá y pegá esta dirección en el navegador:${C_RESET}"
+    echo "${web_proto}://${server_host}/chilemon"
     echo
     echo -e " ${C_GREEN}Usuario web    :${C_RESET} ${web_user}"
     if [[ -n "$web_pass" ]]; then
@@ -1110,9 +1133,6 @@ print_final_banner() {
     echo -e "${C_WHITE}Pruebas rápidas:${C_RESET}"
     echo
     echo " sudo -u www-data sudo -n ${WRAPPER_PATH} nodes ${local_node}"
-    echo
-    echo " Abra en su navegador:"
-    echo " ${web_proto}://${server_host}/chilemon"
     echo -e "${C_CYAN}----------------------------------------------------------------${C_RESET}"
     echo
     echo -e "${C_YELLOW} Gracias por usar ChileMon 🇨🇱${C_RESET}"
