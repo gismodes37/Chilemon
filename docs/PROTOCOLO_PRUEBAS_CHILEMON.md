@@ -12,7 +12,9 @@ Una instalación NUEVA genera un `iax_companion_secret` nuevo y lo escribe en `c
 
 ## Fase 0 — Limpieza de la PC Windows
 
-1. Previsualizar el plan (no cambia nada):
+1. Descargar el desinstalador desde el dashboard: abrir **Settings → Herramientas → Desinstalar Companion** y guardar `chilemon-companion-uninstall.bat`. Ese `.bat` es autocontenido: baja el código desde `main`, muestra el plan con `--dry-run`, pide confirmación en la PC y recién después borra. Ejecutarlo como Administrador para que también se elimine la regla de firewall `ChileMon Companion IAX2`.
+
+   Si ya tenés el código en la PC, el equivalente manual es previsualizar el plan (no cambia nada):
 
    ```
    cd /d "%USERPROFILE%\.chilemon\src"

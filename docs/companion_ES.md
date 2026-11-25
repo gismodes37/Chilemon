@@ -55,7 +55,9 @@ El orden de búsqueda de la configuración es `--config`, luego `~/.chilemon/con
 
 Cuando el usuario decide dejar de usar ChileMon, ejecuta `companion/uninstall-companion.bat` (o `python -m companion.uninstall`). Por defecto muestra el plan exacto, pide confirmación y luego quita la tarea de inicio de sesión, el valor `HKCU\...\Run`, el acceso directo de Startup, todo el directorio `%USERPROFILE%\.chilemon` (config, logs, `src` descargado y bytecode) y los directorios temporales `%TEMP%\chilemon-install-*`. Un proceso solo se detiene si su línea de comandos contiene `-m companion.main`; otra aplicación que escuche en el puerto 9093 se informa y se deja corriendo.
 
-La regla de firewall de Windows `ChileMon Companion IAX2` se elimina cuando el desinstalador corre como administrador. Si no lo está, no falla: imprime el comando exacto `install\companion\install-firewall.ps1 -Remove` para ejecutar desde un PowerShell elevado.
+La regla de firewall de Windows `ChileMon Companion IAX2` se elimina directamente con `Remove-NetFirewallRule` cuando el desinstalador corre como administrador. Esto ocurre **antes** de borrar cualquier archivo, así que una desinstalación completa no puede dejar la regla atrás. Si no lo está, no falla: imprime el comando exacto para ejecutar desde un PowerShell elevado.
+
+Desde el dashboard, abrí **Settings → Herramientas → Desinstalar Companion** para bajar `chilemon-companion-uninstall.bat`. Ese `.bat` autocontenido baja el código fijado, muestra el plan con `--dry-run`, pide confirmación en la PC y recién después borra los datos. El dashboard solo entrega el archivo: nunca autoriza ni realiza el borrado. Ejecutá el `.bat` como Administrador para quitar también la regla de firewall.
 
 Alternativas menos invasivas:
 

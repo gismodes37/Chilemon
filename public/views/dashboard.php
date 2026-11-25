@@ -170,6 +170,11 @@ $systemInfo = $systemInfo ?? [
                         title="Descargar instalador del Companion (audio nativo)">
                         <i class="bi bi-download"></i> Companion App
                     </button>
+                    <button class="btn btn-outline-warning" id="btn-settings"
+                        data-bs-toggle="modal" data-bs-target="#toolsModal"
+                        title="Herramientas disponibles para la PC">
+                        <i class="bi bi-gear"></i> Settings
+                    </button>
                 </div>
             </div>
         </div>
@@ -805,6 +810,45 @@ $systemInfo = $systemInfo ?? [
 </div>
 
 <!-- =========================================
+     Settings Modal (PC tools delivered by the dashboard)
+     ========================================= -->
+<div class="modal fade modal-chilemon-info" id="toolsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-gear text-warning"></i>
+                    Settings — Herramientas
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <p class="small text-muted mb-3">
+                    Estas herramientas se descargan y ejecutan en tu PC. El dashboard solo entrega el archivo: no puede desinstalar nada por vos.
+                </p>
+                <div class="list-group">
+                    <div class="list-group-item">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1"><i class="bi bi-trash3 text-danger"></i> Desinstalar Companion</h6>
+                            <span class="badge text-bg-secondary">PC Windows</span>
+                        </div>
+                        <p class="small mb-2">
+                            Descarga un <code>.bat</code> autocontenido que muestra el plan con <code>--dry-run</code>, pide confirmación en la PC y recién después borra config, logs, código y autostart.
+                        </p>
+                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="downloadCompanionUninstaller()">
+                            <i class="bi bi-download"></i> Descargar desinstalador
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- =========================================
      Registration Modal (Installation Map)
      ========================================= -->
 <div class="modal fade" id="regModal" tabindex="-1" aria-hidden="true">
@@ -1119,6 +1163,28 @@ function downloadCompanion() {
         'Requiere Python 3.11+ e internet en la PC.\n\n' +
         'Para detenerlo o desinstalarlo, usá los .bat en:\n' +
         '%USERPROFILE%\\.chilemon\\src\\companion\\'
+    );
+}
+
+function downloadCompanionUninstaller() {
+    const link = document.createElement('a');
+    link.href = 'api/companion-uninstall.php';
+    link.download = 'chilemon-companion-uninstall.bat';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    alert(
+        '📥 Desinstalador descargado: chilemon-companion-uninstall.bat\n\n' +
+        'Hacé doble clic en ese archivo desde Descargas. El script:\n' +
+        '  • baja el código del companion desde GitHub\n' +
+        '  • muestra QUÉ se va a borrar (--dry-run)\n' +
+        '  • te pide confirmación en la PC\n' +
+        '  • recién entonces borra config, logs, código y autostart\n\n' +
+        'Para quitar también la regla de firewall "ChileMon Companion IAX2",\n' +
+        'ejecutá el .bat con clic derecho → Ejecutar como administrador.\n\n' +
+        'Si querés conservar config y logs, ejecutá desde %USERPROFILE%\\.chilemon\\src:\n' +
+        'python -m companion.uninstall --keep-config'
     );
 }
 
