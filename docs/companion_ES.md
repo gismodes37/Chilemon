@@ -49,6 +49,20 @@ El orden de búsqueda de la configuración es `--config`, luego `~/.chilemon/con
 
 **Inicio automático al iniciar sesión.** Ejecutar `start-companion.bat` una vez (o `install-autostart.bat` directamente) registra `ChileMon Companion` para cada inicio de sesión. La rutina es idempotente: consulta el registro existente y solo lo crea si falta. Se prefiere el Programador de tareas de Windows; cuando el usuario no puede crear tareas, la rutina usa como respaldo una entrada `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` que apunta a `autostart-companion.bat` con una ruta absoluta. Ambos caminos llaman a `start-companion.bat --autostart`, donde la bandera solo evita el aviso de "ya está corriendo". Un acceso directo previo en Startup es inofensivo: si 9093 ya está escuchando, el objetivo de autostart sale silenciosamente.
 
+### Desinstalación
+
+Cuando el usuario decide dejar de usar ChileMon, ejecuta `companion/uninstall-companion.bat` (o `python -m companion.uninstall`). Por defecto muestra el plan exacto, pide confirmación y luego quita la tarea de inicio de sesión, el valor `HKCU\...\Run`, el acceso directo de Startup, todo el directorio `%USERPROFILE%\.chilemon` (config, logs, `src` descargado y bytecode) y los directorios temporales `%TEMP%\chilemon-install-*`. Un proceso solo se detiene si su línea de comandos contiene `-m companion.main`; otra aplicación que escuche en el puerto 9093 se informa y se deja corriendo.
+
+La regla de firewall de Windows `ChileMon Companion IAX2` se elimina cuando el desinstalador corre como administrador. Si no lo está, no falla: imprime el comando exacto `install\companion\install-firewall.ps1 -Remove` para ejecutar desde un PowerShell elevado.
+
+Alternativas menos invasivas:
+
+- `python -m companion.uninstall --dry-run` — muestra el plan exacto sin cambiar nada.
+- `python -m companion.uninstall --keep-config` — conserva `config.toml` y los logs, y quita solo el código y el autostart. Útil para reinstalar conservando el secreto emparejado.
+- `python -m companion.uninstall --yes` — omite la confirmación para automatizaciones.
+
+Los paquetes pip instalados por usuario (como `numpy`, `sounddevice` y `aiohttp`) y el `.bat` descargado en Descargas se informan deliberadamente, pero no se borran: otra aplicación podría usarlos. El desinstalador es idempotente y termina con código distinto de cero si queda una entrada de autostart o un proceso del Companion escuchando.
+
 ### Raspberry Pi (lado servidor)
 
 `install/install_chilemon.sh` realiza la configuración principal:

@@ -49,6 +49,20 @@ The configuration search order is `--config`, then `~/.chilemon/config.toml`, th
 
 **Login autostart.** Running `start-companion.bat` once (or `install-autostart.bat` directly) registers `ChileMon Companion` for every logon. The routine is idempotent: it queries the registration first and only creates it when missing. Windows Task Scheduler is preferred; when the user cannot create tasks, the routine falls back to an `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` entry pointing to `autostart-companion.bat` with an absolute path. Both paths call `start-companion.bat --autostart`, where the flag only suppresses the "already running" prompt. A pre-existing Startup shortcut is harmless: if 9093 is already listening, the autostart target exits quietly.
 
+### Uninstall
+
+When a user decides to stop using ChileMon, run `companion/uninstall-companion.bat` (or `python -m companion.uninstall`). By default it prints the exact plan, asks for confirmation and then removes the logon task, the `HKCU\...\Run` value, the Startup shortcut, the whole `%USERPROFILE%\.chilemon` directory (config, logs, downloaded `src` and bytecode) and the `%TEMP%\chilemon-install-*` staging directories. A process is stopped only when its command line contains `-m companion.main`; another application listening on port 9093 is reported and left running.
+
+The Windows firewall rule `ChileMon Companion IAX2` is removed when the uninstaller runs as administrator. Otherwise it does not fail: it prints the exact `install\companion\install-firewall.ps1 -Remove` command to run from an elevated PowerShell.
+
+Less invasive alternatives:
+
+- `python -m companion.uninstall --dry-run` — print the exact plan and change nothing.
+- `python -m companion.uninstall --keep-config` — keep `config.toml` and the logs, removing only code and autostart. Use this for a reinstall that preserves the paired secret.
+- `python -m companion.uninstall --yes` — skip the confirmation prompt for automation.
+
+User-installed pip packages (such as `numpy`, `sounddevice` and `aiohttp`) and the downloaded `.bat` in Downloads are deliberately reported, not deleted: another application may use them. The uninstaller is idempotent and exits non-zero if an autostart entry or a Companion listener still remains.
+
 ### Raspberry Pi (server side)
 
 `install/install_chilemon.sh` does the authoritative setup:

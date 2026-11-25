@@ -1,10 +1,10 @@
 """
-Contract tests for the Windows companion clean-uninstall script.
+Contract tests for the Windows companion clean-uninstall wrapper.
 
 There is no batch runner in this suite, so these tests pin the observable
-contract encoded in uninstall-companion.bat: it stops the listener, removes
-every logon mechanism, deletes only per-user companion data, verifies the port
-is free and returns a real exit code.
+contract encoded in uninstall-companion.bat: it is a thin, flag-forwarding
+wrapper with no destructive logic of its own. The destructive logic lives in
+companion/uninstall.py, where it is verified with injected dependencies.
 
 Run with: python -m pytest tests/companion/uninstall_companion_bat_test.py -v
 """
@@ -17,42 +17,36 @@ UNINSTALL = (ROOT / "companion" / "uninstall-companion.bat").read_text(
 )
 
 
-def test_uninstall_stops_the_companion_listener() -> None:
-    assert "netstat -ano" in UNINSTALL
-    assert 'findstr ":%PORT%"' in UNINSTALL
-    assert "taskkill /PID %%P /F" in UNINSTALL
+def test_uninstall_delegates_to_the_python_module() -> None:
+    assert "python -m companion.uninstall %*" in UNINSTALL
 
 
-def test_uninstall_removes_all_logon_mechanisms() -> None:
-    assert 'schtasks /delete /tn "%TASK_NAME%" /f' in UNINSTALL
-    assert 'reg delete "%RUNKEY%" /v "%TASK_NAME%" /f' in UNINSTALL
-    assert "ChileMon Companion.lnk" in UNINSTALL
+def test_uninstall_forwards_every_flag_unchanged() -> None:
+    """%* keeps --dry-run, --keep-config and --yes available to the user."""
+    for flag in ("--dry-run", "--keep-config", "--yes"):
+        assert flag in UNINSTALL
+    assert "%*" in UNINSTALL
 
 
-def test_uninstall_removes_only_per_user_companion_data() -> None:
-    assert r"%USERPROFILE%\.chilemon" in UNINSTALL
-    for name in (
-        "config.toml",
-        "companion.log",
-        "companion-startup.log",
-        "companion-install.log",
+def test_uninstall_runs_from_the_repository_root() -> None:
+    assert 'cd /d "%~dp0.."' in UNINSTALL
+
+
+def test_uninstall_propagates_the_exit_code() -> None:
+    assert "exit /b %ERRORLEVEL%" in UNINSTALL
+
+
+def test_uninstall_has_no_destructive_logic_of_its_own() -> None:
+    for forbidden in (
+        "taskkill",
+        "reg delete",
+        "rmdir /s",
+        "schtasks /delete",
+        "netstat",
+        "del /f",
     ):
-        assert name in UNINSTALL
+        assert forbidden not in UNINSTALL
 
 
-def test_uninstall_does_not_delete_repository_sources() -> None:
-    assert "rmdir /s /q \"%~dp0__pycache__\"" in UNINSTALL
-    assert 'del /f /q "%~dp0' not in UNINSTALL
-    assert "git clean" not in UNINSTALL
-
-
-def test_uninstall_verifies_port_and_propagates_failure() -> None:
-    assert 'findstr "LISTENING"' in UNINSTALL
-    assert "exit /b 1" in UNINSTALL
-    assert UNINSTALL.rstrip().endswith("exit /b 0")
-
-
-def test_uninstall_is_idempotent() -> None:
-    """Every removal is guarded, so running it twice is harmless."""
-    assert UNINSTALL.count("if exist") >= 5
-    assert ">nul 2>&1" in UNINSTALL
+def test_uninstall_checks_python_before_delegating() -> None:
+    assert "where python" in UNINSTALL
