@@ -53,6 +53,89 @@ final class System
         return ['ipv4' => $ipv4, 'ipv6' => $ipv6];
     }
 
+    private static function readProcFile(string $path): string
+    {
+        if (!is_readable($path)) {
+            return '';
+        }
+
+        $contents = @file_get_contents($path);
+        return $contents === false ? '' : $contents;
+    }
+
+    /** @return array{model: string, board: string, cores: int} */
+    public static function getCpuInfo(): array
+    {
+        $raw = self::readProcFile('/proc/cpuinfo');
+        $model = 'Desconocido';
+        $board = '';
+        $cores = 0;
+
+        if ($raw !== '') {
+            if (preg_match('/^model name\s*:\s*(.+)$/mi', $raw, $matches) === 1) {
+                $model = trim($matches[1]);
+            }
+            if (preg_match('/^Model\s*:\s*(.+)$/mi', $raw, $matches) === 1) {
+                $board = trim($matches[1]);
+            }
+            $cores = preg_match_all('/^processor\s*:/mi', $raw);
+        }
+
+        return ['model' => $model, 'board' => $board, 'cores' => $cores];
+    }
+
+    /** @return array{total: string, used: string, available: string, percent: int} */
+    public static function getMemoryInfo(): array
+    {
+        $empty = ['total' => '—', 'used' => '—', 'available' => '—', 'percent' => 0];
+        $raw = self::readProcFile('/proc/meminfo');
+        $totalKb = self::meminfoValue($raw, 'MemTotal');
+        $availableKb = self::meminfoValue($raw, 'MemAvailable');
+
+        if ($totalKb <= 0 || $availableKb <= 0) {
+            return $empty;
+        }
+
+        $usedKb = max(0, $totalKb - $availableKb);
+
+        return [
+            'total'     => self::formatMemory($totalKb * 1024),
+            'used'      => self::formatMemory($usedKb * 1024),
+            'available' => self::formatMemory($availableKb * 1024),
+            'percent'   => (int) round(($usedKb / $totalKb) * 100),
+        ];
+    }
+
+    private static function meminfoValue(string $raw, string $key): int
+    {
+        $pattern = '/^' . preg_quote($key, '/') . ':\s*(\d+)\s*kB/mi';
+        return preg_match($pattern, $raw, $matches) === 1 ? (int)$matches[1] : 0;
+    }
+
+    private static function formatMemory(int $bytes): string
+    {
+        if ($bytes >= 1073741824) {
+            return number_format($bytes / 1073741824, 1, '.', '') . ' GiB';
+        }
+
+        return number_format($bytes / 1048576, 0, '.', '') . ' MiB';
+    }
+
+    public static function getUptime(): string
+    {
+        $raw = self::readProcFile('/proc/uptime');
+        if (preg_match('/^(\d+(?:\.\d+)?)/', $raw, $matches) !== 1) {
+            return '—';
+        }
+
+        $seconds = (int)$matches[1];
+        $days = intdiv($seconds, 86400);
+        $hours = intdiv($seconds % 86400, 3600);
+        $minutes = intdiv($seconds % 3600, 60);
+
+        return sprintf('%dd %dh %dm', $days, $hours, $minutes);
+    }
+
     /** @return array<string, mixed> */
     public static function getSystemInfo(): array
     {
@@ -73,6 +156,20 @@ final class System
         $c = self::getCpuTemperature();
         $info['cpu_temp_c'] = $c;
         $info['cpu_temp_f'] = round(($c * 9 / 5) + 32, 1);
+
+        $cpu = self::getCpuInfo();
+        $info['cpu_model'] = $cpu['model'];
+        $info['cpu_board'] = $cpu['board'];
+        $info['cpu_cores'] = $cpu['cores'];
+
+        $memory = self::getMemoryInfo();
+        $info['mem_total'] = $memory['total'];
+        $info['mem_used'] = $memory['used'];
+        $info['mem_available'] = $memory['available'];
+        $info['mem_used_percent'] = $memory['percent'];
+
+        $info['uptime'] = self::getUptime();
+        $info['kernel'] = php_uname('r');
 
         return $info;
     }

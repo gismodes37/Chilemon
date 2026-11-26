@@ -56,12 +56,21 @@ $estadisticas = $estadisticas ?? [
     'total_usuarios' => 0,
 ];
 $systemInfo = $systemInfo ?? [
-    'web_port'     => 80,
-    'cpu_temp_c'   => 0,
-    'cpu_temp_f'   => 32,
-    'hostname'     => 'desconocido',
-    'php_version'  => PHP_VERSION,
-    'timezone'     => date_default_timezone_get(),
+    'web_port'         => 80,
+    'cpu_temp_c'       => 0,
+    'cpu_temp_f'       => 32,
+    'cpu_model'        => 'Desconocido',
+    'cpu_board'        => '',
+    'cpu_cores'        => 0,
+    'mem_total'        => '—',
+    'mem_used'         => '—',
+    'mem_available'    => '—',
+    'mem_used_percent' => 0,
+    'uptime'           => '—',
+    'kernel'           => '—',
+    'hostname'         => 'desconocido',
+    'php_version'      => PHP_VERSION,
+    'timezone'         => date_default_timezone_get(),
 ];
 
 ?>
@@ -593,24 +602,53 @@ $systemInfo = $systemInfo ?? [
                         <div class="col-md-3 mb-3">
                             <div class="card h-100 system-card">
                                 <div class="card-body">
-                                    <h6 class="card-title"><i class="bi bi-info-circle"></i> Comandos RPi</h6>
+                                    <h6 class="card-title"><i class="bi bi-cpu"></i> Hardware RPi</h6>
+                                    <p class="mb-2">
+                                        <small class="text-muted">CPU:</small><br>
+                                        <span class="badge bg-secondary text-wrap text-break">
+                                            <?= htmlspecialchars((string)($systemInfo['cpu_model'] ?? 'Desconocido'), ENT_QUOTES, 'UTF-8') ?>
+                                        </span>
+                                    </p>
+                                    <?php if (!empty($systemInfo['cpu_board'])): ?>
+                                        <p class="mb-2">
+                                            <small class="text-muted">Placa:</small><br>
+                                            <span class="badge bg-info text-wrap text-break">
+                                                <?= htmlspecialchars((string)$systemInfo['cpu_board'], ENT_QUOTES, 'UTF-8') ?>
+                                            </span>
+                                        </p>
+                                    <?php endif; ?>
+                                    <?php
+                                    $memPercent = (int)($systemInfo['mem_used_percent'] ?? 0);
+                                    $memColor = $memPercent >= 85 ? 'bg-danger' : ($memPercent >= 70 ? 'bg-warning' : 'bg-success');
+                                    ?>
                                     <p class="mb-1">
-                                        <small>Temperatura:</small><br>
-                                        <code class="code-ip">vcgencmd measure_temp</code>
+                                        <small class="text-muted">Memoria en uso:</small><br>
+                                        <strong>
+                                            <?= htmlspecialchars((string)($systemInfo['mem_used'] ?? '—'), ENT_QUOTES, 'UTF-8') ?>
+                                            / <?= htmlspecialchars((string)($systemInfo['mem_total'] ?? '—'), ENT_QUOTES, 'UTF-8') ?>
+                                        </strong>
                                     </p>
-                                    <p class="mb-1">
-                                        <small>Info CPU:</small><br>
-                                        <code class="code-ip">cat /proc/cpuinfo</code>
-                                    </p>
-                                    <p class="mb-0">
-                                        <small>Memoria:</small><br>
-                                        <code class="code-ip">free -h</code>
-                                    </p>
-                                    <div class="mt-3">
-                                        <button class="btn btn-sm btn-outline-primary w-100" onclick="loadAdvancedSystemInfo()">
-                                            <i class="bi bi-graph-up"></i> Info Avanzada
-                                        </button>
+                                    <div class="progress mb-3" style="height: 6px;">
+                                        <div class="progress-bar <?= $memColor ?>" style="width: <?= min(100, max(0, $memPercent)) ?>%"></div>
                                     </div>
+                                    <div class="collapse" id="advanced-system-info">
+                                        <div class="border-top pt-2 small">
+                                            <p class="mb-1"><small class="text-muted">Núcleos:</small> <?= (int)($systemInfo['cpu_cores'] ?? 0) ?></p>
+                                            <p class="mb-1"><small class="text-muted">Disponible:</small> <?= htmlspecialchars((string)($systemInfo['mem_available'] ?? '—'), ENT_QUOTES, 'UTF-8') ?></p>
+                                            <p class="mb-1"><small class="text-muted">Kernel:</small> <?= htmlspecialchars((string)($systemInfo['kernel'] ?? '—'), ENT_QUOTES, 'UTF-8') ?></p>
+                                            <p class="mb-2"><small class="text-muted">Uptime:</small> <?= htmlspecialchars((string)($systemInfo['uptime'] ?? '—'), ENT_QUOTES, 'UTF-8') ?></p>
+                                            <p class="mb-0 text-muted">
+                                                Comandos: <code class="code-ip">vcgencmd measure_temp</code>
+                                                <code class="code-ip">cat /proc/cpuinfo</code>
+                                                <code class="code-ip">free -h</code>
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <button class="btn btn-sm btn-outline-primary w-100" type="button"
+                                            data-bs-toggle="collapse" data-bs-target="#advanced-system-info"
+                                            aria-expanded="false" aria-controls="advanced-system-info">
+                                        <i class="bi bi-graph-up"></i> Info Avanzada
+                                    </button>
                                 </div>
                             </div>
                         </div>
