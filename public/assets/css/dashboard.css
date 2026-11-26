@@ -573,9 +573,10 @@ body.has-relative-header {
   }
 }
 
+/* Con imagen el header es relativo, pero no recorta el dropdown de Apariencia. */
 .supermon-header.has-header-bg{
   position: relative;
-  overflow: hidden;
+  overflow: visible;
   color: #fff;
   
 }
@@ -588,7 +589,6 @@ body.has-relative-header {
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
-  transform: scale(1.03);
   z-index: 0;
   filter: brightness(1.8) contrast(1.05);
 

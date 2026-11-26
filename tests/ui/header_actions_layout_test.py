@@ -49,6 +49,15 @@ def test_action_row_is_flex_wrap_and_compacts_on_scroll() -> None:
     assert ".supermon-header.scrolled .header-actions" in CSS
 
 
+def test_header_background_does_not_clip_dropdown() -> None:
+    header_bg_css = _between(CSS, ".supermon-header.has-header-bg{", "}")
+    assert "overflow: hidden" not in header_bg_css
+    assert "overflow: visible" in header_bg_css
+
+    bg_image_css = _between(CSS, ".supermon-header.has-header-bg::before{", "}")
+    assert "transform: scale" not in bg_image_css
+
+
 def test_existing_theme_and_logout_hooks_survive() -> None:
     assert 'aria-labelledby="appearance-menu"' in HEADER
     assert 'data-theme-skin="clasico"' in HEADER
