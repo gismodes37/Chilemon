@@ -20,11 +20,15 @@ Execute in order: first order and structure the design (T0), then add the new lo
 - `T0` — S3, inline, **done** (`c629c6d`) — Foundation: repair cascade, add token layer, migrate structural colors, static contract tests. Commit 1.
 - `T1` — S2, inline, **done** (`4b5e0f8`; probes `f0700ce`) — ThemeManager, single cookie with allowlist, header "Apariencia" dropdown, legacy cookie migration. Risk: item 3 (shared header/JS). Native review: approved, authority burned. Commit 2.
 - `T2` — S2, inline, **done** (`936a179`) — `obsidian` skin as token data only, modal/header colors tokenized with identical clasico values. Commit 3.
-- `T3` — S2-S3, inline, **done** (`f7224e1`) — Docs for both skins and modes; no Settings entry exists, so the header dropdown remains the only selector. Commit 4.
+- `T3` — S2-S3, inline, **done** (`4b72ca8`) — Docs for both skins and modes; no Settings entry exists, so the header dropdown remains the only selector. Commit 4.
 
 Route evidence: no Writer trigger (single behavior per slice, under ~100 changed lines per slice, no parallel units); no Explorer trigger (the read-only mapping already returned a handoff). Large by resume test because it spans four slices across sessions.
 
 ## Log
+
+**L12** — Native assess after each committed slice: T2 (`f0700ce..936a179`) `medium / under_budget`, T3 plus evidence (`936a179..HEAD`) `medium / under_budget`, both with the pre-existing untracked file explicitly excluded; no native review was due. Final local verification: full Python suite 256 passed + 1 skipped, `git diff --check` clean, worktree clean except pre-existing untracked `public/api/log-call.php`. No push, PR or merge performed.
+
+**L11** — Work-unit evidence recorded after the final local commit; no source behavior changed in this documentation-only update. Feature branch is local only and has not been pushed.
 
 **L10** — T3 documented the Appearance dropdown, both skins and the `chilemon_theme=<skin>:<mode>` cookie in `README.md` and `README_ES.md`. No settings page exists in the codebase, so the optional Settings entry was intentionally not added. RED observed on both new assertions in `tests/ui/theme_docs_test.py` before the docs; GREEN after: `theme_docs_test.py` 2 passed, full Python suite 256 passed + 1 skipped, `git diff --check` clean. Both-skin verification is static here: the PHP/JS allowlist and HTML hooks pin `clasico` and `obsidian`, and the CSS token tests pin each skin's token block. Real browser rendering remains unavailable locally. `public/api/log-call.php` remains pre-existing untracked and excluded.
 
