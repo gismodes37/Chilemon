@@ -256,7 +256,10 @@ $systemInfo = $systemInfo ?? [
                     </button>
                 </div>
                 <div class="btn-group">    
-                    <button class="btn btn-sm btn-outline-info" onclick="toggleTheme()">
+                    <button class="btn btn-sm btn-outline-info" onclick="toggleTheme()"
+                            data-theme-toggle data-theme-icon data-theme-title
+                            aria-label="Cambiar modo de color"
+                            title="<?= $darkMode ? 'Tema claro' : 'Tema oscuro' ?>">
                         <i class="bi <?= $darkMode ? 'bi-sun' : 'bi-moon-stars' ?>"></i>
                     </button>
                 </div>

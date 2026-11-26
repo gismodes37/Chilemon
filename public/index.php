@@ -24,7 +24,28 @@ Auth::requireLogin();
 
 // 4. Parámetros globales de estado de interfaz
 $username = Auth::getUsername() ?: 'Usuario';
-$darkMode = (isset($_COOKIE['chilemon_darkmode']) && $_COOKIE['chilemon_darkmode'] === 'true');
+
+// Apariencia: una sola cookie con allowlist. El flag viejo
+// chilemon_darkmode se respeta como fallback y se migra en el cliente.
+$validSkins = ['clasico', 'obsidian'];
+$validModes = ['light', 'dark'];
+$themeCookie = isset($_COOKIE['chilemon_theme']) ? (string)$_COOKIE['chilemon_theme'] : '';
+$themeParts = explode(':', $themeCookie, 2);
+
+if (count($themeParts) === 2
+    && in_array($themeParts[0], $validSkins, true)
+    && in_array($themeParts[1], $validModes, true)) {
+    $skin = $themeParts[0];
+    $mode = $themeParts[1];
+} else {
+    $skin = 'clasico';
+    $mode = (isset($_COOKIE['chilemon_darkmode']) && $_COOKIE['chilemon_darkmode'] === 'true')
+        ? 'dark'
+        : 'light';
+}
+
+// Compatibilidad con las vistas que todavía consultan $darkMode.
+$darkMode = ($mode === 'dark');
 
 // 5. Invocación del Controlador
 $controller = new DashboardController();

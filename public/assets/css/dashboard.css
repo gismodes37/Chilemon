@@ -1147,6 +1147,10 @@ body.has-relative-header {
     color: #000;
 }
 
+/* Apariencia: el check solo se ve en la opción activa del dropdown */
+.dropdown-item[aria-checked="true"] .theme-check { visibility: visible; }
+.dropdown-item[aria-checked="false"] .theme-check { visibility: hidden; }
+
 /* Dark mode adjustments */
 [data-bs-theme="dark"] .btn-update-available {
     background-color: #ffc107;

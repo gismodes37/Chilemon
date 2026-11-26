@@ -11,9 +11,10 @@
         <div class="col-md-6 text-md-end">
           <small>
             <span id="full-date"></span> |
-            <a href="#" class="text-decoration-none" onclick="toggleTheme(); return false;">
+            <a href="#" class="text-decoration-none" onclick="toggleTheme(); return false;"
+               data-theme-toggle data-theme-icon aria-label="Cambiar modo de color">
               <i class="bi <?= $darkMode ? 'bi-sun' : 'bi-moon-stars' ?>"></i>
-              <?= $darkMode ? 'Tema claro' : 'Tema oscuro' ?>
+              <span data-theme-text><?= $darkMode ? 'Tema claro' : 'Tema oscuro' ?></span>
             </a>
           </small>
         </div>
@@ -21,9 +22,3 @@
     </div>
   </div>
 </footer>
-
-<!-- Botón flotante tema -->
-<button class="theme-toggle-btn" onclick="toggleTheme()"
-        title="<?= $darkMode ? 'Tema claro' : 'Tema oscuro' ?>">
-  <i class="bi <?= $darkMode ? 'bi-sun' : 'bi-moon-stars' ?>"></i>
-</button>
