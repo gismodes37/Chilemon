@@ -146,6 +146,16 @@
         .supermon-header.scrolled .quick-info {
             font-size: 0.75em;
         }
+
+        .supermon-header.scrolled .header-actions {
+            gap: 0.35rem;
+            margin-top: 0.25rem;
+        }
+
+        .supermon-header.scrolled .header-actions .btn {
+            font-size: 0.75rem;
+            padding: 0.15rem 0.4rem;
+        }
         
         .header-badge {
             background: rgba(255,255,255,0.2);
@@ -306,6 +316,16 @@
         .quick-info-item {
             display: inline-block;
             margin-right: 15px;
+        }
+
+        /* Fila única de acciones del header */
+        .header-actions {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
         }
         
         /* Animaciones */

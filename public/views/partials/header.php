@@ -71,10 +71,8 @@ $headerStyle = $headerImgUrl
 
       <!-- DERECHA -->
       <div class="col-md-6 text-md-end">
-        <div class="d-flex justify-content-md-end align-items-center gap-3 flex-wrap">
-
-          <div class="text-end">
-            <div class="mb-1">
+        <div class="header-summary text-end">
+          <div class="mb-1">
 
               
 
@@ -110,25 +108,30 @@ $headerStyle = $headerImgUrl
                 SQLite | <span id="current-time"><?= date('H:i') ?></span>
               </span>
 
-              <?php if (\App\Auth\Auth::isAdmin()): ?>
-              <button type="button"
-                      id="update-status-badge"
-                      class="btn btn-sm btn-outline-info"
-                      onclick="window.checkForUpdate(true)"
-                      title="Verificar actualizaciones en GitHub">
-                <i class="bi bi-check-circle" id="update-badge-icon"></i>
-                <span id="update-badge-text">Actualización Disponible</span>
-              </button>
-              <?php endif; ?>
-
-              <button class="btn btn-sm btn-outline-warning"
-                      data-bs-toggle="modal"
-                      data-bs-target="#favoritesModal">
-                <i class="bi bi-star"></i> Favoritos
-              </button>
-
             </div>
+
+            <small class="header-user opacity-75 d-block mb-2">
+              <?= htmlspecialchars((string)($username ?? ''), ENT_QUOTES, 'UTF-8') ?>
+            </small>
           </div>
+
+          <div class="header-actions d-flex flex-wrap justify-content-end align-items-center gap-2">
+            <?php if (\App\Auth\Auth::isAdmin()): ?>
+            <button type="button"
+                    id="update-status-badge"
+                    class="btn btn-sm btn-outline-info"
+                    onclick="window.checkForUpdate(true)"
+                    title="Verificar actualizaciones en GitHub">
+              <i class="bi bi-check-circle" id="update-badge-icon"></i>
+              <span id="update-badge-text">Actualización Disponible</span>
+            </button>
+            <?php endif; ?>
+
+            <button class="btn btn-sm btn-outline-warning"
+                    data-bs-toggle="modal"
+                    data-bs-target="#favoritesModal">
+              <i class="bi bi-star"></i> Favoritos
+            </button>
 
           <!-- Apariencia: skin + modo. Reemplaza al botón flotante. -->
           <div class="dropdown">
@@ -184,11 +187,6 @@ $headerStyle = $headerImgUrl
             </div>
           </div>
 
-          <div class="d-flex flex-column align-items-end">
-            <small class="opacity-75 mb-1">
-              <?= htmlspecialchars((string)($username ?? ''), ENT_QUOTES, 'UTF-8') ?>
-            </small>
-
             <form method="post"
                   action="<?= rtrim(BASE_PATH, '/') ?>/logout.php"
                   class="d-inline">
@@ -202,8 +200,7 @@ $headerStyle = $headerImgUrl
               </button>
             </form>
           </div>
-
-        </div>
+          <!-- /header-actions -->
       </div>
 
     </div>
