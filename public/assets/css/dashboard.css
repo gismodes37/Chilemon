@@ -12,6 +12,95 @@
             --chile-blue: #0039A6;
             --chile-red: #D52B1E;
             --cm-header-deep: #00155a;
+            --cm-header-overlay-start: rgba(4, 18, 85, .92);
+            --cm-header-overlay-end: rgba(4, 18, 85, .75);
+            --cm-modal-bg: rgba(4, 18, 85, 0.88);
+            --cm-modal-border: rgba(255, 255, 255, 0.22);
+            --cm-modal-fg: #fff;
+            --cm-modal-header-bg: rgba(0, 0, 0, 0.22);
+            --cm-modal-header-border: rgba(255, 255, 255, 0.08);
+            --cm-modal-title-shadow: rgba(0, 0, 0, 0.3);
+            --cm-modal-table-border: rgba(255, 255, 255, 0.1);
+            --cm-modal-footer-start: rgba(0, 0, 0, 0.15);
+            --cm-modal-footer-end: rgba(0, 0, 0, 0.05);
+            --cm-modal-danger-bg: rgba(78, 6, 22, 0.92);
+            --cm-modal-danger-border: rgba(220, 53, 69, 0.35);
+            --cm-modal-danger-header-bg: rgba(220, 53, 69, 0.12);
+            --cm-modal-info-bg: rgba(1, 24, 55, 0.92);
+            --cm-modal-info-border: rgba(1, 254, 253, 0.28);
+            --cm-modal-info-header-bg: rgba(1, 254, 253, 0.06);
+            --cm-modal-control-bg: rgba(255, 255, 255, 0.08);
+            --cm-modal-control-border: rgba(255, 255, 255, 0.18);
+            --cm-modal-control-focus-bg: rgba(255, 255, 255, 0.14);
+            --cm-modal-control-focus-border: rgba(1, 254, 253, 0.6);
+            --cm-modal-control-focus-shadow: rgba(1, 254, 253, 0.15);
+            --cm-modal-muted: rgba(255, 255, 255, 0.55);
+            --cm-modal-hr: rgba(255, 255, 255, 0.08);
+        }
+
+        /* Skin data only. Structural selectors consume these tokens. */
+        [data-skin="obsidian"] {
+            color-scheme: dark;
+            --bs-body-bg: #0b0d10;
+            --bs-body-color: #e6e9ef;
+            --bs-secondary-bg: #161a20;
+            --bs-tertiary-bg: #1b2028;
+            --bs-border-color: #2b323c;
+            --bs-primary: #5b9cff;
+            --bs-secondary: #9aa5b4;
+            --bs-success: #3fb950;
+            --bs-info: #22d3ee;
+            --bs-warning: #f0b429;
+            --bs-danger: #ff5c66;
+            --bs-link-color: #8ab4ff;
+            --bs-link-hover-color: #b0caff;
+            --bs-emphasis-color: #f8fafc;
+            --bs-secondary-color: #a9b4c4;
+            --bs-heading-color: #f8fafc;
+            --asl-green: #3fb950;
+            --asl-blue: #5b9cff;
+            --asl-red: #ff5c66;
+            --asl-yellow: #f0b429;
+            --asl-dark: #0b0d10;
+            --asl-skyblue: #22d3ee;
+            --asl-lime: #a3e635;
+            --asl-green-dark: #2ea043;
+            --chile-blue: #10151f;
+            --chile-red: #ff4d5a;
+            --cm-header-deep: #05070a;
+            --cm-header-overlay-start: rgba(10, 13, 18, 0.94);
+            --cm-header-overlay-end: rgba(6, 8, 12, 0.92);
+            --cm-modal-bg: rgba(8, 10, 14, 0.92);
+            --cm-modal-border: rgba(255, 255, 255, 0.14);
+            --cm-modal-fg: #f2f5fa;
+            --cm-modal-header-bg: rgba(255, 255, 255, 0.04);
+            --cm-modal-header-border: rgba(255, 255, 255, 0.1);
+            --cm-modal-title-shadow: rgba(0, 0, 0, 0.6);
+            --cm-modal-table-border: rgba(255, 255, 255, 0.1);
+            --cm-modal-footer-start: rgba(0, 0, 0, 0.22);
+            --cm-modal-footer-end: rgba(0, 0, 0, 0.08);
+            --cm-modal-danger-bg: rgba(46, 8, 15, 0.94);
+            --cm-modal-danger-border: rgba(255, 92, 102, 0.38);
+            --cm-modal-danger-header-bg: rgba(255, 92, 102, 0.12);
+            --cm-modal-info-bg: rgba(6, 18, 24, 0.94);
+            --cm-modal-info-border: rgba(34, 211, 238, 0.32);
+            --cm-modal-info-header-bg: rgba(34, 211, 238, 0.08);
+            --cm-modal-control-bg: rgba(255, 255, 255, 0.06);
+            --cm-modal-control-border: rgba(255, 255, 255, 0.16);
+            --cm-modal-control-focus-bg: rgba(255, 255, 255, 0.1);
+            --cm-modal-control-focus-border: rgba(34, 211, 238, 0.6);
+            --cm-modal-control-focus-shadow: rgba(34, 211, 238, 0.16);
+            --cm-modal-muted: rgba(242, 245, 250, 0.6);
+            --cm-modal-hr: rgba(255, 255, 255, 0.1);
+        }
+
+        [data-skin="obsidian"][data-bs-theme="dark"] {
+            --bs-body-bg: #050608;
+            --bs-body-color: #f2f5fa;
+            --bs-secondary-bg: #101318;
+            --bs-tertiary-bg: #15191f;
+            --bs-border-color: #313949;
+            --cm-modal-bg: rgba(3, 4, 6, 0.94);
         }
         
         body {
@@ -282,11 +371,11 @@
 
 /* Base de la ventana modal (Premium Glass) */
 .modal-content {
-    background: rgba(4, 18, 85, 0.88); /* Azul profundo ChileMon */
-    border: 1px solid rgba(255, 255, 255, 0.22);
+    background: var(--cm-modal-bg);
+    border: 1px solid var(--cm-modal-border);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
-    color: #fff;
+    color: var(--cm-modal-fg);
     border-radius: 24px;
     box-shadow: 0 35px 85px rgba(0, 0, 0, 0.65);
     overflow: hidden;
@@ -304,8 +393,8 @@
 
 /* Cabecera uniforme y minimalista */
 .modal-header {
-    background: rgba(0, 0, 0, 0.22);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    background: var(--cm-modal-header-bg);
+    border-bottom: 1px solid var(--cm-modal-header-border);
     padding: 1.4rem 1.6rem;
 }
 
@@ -316,7 +405,7 @@
     display: flex;
     align-items: center;
     gap: 14px;
-    text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    text-shadow: 0 2px 4px var(--cm-modal-title-shadow);
 }
 
 /* Botón de cierre Premium */
@@ -344,8 +433,8 @@
 .modal-body .table tbody,
 .modal-body .table td,
 .modal-body .table th {
-    color: #fff;
-    border-color: rgba(255, 255, 255, 0.1);
+    color: var(--cm-modal-fg);
+    border-color: var(--cm-modal-table-border);
     background: transparent !important;
 }
 
@@ -376,8 +465,8 @@
 
 /* Footer con degradado suave */
 .modal-footer {
-    background: linear-gradient(to top, rgba(0, 0, 0, 0.15), rgba(0, 0, 0, 0.05));
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    background: linear-gradient(to top, var(--cm-modal-footer-start), var(--cm-modal-footer-end));
+    border-top: 1px solid var(--cm-modal-header-border);
     padding: 1.2rem 1.6rem;
     gap: 12px;
 }
@@ -394,47 +483,47 @@
 
 /* 1. Peligro / Advertencia (Reinicio, Apagado) */
 .modal-chilemon-danger .modal-content {
-    background: rgba(78, 6, 22, 0.92); /* Tinto profundo cristalino */
-    border-color: rgba(220, 53, 69, 0.35);
+    background: var(--cm-modal-danger-bg); /* Tinto profundo cristalino */
+    border-color: var(--cm-modal-danger-border);
 }
 
 .modal-chilemon-danger .modal-header {
-    background: rgba(220, 53, 69, 0.12);
+    background: var(--cm-modal-danger-header-bg);
 }
 
 /* 2. Info / Nodos Remotos (Cian AllStarLink) */
 .modal-chilemon-info .modal-content {
-    background: rgba(1, 24, 55, 0.92); 
-    border-color: rgba(1, 254, 253, 0.28);
+    background: var(--cm-modal-info-bg);
+    border-color: var(--cm-modal-info-border);
 }
 
 .modal-chilemon-info .modal-header {
-    background: rgba(1, 254, 253, 0.06);
+    background: var(--cm-modal-info-header-bg);
 }
 
 /* Inputs y Formularios (Alta Visibilidad) */
 .modal .form-control, 
 .modal .form-select {
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    color: #fff;
+    background: var(--cm-modal-control-bg);
+    border: 1px solid var(--cm-modal-control-border);
+    color: var(--cm-modal-fg);
     border-radius: 12px;
     transition: all 0.25s ease;
 }
 
 .modal .form-control:focus {
-    background: rgba(255, 255, 255, 0.14);
-    border-color: rgba(1, 254, 253, 0.6);
-    color: #fff;
-    box-shadow: 0 0 20px rgba(1, 254, 253, 0.15);
+    background: var(--cm-modal-control-focus-bg);
+    border-color: var(--cm-modal-control-focus-border);
+    color: var(--cm-modal-fg);
+    box-shadow: 0 0 20px var(--cm-modal-control-focus-shadow);
 }
 
 .modal .text-muted {
-    color: rgba(255, 255, 255, 0.55) !important;
+    color: var(--cm-modal-muted) !important;
 }
 
 .modal hr {
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    border-top: 1px solid var(--cm-modal-hr);
     opacity: 1;
 }
 
@@ -492,8 +581,8 @@ body.has-relative-header {
   inset:0;
   background: linear-gradient(
       90deg,
-      rgba(4,18,85,.92),
-      rgba(4,18,85,.75)
+      var(--cm-header-overlay-start),
+      var(--cm-header-overlay-end)
   );
   z-index: 1;
 }
