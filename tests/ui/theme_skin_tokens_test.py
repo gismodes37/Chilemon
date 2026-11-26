@@ -43,6 +43,22 @@ def test_obsidian_defines_near_black_token_layer() -> None:
     assert tokens.get("--cm-modal-bg") == "rgba(8, 10, 14, 0.92)"
 
 
+def test_obsidian_light_mode_defines_a_light_layer() -> None:
+    tokens = _declarations(
+        _block(r'\[data-skin="obsidian"\]\[data-bs-theme="light"\]')
+    )
+    dark_tokens = _declarations(
+        _block(r'\[data-skin="obsidian"\]\[data-bs-theme="dark"\]')
+    )
+
+    assert tokens.get("color-scheme") == "light"
+    assert tokens.get("--bs-body-bg") == "#f4f7fb"
+    assert tokens.get("--bs-body-color") == "#17202c"
+    assert tokens.get("--cm-modal-bg") == "rgba(244, 247, 251, 0.96)"
+    assert tokens.get("--cm-modal-fg") == "#17202c"
+    assert tokens.get("--bs-body-bg") != dark_tokens.get("--bs-body-bg")
+
+
 def test_obsidian_dark_mode_refines_the_same_tokens() -> None:
     tokens = _declarations(
         _block(r'\[data-skin="obsidian"\]\[data-bs-theme="dark"\]')

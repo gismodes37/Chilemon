@@ -171,6 +171,21 @@ function testDropdownOptionsAreWired() {
   assert.deepEqual(checked(nodes['[data-theme-skin]']), ['false', 'true']);
 }
 
+function testObsidianModeCanReturnToLight() {
+  const { context, nodes, store, attrs } = makeContext({
+    theme: 'dark',
+    skin: 'obsidian',
+  });
+  context.window.ThemeManager.bindControls();
+
+  nodes['[data-theme-mode]'][0].click();
+
+  assert.equal(store.get('chilemon_theme'), 'obsidian:light');
+  assert.equal(attrs['data-skin'], 'obsidian');
+  assert.equal(attrs['data-bs-theme'], 'light');
+  assert.deepEqual(checked(nodes['[data-theme-mode]']), ['true', 'false']);
+}
+
 function testServerRenderedThemeIsAuthoritative() {
   const { context } = makeContext({
     theme: 'dark',
@@ -188,8 +203,9 @@ function testServerRenderedThemeIsAuthoritative() {
   testAllowlistRejectsInjectedValues();
   testLegacyCookieMigratesOnce();
   testDropdownOptionsAreWired();
+  testObsidianModeCanReturnToLight();
   testServerRenderedThemeIsAuthoritative();
-  console.log('theme manager: 6 passed');
+  console.log('theme manager: 7 passed');
 })().catch((err) => {
   console.error(err.message);
   process.exitCode = 1;

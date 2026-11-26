@@ -206,7 +206,7 @@ It also allows you to:
 
 ### Appearance
 
-The **Appearance** menu in the dashboard header selects the skin and the light/dark mode. Two skins are available: `clasico` (the improved original look) and `obsidian` (near-black). The choice is stored in the `chilemon_theme` cookie as `<skin>:<mode>` and rendered by PHP before the page is sent to the browser, so the layout is correct even before JavaScript loads. Existing `chilemon_darkmode` cookies are migrated automatically.
+The **Appearance** menu in the dashboard header selects the skin and the light/dark mode. Two skins are available: `clasico` (the improved original look) and `obsidian` (a cool slate palette with real light and dark modes). The choice is stored in the `chilemon_theme` cookie as `<skin>:<mode>` and rendered by PHP before the page is sent to the browser, so the layout is correct even before JavaScript loads. Existing `chilemon_darkmode` cookies are migrated automatically.
 
 ---
 
