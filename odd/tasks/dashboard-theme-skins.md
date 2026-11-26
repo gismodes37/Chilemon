@@ -18,7 +18,7 @@ Execute in order: first order and structure the design (T0), then add the new lo
 ## Tasks
 
 - `T0` — S3, inline, **done** (`c629c6d`) — Foundation: repair cascade, add token layer, migrate structural colors, static contract tests. Commit 1.
-- `T1` — S2, inline, **done** (commit pending) — ThemeManager, single cookie with allowlist, header "Apariencia" dropdown, legacy cookie migration. Risk: item 3 (shared header/JS). Commit 2.
+- `T1` — S2, inline, **done** (`4b5e0f8`) — ThemeManager, single cookie with allowlist, header "Apariencia" dropdown, legacy cookie migration. Risk: item 3 (shared header/JS). Commit 2.
 - `T2` — S2, inline, pending — `obsidian` skin as token data only. Commit 3.
 - `T3` — S2-S3, inline, pending — Docs and optional Settings entry; verification in both skins. Commit 4.
 
@@ -33,6 +33,8 @@ Route evidence: no Writer trigger (single behavior per slice, under ~100 changed
 **L3** (2026-11-25) — "puedes hacer un analisis del actual estilo del dashboard de chilemon y realizar una propuesta de mejora visual, para aprobechar la potencia de bootstrap y mejorar el aspecto, por a trabajar a tus mejores expertos"
 
 **L4** — Analysis found verified cascade defects (`dashboard.css:18,442-445,451-454`), undefined `--asl-skyblue` (`:79`), duplicate `.supermon-table` (`:96-98,525-535`), and a theme toggle whose `data-theme-*` hooks exist only in JS. User approved the ordered plan and asked for care with working code.
+
+**L7** — Independent verifier returned no blockers: S1 met (no code), S2 met for T1 (obsidian look deferred to T2), S3 met, S0 acceptance met; own boundary probes 14 JS + 30 Python green in scratch, baseline comparison green. Added its durable probes as `tests/js/theme-boundary.test.js` (3 passed) and `tests/ui/theme_contract_boundary_test.py` (3 passed). Advisories: (1) invalid new cookie plus legacy `chilemon_darkmode=true` keeps both cookies but renders correct dark mode — cleanup stalls, behavior intact; (2) pre-existing untracked `public/api/log-call.php` untouched. Unverified locally: real PHP execution and browser clicks (PHP/browser unavailable). Scratch dir to remove by parent: `C:\Users\gismo\AppData\Local\Temp\opencode\verify-t1-2d14c260`.
 
 **L6** — T1 implemented: `ThemeManager` (read/apply/persist/sync/bindControls/set/toggle/migrateLegacy) replaces the old `toggleTheme`; single allowlisted cookie `chilemon_theme=<skin>:<mode>` parsed in `index.php` with `chilemon_darkmode` fallback; `<html data-skin>` emitted by `head.php`; Bootstrap "Apariencia" dropdown in `header.php` with two radiogroups and four wired options; floating theme button removed from `footer.php`; `data-theme-*` hooks added to the remaining toggles; dead duplicate theme code and cookie helpers removed from unloaded `chilemon.js`. RED observed on 1 JS test and 7 Python assertions before the implementation. Verification: `theme-manager.test.js` 6 passed, dashboard connect/update JS suites green, full Python suite 246 passed + 1 skipped, `git diff --check` clean. No audio, PTT, node or AMI logic touched.
 
