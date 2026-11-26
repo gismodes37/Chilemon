@@ -17,6 +17,10 @@
   <?php
     $cssPath = dirname(__DIR__, 2) . '/assets/css/dashboard.css';
     $cssVer  = file_exists($cssPath) ? (string)filemtime($cssPath) : (string)APP_VERSION;
+
+    // Con imagen de cabecera el header es relativo, no fijo.
+    $headerImgPath = dirname(__DIR__, 2) . '/assets/img/header.jpg';
+    $bodyClass = file_exists($headerImgPath) ? ' class="has-relative-header"' : '';
   ?>
   
   <!-- Leaflet (map picker en registro) -->
@@ -25,4 +29,4 @@
   <!-- CSS del Dashboard -->
   <link rel="stylesheet" href="<?= rtrim(BASE_URL, '/') ?>/assets/css/dashboard.css?v=<?= $cssVer ?>">
 </head>
-<body>
+<body<?= $bodyClass ?>>

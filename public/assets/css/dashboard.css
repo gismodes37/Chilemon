@@ -6,8 +6,12 @@
             --asl-red: #dc3545;
             --asl-yellow: #ffc107;
             --asl-dark: #343a40;
+            --asl-skyblue: #17a2b8;
+            --asl-lime: #6FAE1E;
+            --asl-green-dark: #218838;
             --chile-blue: #0039A6;
             --chile-red: #D52B1E;
+            --cm-header-deep: #00155a;
         }
         
         body {
@@ -27,7 +31,7 @@
         
         /* HEADER estilo Supermon - FIJADO */
         .supermon-header {
-            background: linear-gradient(135deg, var(--chile-blue) 0%, #00155a 100%);
+            background: linear-gradient(135deg, var(--chile-blue) 0%, var(--cm-header-deep) 100%);
             color: white;
             border-bottom: 3px solid var(--chile-red);
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
@@ -80,23 +84,19 @@
         }
 
         .btn-outline-custom {
-            color: #6FAE1E; /* Tu color */
-            border-color: #6FAE1E;
+            color: var(--asl-lime);
+            border-color: var(--asl-lime);
         }
 
         .btn-outline-custom:hover {
-            background-color: #6FAE1E; /* Color al pasar el ratón */
-            border-color: #6FAE1E;
+            background-color: var(--asl-lime);
+            border-color: var(--asl-lime);
             color: black;
         }
         /* Fin bloque accesos rapidos*/
 
         
-        /* Tabla estilo Supermon */
-        .supermon-table {
-            font-size: 0.9em;
-        }
-        
+        /* Tabla estilo Supermon — el tamaño se define en el bloque compacto */
         .supermon-table th {
             background: var(--bs-secondary-bg);
             border-bottom: 2px solid var(--bs-border-color);
@@ -129,7 +129,7 @@
         }
         
         .btn-connect:hover {
-            background: #218838;
+            background: var(--asl-green-dark);
         }
         
         .btn-monitor {
@@ -194,9 +194,9 @@
             line-height: 1;
         }
         
-        .temp-low { color: #28a745; }
-        .temp-medium { color: #ffc107; }
-        .temp-high { color: #dc3545; }
+        .temp-low { color: var(--asl-green); }
+        .temp-medium { color: var(--asl-yellow); }
+        .temp-high { color: var(--asl-red); }
         
         .code-ip {
             font-family: 'Courier New', monospace;
@@ -438,10 +438,15 @@
     opacity: 1;
 }
 
-/* Quita la franja gris superior (margen por defecto del navegador) */
-html, body{
+/* Quita la franja gris superior sin anular el offset del header fijo.
+   Con imagen de cabecera el header deja de ser fijo, así que ahí sí va a 0. */
+html {
   margin: 0;
   padding: 0;
+}
+
+body.has-relative-header {
+  padding-top: 0;
 }
 
 /* ===============================
@@ -449,8 +454,8 @@ html, body{
    La imagen es de : 1920x400 de 300kb
    =============================== */
 .supermon-header{
-  padding-top: 2rem !important;
-  padding-bottom: 0.5rem !important;
+  padding-top: 2rem;
+  padding-bottom: 0.5rem;
 }   
 
 @media (min-width: 992px){
