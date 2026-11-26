@@ -19,12 +19,14 @@ Execute in order: first order and structure the design (T0), then add the new lo
 
 - `T0` — S3, inline, **done** (`c629c6d`) — Foundation: repair cascade, add token layer, migrate structural colors, static contract tests. Commit 1.
 - `T1` — S2, inline, **done** (`4b5e0f8`; probes `f0700ce`) — ThemeManager, single cookie with allowlist, header "Apariencia" dropdown, legacy cookie migration. Risk: item 3 (shared header/JS). Native review: approved, authority burned. Commit 2.
-- `T2` — S2, inline, **done** (pending commit) — `obsidian` skin as token data only, modal/header colors tokenized with identical clasico values. Commit 3.
-- `T3` — S2-S3, inline, pending — Docs and optional Settings entry; verification in both skins. Commit 4.
+- `T2` — S2, inline, **done** (`936a179`) — `obsidian` skin as token data only, modal/header colors tokenized with identical clasico values. Commit 3.
+- `T3` — S2-S3, inline, **done** (`f7224e1`) — Docs for both skins and modes; no Settings entry exists, so the header dropdown remains the only selector. Commit 4.
 
 Route evidence: no Writer trigger (single behavior per slice, under ~100 changed lines per slice, no parallel units); no Explorer trigger (the read-only mapping already returned a handoff). Large by resume test because it spans four slices across sessions.
 
 ## Log
+
+**L10** — T3 documented the Appearance dropdown, both skins and the `chilemon_theme=<skin>:<mode>` cookie in `README.md` and `README_ES.md`. No settings page exists in the codebase, so the optional Settings entry was intentionally not added. RED observed on both new assertions in `tests/ui/theme_docs_test.py` before the docs; GREEN after: `theme_docs_test.py` 2 passed, full Python suite 256 passed + 1 skipped, `git diff --check` clean. Both-skin verification is static here: the PHP/JS allowlist and HTML hooks pin `clasico` and `obsidian`, and the CSS token tests pin each skin's token block. Real browser rendering remains unavailable locally. `public/api/log-call.php` remains pre-existing untracked and excluded.
 
 **L9** — T2 implemented as token data only. Added `[data-skin="obsidian"]` and `[data-skin="obsidian"][data-bs-theme="dark"]` token blocks: near-black Bootstrap surface/text/border/state tokens, brand tokens and modal/header tokens. Migrated the remaining hardcoded modal glass colors and the header image overlay to `--cm-*` tokens with values identical to the previous literals, so `clasico` is visually unchanged. No structural selector, PHP, JS, audio, PTT, node or AMI code changed. RED observed on all 5 new assertions in `tests/ui/theme_skin_tokens_test.py` before the CSS; GREEN after: 5 passed, full Python suite 254 passed + 1 skipped, all 7 JS suites green, `git diff --check` clean. Native review advisories from T1 remain deferred and did not reopen that candidate. Unverified locally: real browser pixel rendering (no browser runtime available).
 

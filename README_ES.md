@@ -81,6 +81,7 @@ ChileMon actualmente incluye:
 - **Selector de mapa interactivo** — Clic para fijar coordenadas en el modal de registro con marcador arrastrable
 - **Geocodificación de dirección** — Escribí una dirección y el mapa se posiciona automáticamente vía Nominatim (OpenStreetMap)
 - **Registro cross-origin** — Los nodos agente se registran en el hub sin sesión previa
+- **Apariencia seleccionable** — Skins `clasico` y `obsidian` con modos claro y oscuro guardados en la cookie `chilemon_theme`
 
 ---
 
