@@ -1,0 +1,51 @@
+# Dashboard theme skins — structure first, then visual variants
+
+Branch: `feat/dashboard-theme-skins` · Delivery: work-unit commits; push only on explicit user request · Runner: `python -m pytest tests/` (PHP is unavailable locally)
+
+## Specs
+
+**S1** — "puedes hacer un analisis del actual estilo del dashboard de chilemon y realizar una propuesta de mejora visual, para aprobechar la potencia de bootstrap y mejorar el aspecto, por a trabajar a tus mejores expertos"
+Analysis and ranked proposal only, no code change. Completed before this document; evidence in `discovery/dashboard-visual-layer` and `dashboard/visual-improvement-proposal` in Engram.
+
+**S2** — "se puede preparar esa propuesta como un thema, estructurarlo como para preparar unos dos thema diferentes o skin, para darle opciones a los usuarios de tener otras opciones de color, por ejemplo el original que tenemos pero mejorado, un black, que se yo un par de variantes, que te parece"
+Prepare the design to support two selectable skins: `clasico` (improved original) and `obsidian` (near-black). Model: one cookie `chilemon_theme=<skin>:<mode>` with `chilemon_darkmode` legacy fallback, PHP allowlist, `<html data-bs-theme data-skin>`, CSS token layer mapped to `--bs-*`, one `ThemeManager` in `dashboard.js`, Bootstrap dropdown "Apariencia" in the header. No arbitrary attribute values from cookies.
+
+**S3** — "si megusta tu propuesta, primero ordenamos y estructuramos el diseño y luego la ropa nueva, con mucho cuidado con el código sencible de funcionamiento, llegar a donde estamos a costado mucho, dale"
+Execute in order: first order and structure the design (T0), then add the new looks (T1-T3). Do not touch audio/PTT/node/AMI logic. Work in reviewable slices and show the T0 diff before starting T1. Preserve current behavior and values: the token layer must be value-identical where it replaces a color.
+
+**S0 acceptance (T0)** — Body top padding works again for the fixed header; the duplicate `.supermon-header` no longer cancels `.scrolled`; `--asl-skyblue` exists; one `.supermon-table` font-size rule; structural colors come from tokens with unchanged computed values; no changes to functional JS or AMI/audio/node code; static tests pass and the full Python suite stays green.
+
+## Tasks
+
+- `T0` — S3, inline, **done** (`c629c6d`) — Foundation: repair cascade, add token layer, migrate structural colors, static contract tests. Commit 1.
+- `T1` — S2, inline, **done** (`4b5e0f8`; probes `f0700ce`) — ThemeManager, single cookie with allowlist, header "Apariencia" dropdown, legacy cookie migration. Risk: item 3 (shared header/JS). Native review: approved, authority burned. Commit 2.
+- `T2` — S2, inline, **done** (`936a179`) — `obsidian` skin as token data only, modal/header colors tokenized with identical clasico values. Commit 3.
+- `T3` — S2-S3, inline, **done** (`4b72ca8`) — Docs for both skins and modes; no Settings entry exists, so the header dropdown remains the only selector. Commit 4.
+
+Route evidence: no Writer trigger (single behavior per slice, under ~100 changed lines per slice, no parallel units); no Explorer trigger (the read-only mapping already returned a handoff). Large by resume test because it spans four slices across sessions.
+
+## Log
+
+**L12** — Native assess after each committed slice: T2 (`f0700ce..936a179`) `medium / under_budget`, T3 plus evidence (`936a179..HEAD`) `medium / under_budget`, both with the pre-existing untracked file explicitly excluded; no native review was due. Final local verification: full Python suite 256 passed + 1 skipped, `git diff --check` clean, worktree clean except pre-existing untracked `public/api/log-call.php`. No push, PR or merge performed.
+
+**L11** — Work-unit evidence recorded after the final local commit; no source behavior changed in this documentation-only update. Feature branch is local only and has not been pushed.
+
+**L10** — T3 documented the Appearance dropdown, both skins and the `chilemon_theme=<skin>:<mode>` cookie in `README.md` and `README_ES.md`. No settings page exists in the codebase, so the optional Settings entry was intentionally not added. RED observed on both new assertions in `tests/ui/theme_docs_test.py` before the docs; GREEN after: `theme_docs_test.py` 2 passed, full Python suite 256 passed + 1 skipped, `git diff --check` clean. Both-skin verification is static here: the PHP/JS allowlist and HTML hooks pin `clasico` and `obsidian`, and the CSS token tests pin each skin's token block. Real browser rendering remains unavailable locally. `public/api/log-call.php` remains pre-existing untracked and excluded.
+
+**L9** — T2 implemented as token data only. Added `[data-skin="obsidian"]` and `[data-skin="obsidian"][data-bs-theme="dark"]` token blocks: near-black Bootstrap surface/text/border/state tokens, brand tokens and modal/header tokens. Migrated the remaining hardcoded modal glass colors and the header image overlay to `--cm-*` tokens with values identical to the previous literals, so `clasico` is visually unchanged. No structural selector, PHP, JS, audio, PTT, node or AMI code changed. RED observed on all 5 new assertions in `tests/ui/theme_skin_tokens_test.py` before the CSS; GREEN after: 5 passed, full Python suite 254 passed + 1 skipped, all 7 JS suites green, `git diff --check` clean. Native review advisories from T1 remain deferred and did not reopen that candidate. Unverified locally: real browser pixel rendering (no browser runtime available).
+
+**L1** (2026-11-25) — "si megusta tu propuesta, primero ordenamos y estructuramos el diseño y luego la ropa nueva, con mucho cuidado con el código sencible de funcionamiento, llegar a donde estamos a costado mucho, dale"
+
+**L2** (2026-11-25) — "se puede preparar esa propuesta como un thema, estructurarlo como para preparar unos dos thema diferentes o skin, para darle opciones a los usuarios de tener otras opciones de color, por ejemplo el original que tenemos pero mejorado, un black, que se yo un par de variantes, que te parece"
+
+**L3** (2026-11-25) — "puedes hacer un analisis del actual estilo del dashboard de chilemon y realizar una propuesta de mejora visual, para aprobechar la potencia de bootstrap y mejorar el aspecto, por a trabajar a tus mejores expertos"
+
+**L4** — Analysis found verified cascade defects (`dashboard.css:18,442-445,451-454`), undefined `--asl-skyblue` (`:79`), duplicate `.supermon-table` (`:96-98,525-535`), and a theme toggle whose `data-theme-*` hooks exist only in JS. User approved the ordered plan and asked for care with working code.
+
+**L8** — Native review completed with `lineage review-e2a14a84970152ea`, four lenses (`risk`, `resilience`, `readability`, `reliability`), `state: approved`, no correction and `authority: burned`. `risk` and `resilience` had zero findings. Eight non-blocking advisories were recorded for later work: cross-file theme vocabulary duplication, repeated allowlist validation, unnamed one-year cookie lifetime, misleading `window.ThemeManager` export comment, two static-test/model gaps, an untested `DOMContentLoaded` wiring path, and stalled legacy-cookie cleanup when the new cookie is invalid. None reopened T1. The reviewer slots initially returned `provider_failed` through `subagent`; their raw JSON was captured with the provider-issued `review.capture-result` tokens after manual review of the immutable candidate. No source changed during review.
+
+**L7** — Independent verifier returned no blockers: S1 met (no code), S2 met for T1 (obsidian look deferred to T2), S3 met, S0 acceptance met; own boundary probes 14 JS + 30 Python green in scratch, baseline comparison green. Added its durable probes as `tests/js/theme-boundary.test.js` (3 passed) and `tests/ui/theme_contract_boundary_test.py` (3 passed). Advisories: (1) invalid new cookie plus legacy `chilemon_darkmode=true` keeps both cookies but renders correct dark mode — cleanup stalls, behavior intact; (2) pre-existing untracked `public/api/log-call.php` untouched. Unverified locally: real PHP execution and browser clicks (PHP/browser unavailable). Scratch dir to remove by parent: `C:\Users\gismo\AppData\Local\Temp\opencode\verify-t1-2d14c260`.
+
+**L6** — T1 implemented: `ThemeManager` (read/apply/persist/sync/bindControls/set/toggle/migrateLegacy) replaces the old `toggleTheme`; single allowlisted cookie `chilemon_theme=<skin>:<mode>` parsed in `index.php` with `chilemon_darkmode` fallback; `<html data-skin>` emitted by `head.php`; Bootstrap "Apariencia" dropdown in `header.php` with two radiogroups and four wired options; floating theme button removed from `footer.php`; `data-theme-*` hooks added to the remaining toggles; dead duplicate theme code and cookie helpers removed from unloaded `chilemon.js`. RED observed on 1 JS test and 7 Python assertions before the implementation. Verification: `theme-manager.test.js` 6 passed, dashboard connect/update JS suites green, full Python suite 246 passed + 1 skipped, `git diff --check` clean. No audio, PTT, node or AMI logic touched.
+
+**L5** — T0 committed as `c629c6d` on `feat/dashboard-theme-skins`. Changes: `html,body{padding:0}` reset replaced with `html` reset plus `body.has-relative-header{padding-top:0}`; `head.php` emits that class only when `assets/img/header.jpg` exists; duplicate `.supermon-header` padding lost its `!important` so `.scrolled` compaction works; one owner for `.supermon-table` font-size; tokens `--asl-skyblue`, `--asl-lime`, `--asl-green-dark`, `--cm-header-deep` added and structural colors migrated. `--asl-skyblue` was previously undefined, so its cyan left border on Accesos rápidos is now restored (intentional bug fix, not a value change). RED observed on all 5 new assertions before the fix. Verification: `tests/ui/theme_foundation_test.py` 5 passed; full suite 239 passed, 1 skipped; `git diff --check` clean. Native assess: medium / `under_budget`, no review due. No audio, PTT, node, AMI or PHP logic touched. Not pushed.

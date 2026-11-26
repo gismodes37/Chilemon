@@ -10,7 +10,7 @@
  *   3.  HTTP helpers — postForm() y getJson()
  *   4.  Sesión expirada — handleUnauthorized()
  *   5.  Helpers UI — escapeHtml(), setButtonLoading()
- *   6.  Tema claro/oscuro — setThemeUI(), toggleTheme()
+ *   6.  Apariencia — ThemeManager, setTheme(), toggleTheme()
  *   7.  Refresco del dashboard — reloadDashboard(), refreshNodesLive()
  *   8.  Acciones de nodos — connect, disconnect, delete
  *   9.  Favoritos — modal, CRUD, conectar desde favorito
@@ -550,63 +550,133 @@ function openRemoteNodesModal(directNode, remoteNodes, remoteScope = "direct") {
 }
 
 /* =============================================================
- * 6. TEMA CLARO / OSCURO
+ * 6. APARIENCIA — skins + modo claro/oscuro
  * -------------------------------------------------------------
- * Bootstrap 5 usa data-bs-theme="dark|light" en <html>.
- * La preferencia se persiste en una cookie (1 año) para que
- * PHP la lea en el siguiente render y aplique el tema desde
- * el servidor sin parpadeo inicial.
+ * El servidor es la fuente de verdad: PHP renderiza <html
+ * data-bs-theme="light|dark" data-skin="clasico|obsidian"> desde
+ * la cookie chilemon_theme (con fallback de chilemon_darkmode).
+ *
+ * JS solo sincroniza los controles, persiste valores allowlisted
+ * y alterna el modo. Cambiar variables CSS repinta sin recargar.
  *
  * Elementos del DOM controlados por atributos data-*:
  *   data-theme-icon  → contenedor del <i> con clase bi-sun / bi-moon-stars
  *   data-theme-text  → elemento con texto "Tema claro" / "Tema oscuro"
  *   data-theme-title → elemento con atributo title (tooltip)
+ *   data-theme-skin  → opción de esquema (aria-checked)
+ *   data-theme-mode  → opción de modo (aria-checked)
  * ============================================================= */
 
+const THEME_SKINS = ["clasico", "obsidian"];
+const THEME_MODES = ["light", "dark"];
+const THEME_COOKIE = "chilemon_theme";
+
 /**
- * Actualiza los iconos y textos del botón de tema en toda la UI.
- * Se llama tanto en toggleTheme() como en el init para sincronizar
- * el estado inicial (cuando PHP ya aplicó el tema vía cookie).
+ * Actualiza iconos y textos de los controles rápidos de modo.
  *
  * @param {boolean} isDark - true si el tema activo es oscuro.
  */
 function setThemeUI(isDark) {
-  // Cambiar icono: sol en modo oscuro (para cambiar a claro), luna en modo claro
   document.querySelectorAll("[data-theme-icon] i").forEach((icon) => {
     icon.classList.remove("bi-sun", "bi-moon-stars");
     icon.classList.add(isDark ? "bi-sun" : "bi-moon-stars");
   });
 
-  // Actualizar texto del botón
   document.querySelectorAll("[data-theme-text]").forEach((el) => {
     el.textContent = isDark ? "Tema claro" : "Tema oscuro";
   });
 
-  // Actualizar tooltip
   document.querySelectorAll("[data-theme-title]").forEach((el) => {
     el.setAttribute("title", isDark ? "Tema claro" : "Tema oscuro");
   });
 }
 
-/**
- * Alterna entre tema claro y oscuro.
- * Llamado desde onclick="toggleTheme()" en el botón del header.
- * Persiste la preferencia en cookie "chilemon_darkmode".
- */
+const ThemeManager = {
+  /** Lee el estado ya renderizado por PHP, nunca valores crudos de cookie. */
+  read() {
+    const html = document.documentElement;
+    const skin = html.getAttribute("data-skin");
+    const mode = html.getAttribute("data-bs-theme");
+    return {
+      skin: THEME_SKINS.includes(skin) ? skin : "clasico",
+      mode: THEME_MODES.includes(mode) ? mode : "light",
+    };
+  },
+
+  apply(skin, mode) {
+    const html = document.documentElement;
+    html.setAttribute("data-skin", THEME_SKINS.includes(skin) ? skin : "clasico");
+    html.setAttribute("data-bs-theme", THEME_MODES.includes(mode) ? mode : "light");
+  },
+
+  persist(skin, mode) {
+    document.cookie = `${THEME_COOKIE}=${skin}:${mode}; path=/; max-age=31536000; samesite=Lax`;
+  },
+
+  sync() {
+    const { skin, mode } = this.read();
+    document.querySelectorAll("[data-theme-skin]").forEach((el) => {
+      el.setAttribute("aria-checked", String(el.getAttribute("data-theme-skin") === skin));
+    });
+    document.querySelectorAll("[data-theme-mode]").forEach((el) => {
+      el.setAttribute("aria-checked", String(el.getAttribute("data-theme-mode") === mode));
+    });
+    setThemeUI(mode === "dark");
+  },
+
+  bindControls() {
+    document.querySelectorAll("[data-theme-skin]").forEach((el) => {
+      el.addEventListener("click", () => {
+        this.set(el.getAttribute("data-theme-skin"), this.read().mode);
+      });
+    });
+    document.querySelectorAll("[data-theme-mode]").forEach((el) => {
+      el.addEventListener("click", () => {
+        this.set(this.read().skin, el.getAttribute("data-theme-mode"));
+      });
+    });
+  },
+
+  set(skin, mode) {
+    const safeSkin = THEME_SKINS.includes(skin) ? skin : "clasico";
+    const safeMode = THEME_MODES.includes(mode) ? mode : "light";
+    this.apply(safeSkin, safeMode);
+    this.persist(safeSkin, safeMode);
+    this.sync();
+    return { skin: safeSkin, mode: safeMode };
+  },
+
+  toggle() {
+    const current = this.read();
+    return this.set(current.skin, current.mode === "dark" ? "light" : "dark");
+  },
+
+  /** Migra la cookie vieja una sola vez, sin perder la preferencia. */
+  migrateLegacy() {
+    const cookies = document.cookie.split(";").map((c) => c.trim());
+    if (cookies.some((c) => c.startsWith(`${THEME_COOKIE}=`))) return false;
+    if (!cookies.some((c) => c.startsWith("chilemon_darkmode="))) return false;
+    const current = this.read();
+    this.persist(current.skin, current.mode);
+    document.cookie = "chilemon_darkmode=; path=/; max-age=0";
+    return true;
+  },
+};
+
+// Exported for the dropdown handlers and for the Node regression tests.
+window.ThemeManager = ThemeManager;
+
+/** API pública usada por los handlers inline de las vistas. */
+function setTheme(skin, mode) {
+  return ThemeManager.set(skin, mode);
+}
+
 function toggleTheme() {
-  const html = document.documentElement;
-  const isDark = html.getAttribute("data-bs-theme") === "dark";
-  const nextDark = !isDark;
+  return ThemeManager.toggle();
+}
 
-  // Aplicar nuevo tema en el atributo HTML (Bootstrap lo detecta automáticamente)
-  html.setAttribute("data-bs-theme", nextDark ? "dark" : "light");
-
-  // Persistir en cookie para que PHP aplique el tema en el próximo render
-  // max-age=31536000 = 1 año en segundos
-  document.cookie = `chilemon_darkmode=${nextDark}; path=/; max-age=31536000`;
-
-  // Sincronizar iconos y textos del botón
-  setThemeUI(nextDark);
+function migrateLegacyTheme() {
+  return ThemeManager.migrateLegacy();
 }
 
 /* =============================================================
@@ -1652,11 +1722,11 @@ function startUpdatePolling() {
  *   4. Iniciar auto refresh
  * ============================================================= */
 document.addEventListener("DOMContentLoaded", async () => {
-  // 1. Sincronizar iconos del botón de tema con el atributo data-bs-theme
-  //    que PHP ya aplicó en el <html> según la cookie chilemon_darkmode
-  const isDark =
-    document.documentElement.getAttribute("data-bs-theme") === "dark";
-  setThemeUI(isDark);
+  // 1. Sincronizar controles con el tema que PHP ya renderizó en <html>.
+  //    La cookie vieja se migra aquí, sin recargar la página.
+  ThemeManager.sync();
+  ThemeManager.bindControls();
+  migrateLegacyTheme();
 
   // 2. Enlazar todos los eventos del modal de favoritos
   setupFavoritesModal();

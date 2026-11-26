@@ -130,6 +130,60 @@ $headerStyle = $headerImgUrl
             </div>
           </div>
 
+          <!-- Apariencia: skin + modo. Reemplaza al botón flotante. -->
+          <div class="dropdown">
+            <button type="button"
+                    id="appearance-menu"
+                    class="btn btn-sm btn-outline-info dropdown-toggle"
+                    data-bs-toggle="dropdown"
+                    aria-expanded="false"
+                    aria-label="Cambiar apariencia">
+              <i class="bi bi-palette"></i>
+              <span class="d-none d-lg-inline">Apariencia</span>
+            </button>
+
+            <div class="dropdown-menu dropdown-menu-end p-3"
+                 aria-labelledby="appearance-menu">
+              <small class="text-muted d-block px-2 mb-1">Esquema</small>
+              <div role="radiogroup" aria-label="Esquema de color">
+                <button type="button" role="radio"
+                        class="dropdown-item d-flex justify-content-between align-items-center gap-2"
+                        aria-checked="<?= $skin === 'clasico' ? 'true' : 'false' ?>"
+                        data-theme-skin="clasico" >
+                  <span><i class="bi bi-sun me-2"></i>Clásico</span>
+                  <i class="bi bi-check2 theme-check" aria-hidden="true"></i>
+                </button>
+                <button type="button" role="radio"
+                        class="dropdown-item d-flex justify-content-between align-items-center gap-2"
+                        aria-checked="<?= $skin === 'obsidian' ? 'true' : 'false' ?>"
+                        data-theme-skin="obsidian" >
+                  <span><i class="bi bi-moon-stars me-2"></i>Obsidian</span>
+                  <i class="bi bi-check2 theme-check" aria-hidden="true"></i>
+                </button>
+              </div>
+
+              <hr class="dropdown-divider">
+
+              <small class="text-muted d-block px-2 mb-1">Modo</small>
+              <div role="radiogroup" aria-label="Modo">
+                <button type="button" role="radio"
+                        class="dropdown-item d-flex justify-content-between align-items-center gap-2"
+                        aria-checked="<?= $mode === 'light' ? 'true' : 'false' ?>"
+                        data-theme-mode="light" >
+                  <span><i class="bi bi-sun me-2"></i>Claro</span>
+                  <i class="bi bi-check2 theme-check" aria-hidden="true"></i>
+                </button>
+                <button type="button" role="radio"
+                        class="dropdown-item d-flex justify-content-between align-items-center gap-2"
+                        aria-checked="<?= $mode === 'dark' ? 'true' : 'false' ?>"
+                        data-theme-mode="dark" >
+                  <span><i class="bi bi-moon-stars me-2"></i>Oscuro</span>
+                  <i class="bi bi-check2 theme-check" aria-hidden="true"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+
           <div class="d-flex flex-column align-items-end">
             <small class="opacity-75 mb-1">
               <?= htmlspecialchars((string)($username ?? ''), ENT_QUOTES, 'UTF-8') ?>

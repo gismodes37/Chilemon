@@ -1,6 +1,13 @@
-<?php declare(strict_types=1); ?>
+<?php
+declare(strict_types=1);
+
+// Valores por defecto si el partial se incluye fuera del front controller.
+$skin = in_array($skin ?? '', ['clasico', 'obsidian'], true) ? $skin : 'clasico';
+$mode = in_array($mode ?? '', ['light', 'dark'], true) ? $mode : 'light';
+$darkMode = ($mode === 'dark');
+?>
 <!DOCTYPE html>
-<html lang="es-CL" data-bs-theme="<?= $darkMode ? 'dark' : 'light' ?>">
+<html lang="es-CL" data-bs-theme="<?= $mode ?>" data-skin="<?= $skin ?>">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -17,6 +24,10 @@
   <?php
     $cssPath = dirname(__DIR__, 2) . '/assets/css/dashboard.css';
     $cssVer  = file_exists($cssPath) ? (string)filemtime($cssPath) : (string)APP_VERSION;
+
+    // Con imagen de cabecera el header es relativo, no fijo.
+    $headerImgPath = dirname(__DIR__, 2) . '/assets/img/header.jpg';
+    $bodyClass = file_exists($headerImgPath) ? ' class="has-relative-header"' : '';
   ?>
   
   <!-- Leaflet (map picker en registro) -->
@@ -25,4 +36,4 @@
   <!-- CSS del Dashboard -->
   <link rel="stylesheet" href="<?= rtrim(BASE_URL, '/') ?>/assets/css/dashboard.css?v=<?= $cssVer ?>">
 </head>
-<body>
+<body<?= $bodyClass ?>>
