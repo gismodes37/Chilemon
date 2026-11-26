@@ -31,7 +31,7 @@ use App\Core\NodeLogger;
 $recentEvents = [];
 
 try {
-    $recentEvents = NodeLogger::latest(15);
+    $recentEvents = NodeLogger::latest(10);
     if (!is_array($recentEvents)) {
         $recentEvents = [];
     }

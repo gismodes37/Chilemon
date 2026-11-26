@@ -127,7 +127,7 @@ async function pollNodes() {
  * Polling: actividad reciente
  * ------------------------------------- */
 async function pollActivity() {
-  const json = await getJson("api/ami/activity.php?limit=15");
+  const json = await getJson("api/ami/activity.php?limit=10");
   renderActivity(json.items || []);
 }
 
