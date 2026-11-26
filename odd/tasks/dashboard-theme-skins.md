@@ -1,6 +1,6 @@
 # Dashboard theme skins — structure first, then visual variants
 
-Branch: `feat/dashboard-theme-skins` · Delivery: work-unit commits; push only on explicit user request · Runner: `python -m pytest tests/` (PHP is unavailable locally)
+Branch: `feat/dashboard-theme-skins` → integrated into `develop` (`031d487`) · `main` stays at production `ddf84b5` · Delivery: work-unit commits; push only on explicit user request · Runner: `python -m pytest tests/` (PHP is unavailable locally)
 
 ## Specs
 
@@ -25,6 +25,8 @@ Execute in order: first order and structure the design (T0), then add the new lo
 Route evidence: no Writer trigger (single behavior per slice, under ~100 changed lines per slice, no parallel units); no Explorer trigger (the read-only mapping already returned a handoff). Large by resume test because it spans four slices across sessions.
 
 ## Log
+
+**L13** — Branching policy adopted while ChileMon is in soft launch: `main` is production-only and stays at `ddf84b5`; `develop` was created from `main` and received this feature as merge `031d487`. All further tests and new work happen on `develop`; promotion to `main` is a separate explicit user decision. Verified on `develop`: full Python suite 256 passed + 1 skipped, `git diff --check` clean, worktree clean except the pre-existing untracked `public/api/log-call.php`.
 
 **L12** — Native assess after each committed slice: T2 (`f0700ce..936a179`) `medium / under_budget`, T3 plus evidence (`936a179..HEAD`) `medium / under_budget`, both with the pre-existing untracked file explicitly excluded; no native review was due. Final local verification: full Python suite 256 passed + 1 skipped, `git diff --check` clean, worktree clean except pre-existing untracked `public/api/log-call.php`. No push, PR or merge performed.
 
