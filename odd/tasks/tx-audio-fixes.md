@@ -1,6 +1,6 @@
 # TX audio fixes — stable timestamp media clock and automatic live-mic selection
 
-Branch: `develop` (`9452a00`); live Pi install tracks `develop`, `main` stays at `ddf84b5` until explicit promotion · Delivery: two work-unit commits on `develop`, push to `origin/develop`, then promote to `main` on user approval · Runner: `python -m pytest tests -q`
+Branch: `develop`; live Pi install tracks `develop`; `main` was promoted from `ddf84b5` to `5ebae52` with the accepted TX configuration · Delivery: two work-unit commits plus this evidence doc, pushed to `origin/develop` and `origin/main` · Runner: `python -m pytest tests -q`
 
 ## Specs
 
@@ -25,4 +25,6 @@ Route evidence: no Writer trigger (each unit is one behavior with its tests, alr
 
 **L3** — No project skill registry is installed (`.atl/skill-registry.md` absent); the installed `work-unit-commits` skill was loaded. Full suite already observed at 289 passed, 1 skipped after the mic-probe fix; re-run before delivery. `gentle-ai review mode status`: on by global default.
 
-**L4** — Delivery verification on `develop`: `python -m pytest tests -q` → 289 passed, 1 skipped in 8.91s; `git diff --check` clean. T1 committed as `797070a` (2 files, +151/-32), T2 as `f3197da` (3 files, +223/-7). Native assess with the pre-existing untracked inventory explicitly excluded: both `medium / under_budget`, `review_due: false`; no native review ceremony started. `public/api/log-call.php` remains untracked and excluded. Next: push `origin/develop`, then resolve the version target and promote to `main`.
+**L4** — Delivery verification on `develop`: `python -m pytest tests -q` → 289 passed, 1 skipped in 8.91s; `git diff --check` clean. T1 committed as `797070a` (2 files, +151/-32), T2 as `f3197da` (3 files, +223/-7). Native assess with the pre-existing untracked inventory explicitly excluded: both `medium / under_budget`, `review_due: false`; no native review ceremony started. `public/api/log-call.php` remains untracked and excluded.
+
+**L5** — Pushed `origin/develop` (`9452a00..5ebae52`) and promoted `main` (`ddf84b5..5ebae52`) by fast-forward. Native assess for the evidence-only commit `5ebae52` was `passive`, `review_due: false`. Restored `level = "INFO"` in the local Companion config and restarted Companion: PID `23584`, WS `127.0.0.1:9093`, endpoint confirmed at `192.168.0.125:4569`. Installed `audio.py` and `iax2.py` hashes still match the deployed fixes. Remaining decisions: version target and whether the live Pi should keep tracking `develop` or return to `main`.
