@@ -9,6 +9,7 @@ no tone keeps playing after the call ends.
 from __future__ import annotations
 
 import asyncio
+import time
 from unittest.mock import AsyncMock, MagicMock
 
 from companion.audio import AudioEngine
@@ -134,6 +135,80 @@ def test_session_status_without_call_ends_audio() -> None:
 
     app.audio.stop.assert_called_once()
     app.audio.reset.assert_called_once()
+
+
+def _calling_session_with_old_audio() -> CompanionSession:
+    """A healthy session carrying the RX timestamp of a previous call."""
+    session = CompanionSession.__new__(CompanionSession)
+    session._node = "494780"
+    session._registered = True
+    session._in_call = False
+    session._reconnecting = False
+    session.ptt_active = False
+    session._last_audio_time = time.monotonic() - 531
+    session._emit_status = AsyncMock()
+
+    iax = MagicMock()
+    iax.start_call = AsyncMock(return_value=True)
+    iax.send_dtmf.return_value = True
+    iax.hangup_call = AsyncMock()
+    session._session = iax
+    return session
+
+
+def test_place_call_resets_idle_audio_timer() -> None:
+    """A new call gets a fresh 60s grace period for its first RX frame."""
+    session = _calling_session_with_old_audio()
+
+    asyncio.run(session.place_call("54614"))
+
+    assert session._in_call is True
+    assert time.monotonic() - session._last_audio_time < 2
+
+
+def test_new_call_is_not_hung_up_by_previous_call_idle_timer() -> None:
+    """The idle timeout must not kill a new call before audio starts."""
+    session = _calling_session_with_old_audio()
+
+    asyncio.run(session.place_call("54614"))
+    asyncio.run(session._check_health())
+
+    session._session.hangup_call.assert_not_awaited()
+
+
+def test_hangup_clears_idle_audio_timer() -> None:
+    """A hung-up call must not leave an RX timestamp for the next call."""
+    session, _iax = _in_call_session()
+    session._last_audio_time = time.monotonic()
+
+    asyncio.run(session.hangup_call())
+
+    assert session._last_audio_time == 0.0
+
+
+def test_remote_disconnect_clears_idle_audio_timer() -> None:
+    """Asterisk-initiated disconnect must also clear the RX timestamp."""
+    session, _iax = _in_call_session()
+    session._last_audio_time = time.monotonic()
+
+    asyncio.run(session._on_disconnect())
+
+    assert session._last_audio_time == 0.0
+
+
+def test_inbound_call_resets_idle_audio_timer() -> None:
+    """Inbound calls need the same grace period as dashboard-initiated ones."""
+    session = CompanionSession.__new__(CompanionSession)
+    session._session = MagicMock()
+    session._in_call = False
+    session.ptt_active = False
+    session._last_audio_time = time.monotonic() - 531
+    session._emit_status = AsyncMock()
+
+    asyncio.run(session._on_inbound_call("54614"))
+
+    assert session._in_call is True
+    assert time.monotonic() - session._last_audio_time < 2
 
 
 def test_session_status_with_call_reopens_audio() -> None:

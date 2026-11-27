@@ -266,6 +266,7 @@ class CompanionSession:
             success = await self._session.start_call(target, caller_number=caller_number)
             if success:
                 self._in_call = True
+                self._last_audio_time = time.monotonic()
                 logger.info("Call to node %s established", target)
             else:
                 logger.warning("Call to node %s failed", target)
@@ -285,6 +286,7 @@ class CompanionSession:
             await self._session.hangup_call()
             self._in_call = False
             self.ptt_active = False
+            self._last_audio_time = 0.0
             logger.info("Call hung up")
             await self._emit_status()
 
@@ -358,6 +360,7 @@ class CompanionSession:
         logger.info("Remote disconnect received")
         self._in_call = False
         self.ptt_active = False
+        self._last_audio_time = 0.0
         await self._emit_status()
 
     async def _on_inbound_call(self, called_num: str) -> None:
@@ -379,6 +382,7 @@ class CompanionSession:
             self._session.accept_inbound()
             self._session.answer_inbound()
             self._in_call = True
+            self._last_audio_time = time.monotonic()
             await self._emit_status()
 
     # -- Monitoring --
