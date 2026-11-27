@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import time
 
-from companion.audio import AUDIO_CALLBACK_STALL_S, AudioEngine
+from companion.audio import AUDIO_CALLBACK_STALL_S, SILENT_INPUT_S, AudioEngine
 
 
 class _Stream:
@@ -58,6 +58,42 @@ def test_stalled_input_triggers_restart() -> None:
     now = time.monotonic()
     engine._last_input_callback = now - AUDIO_CALLBACK_STALL_S - 1
     engine._last_output_callback = now
+
+    calls: list[str] = []
+    engine.stop = lambda: calls.append("stop")  # type: ignore[method-assign]
+    engine.start = lambda: calls.append("start")  # type: ignore[method-assign]
+
+    assert engine.check_health() is True
+    assert calls == ["stop", "start"]
+
+
+def test_mic_silence_without_ptt_does_not_restart_streams() -> None:
+    """An operator listening with PTT up is not a dead microphone."""
+    engine = _engine()
+    now = time.monotonic()
+    engine._last_input_callback = now
+    engine._last_output_callback = now
+    engine._tx_state = "active"
+    engine._input_silent_since = now - SILENT_INPUT_S - 1
+    engine.is_ptt_active = lambda: False  # type: ignore[method-assign]
+
+    calls: list[str] = []
+    engine.stop = lambda: calls.append("stop")  # type: ignore[method-assign]
+    engine.start = lambda: calls.append("start")  # type: ignore[method-assign]
+
+    assert engine.check_health() is False
+    assert calls == []
+
+
+def test_mic_silence_while_keyed_still_restarts_streams() -> None:
+    """A keyed operator with no mic signal still needs device recovery."""
+    engine = _engine()
+    now = time.monotonic()
+    engine._last_input_callback = now
+    engine._last_output_callback = now
+    engine._tx_state = "active"
+    engine._input_silent_since = now - SILENT_INPUT_S - 1
+    engine.is_ptt_active = lambda: True  # type: ignore[method-assign]
 
     calls: list[str] = []
     engine.stop = lambda: calls.append("stop")  # type: ignore[method-assign]

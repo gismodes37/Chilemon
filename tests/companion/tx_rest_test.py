@@ -128,8 +128,9 @@ def test_resting_silence_does_not_trigger_device_restart() -> None:
 
 
 def test_active_silence_still_triggers_device_restart() -> None:
-    """The original dead-device detection must keep working while active."""
+    """The original dead-device detection must keep working while keyed."""
     engine, sent = _engine()
+    engine.is_ptt_active = lambda: True  # type: ignore[method-assign]
     engine._input_stream = object()  # type: ignore[assignment]
     engine._output_stream = object()  # type: ignore[assignment]
     now = time.monotonic()

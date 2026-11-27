@@ -46,8 +46,9 @@ def test_changed_default_device_reopens_streams() -> None:
 
 
 def test_silent_input_reopens_streams() -> None:
-    """Callbacks can keep firing while the opened device delivers silence."""
+    """A keyed mic delivering silence still needs device recovery."""
     engine = _engine()
+    engine.is_ptt_active = lambda: True  # type: ignore[method-assign]
     engine._input_silent_since = time.monotonic() - SILENT_INPUT_S - 1
     calls = _spy_restart(engine)
 
@@ -68,6 +69,7 @@ def test_active_input_does_not_reopen_streams() -> None:
 def test_restart_cooldown_prevents_a_loop() -> None:
     """Repeated silent checks must not restart on every health tick."""
     engine = _engine()
+    engine.is_ptt_active = lambda: True  # type: ignore[method-assign]
     engine._input_silent_since = time.monotonic() - SILENT_INPUT_S - 1
     engine._last_restart = time.monotonic()
     calls = _spy_restart(engine)

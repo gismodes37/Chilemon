@@ -407,10 +407,14 @@ class AudioEngine:
             and self._current_device_ids()
             != (self._input_device_id, self._output_device_id)
         )
-        # Silence is intentional while TX is resting, so it must not be
-        # treated as a dead input and restart the streams.
+        # Silence is intentional while listening (PTT up) or while TX is
+        # resting. Restarting on that silence drops RX audio and creates a
+        # repeating 30s glitch, so only treat it as a dead input while the
+        # operator is actively keyed.
+        ptt_active = bool(self.is_ptt_active and self.is_ptt_active())
         input_silent = (
-            self._tx_state != "resting"
+            ptt_active
+            and self._tx_state != "resting"
             and self._input_silent_since > 0.0
             and now - self._input_silent_since > SILENT_INPUT_S
         )
