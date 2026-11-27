@@ -1,6 +1,6 @@
 # Dashboard theme skins — structure first, then visual variants
 
-Branch: `feat/dashboard-theme-skins` → integrated into `develop` (`031d487`) · `main` stays at production `ddf84b5` · Delivery: work-unit commits; push only on explicit user request · Runner: `python -m pytest tests/` (PHP is unavailable locally)
+Branch: `feat/dashboard-theme-skins` → integrated into `develop` (`031d487`); `develop` is now the branch served by the live Pi install · `main` stays the accepted snapshot at `ddf84b5` until explicitly promoted · Delivery: work-unit commits; push only on explicit user request · Runner: `python -m pytest tests/` (PHP is unavailable locally)
 
 ## Specs
 
@@ -25,6 +25,8 @@ Execute in order: first order and structure the design (T0), then add the new lo
 Route evidence: no Writer trigger (single behavior per slice, under ~100 changed lines per slice, no parallel units); no Explorer trigger (the read-only mapping already returned a handoff). Large by resume test because it spans four slices across sessions.
 
 ## Log
+
+**L14** — User decision on 2026-11-27: "es necesario el servidor de pruebas?, por que no enlazamos la instalacion de la pi a larama de desarrollo, asi pusheamos directamente y suve por defaul a la rama de desarrollo, cuando haga lo que queremos copiamos todo a main como modificacion aceptada" and "lo que me interesa es que el proceso de desarrollo no se haga tedioso, el repositorio es publico no hay nada que ocultar, es para todos asi es que si developer va a complicar las cosas en vez de facilitarla, mejor buscamos algo mas practico, las pruebas en developer no estan siendo del todo reales". Policy changed: the real Pi install `/opt/chilemon` tracks `develop` with automatic pull; `/opt/chilemon-review` is no longer the test target; `main` stays the accepted snapshot and moves only on explicit user approval. Consequence: every push to `origin/develop` is a live deployment, so the local suites must stay green before pushing. `config/local.php`, `data/` and `logs/` remain local via `.gitignore`. L13 is superseded by this decision.
 
 **L13** — Branching policy adopted while ChileMon is in soft launch: `main` is production-only and stays at `ddf84b5`; `develop` was created from `main` and received this feature as merge `031d487`. All further tests and new work happen on `develop`; promotion to `main` is a separate explicit user decision. Verified on `develop`: full Python suite 256 passed + 1 skipped, `git diff --check` clean, worktree clean except the pre-existing untracked `public/api/log-call.php`.
 
