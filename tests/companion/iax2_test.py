@@ -149,16 +149,16 @@ def test_legacy_send_voice_mini_frame_f_bit_and_source_callno() -> None:
     assert transport.sent[0][4:] == payload
 
 
-def test_session_send_voice_media_timestamp_counter() -> None:
-    """TX timestamps must be a media counter, not the wall clock.
+def test_session_send_voice_media_timestamp_tracks_clock() -> None:
+    """TX timestamps follow the control clock and never repeat.
 
-    The sound device delivers two buffers inside the same millisecond, so a
-    monotonic-clock timestamp repeats (observed live deltas 36,0,45,0) and
-    Asterisk's jitter buffer (forcejitterbuffer=yes) discards the duplicate —
-    ~46% loss in the *0 echo. Each frame's ts must advance by exactly its
-    payload duration (len//8 ms for 8 kHz ulaw: 160 bytes = 20 ms).
+    A pure payload counter freezes during PTT silence and Asterisk resyncs
+    the next key. A raw wall clock repeats when two buffers land in the same
+    millisecond (~46% loss in the *0 echo), so each frame takes the wall clock
+    with a strictly-increasing 1 ms guard.
     """
     sess, transport = _in_call_session()
+    sess._start_ts = time.monotonic() - 1.0
     payload = bytes(160)  # 20 ms of 8 kHz ulaw
 
     for _ in range(5):
@@ -169,13 +169,76 @@ def test_session_send_voice_media_timestamp_counter() -> None:
     full_ts = struct.unpack("!I", transport.sent[0][4:8])[0]
     mini_ts = [struct.unpack("!H", f[2:4])[0] for f in transport.sent[1:]]
 
-    assert full_ts == 0, (
-        "the first full VOICE frame must anchor the media timeline at 0, "
+    assert full_ts >= 1000, (
+        "the first full VOICE frame must use the same ms clock as DTMF frames, "
         f"got {full_ts}"
     )
-    assert mini_ts == [20, 40, 60, 80], (
+    assert all(b > a for a, b in zip(mini_ts, mini_ts[1:])), (
         "consecutive TX frames must carry strictly increasing media "
-        f"timestamps stepping by the payload duration, got {mini_ts}"
+        f"timestamps, got {mini_ts}"
+    )
+    assert all(1000 <= ts <= 1100 for ts in mini_ts), (
+        f"mini frames must stay on the wall-clock media timeline, got {mini_ts}"
+    )
+
+
+def test_send_voice_media_timeline_tracks_clock_across_silence(monkeypatch) -> None:
+    """A key after silence must not carry a ts frozen at the previous burst.
+
+    Asterisk anchors ``pvt->rxcore`` on the first frame of the call and then
+    compares every frame's ts against a wall clock (``calc_rxstamp``). A
+    counter that only advances when audio is delivered falls behind by the
+    whole silence gap, so the next key arrives ~16 s late, trips
+    ``Resyncing the jb`` and gets dropped while app_rpt is already keyed.
+    """
+    class _Clock:
+        now = 1000.0
+
+        def monotonic(self) -> float:
+            return self.now
+
+    clock = _Clock()
+    monkeypatch.setattr(iax2, "time", clock)
+    sess, transport = _in_call_session()
+    sess._start_ts = 1000.0
+    payload = bytes(160)
+
+    sess.send_voice(payload)  # full VOICE frame
+    sess.send_voice(payload)  # first mini frame: ~20 ms of media
+
+    clock.now += 16.0  # operator releases PTT, waits, then keys again
+    sess.send_voice(payload)
+
+    ts = struct.unpack("!H", transport.sent[-1][2:4])[0]
+    assert 16000 <= ts <= 16100, (
+        "ts must follow the wall clock through silence, not stall at the "
+        f"last burst's payload counter, got ts={ts}"
+    )
+
+
+def test_send_voice_media_timeline_shares_control_clock() -> None:
+    """The first VOICE frame must use the same ms clock as DTMF frames.
+
+    chan_iax2 feeds control frames (DTMF) into the jitter buffer as
+    ``JB_TYPE_CONTROL``, which resynchronizes immediately on a timestamp
+    discontinuity. Voice anchored at ts=0 lives in a different domain, so
+    every key produced ``Resyncing the jb`` and the following voice frames
+    were dropped: the node keyed but stayed silent.
+    """
+    sess, transport = _in_call_session()
+    sess._start_ts = time.monotonic() - 23.456
+
+    sess.send_voice(bytes(160))  # full VOICE frame anchors the timeline
+    full_ts = struct.unpack("!I", transport.sent[0][4:8])[0]
+    assert 23000 <= full_ts <= 24000, (
+        "first VOICE frame must anchor to the same ms clock as full "
+        f"control frames (DTMF), got ts={full_ts}"
+    )
+
+    sess.send_voice(bytes(160))  # first mini frame steps by payload duration
+    mini_ts = struct.unpack("!H", transport.sent[1][2:4])[0]
+    assert 23020 <= mini_ts <= 24020, (
+        f"mini frames must continue that media clock, got ts={mini_ts}"
     )
 
 
@@ -194,9 +257,40 @@ def test_session_send_voice_timestamps_do_not_duplicate_under_burst() -> None:
     )
 
 
-def test_session_send_voice_media_counter_resets_per_call() -> None:
-    """A new call must restart the media timeline (Asterisk re-anchors on it)."""
+def test_send_voice_burst_advances_by_payload_duration(monkeypatch) -> None:
+    """Frames delivered in one wall-clock ms must still step 20 ms in media time.
+
+    PortAudio on Windows hands back two 20 ms buffers inside the same
+    millisecond. A ``+1 ms`` guard packs 40 ms of audio into 1 ms of IAX2
+    media timeline: chan_iax2 plays the frames back-to-back and fills the
+    rest of the window with silence, so app_rpt keys but nothing is heard.
+    """
+    class _Clock:
+        now = 3000.0
+
+        def monotonic(self) -> float:
+            return self.now
+
+    clock = _Clock()
+    monkeypatch.setattr(iax2, "time", clock)
     sess, transport = _in_call_session()
+    sess._start_ts = 3000.0
+    payload = bytes(160)
+
+    for _ in range(6):
+        assert sess.send_voice(payload) is True
+
+    ts_values = [struct.unpack("!H", f[2:4])[0] for f in transport.sent[1:]]
+    assert ts_values == [40, 60, 80, 100, 120], (
+        "burst frames must advance by the 20 ms payload duration, not by "
+        f"1 ms wall-clock guard steps, got {ts_values}"
+    )
+
+
+def test_session_send_voice_media_counter_resets_per_call() -> None:
+    """A new call must re-anchor the media timeline to the control clock."""
+    sess, transport = _in_call_session()
+    sess._start_ts = time.monotonic() - 1.0
     for _ in range(3):
         sess.send_voice(bytes(160))
 
@@ -206,7 +300,9 @@ def test_session_send_voice_media_counter_resets_per_call() -> None:
 
     sess.send_voice(bytes(160))  # full VOICE frame of the new call
     full_ts = struct.unpack("!I", transport.sent[-1][4:8])[0]
-    assert full_ts == 0, f"new call must restart media ts at 0, got {full_ts}"
+    assert full_ts >= 1000, (
+        f"new call must re-anchor media ts to the control clock, got {full_ts}"
+    )
 
 
 def test_legacy_send_voice_media_timestamp_counter() -> None:

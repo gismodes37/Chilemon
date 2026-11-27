@@ -252,13 +252,10 @@ class IAX2Session:
         # contributes a forward delta. Per-call: cleared in start_call.
         self._rx_ts32: Optional[int] = None
 
-        # TX media timestamp counter (ms). The sound device delivers two
-        # buffers inside the same wall-clock millisecond, so a monotonic
-        # clock repeats ts values and Asterisk's jitter buffer discards the
-        # duplicate as a replay (~46% loss observed in the *0 echo). The
-        # timeline therefore advances by the payload duration alone:
-        # len//8 ms for 8 kHz ulaw (160 bytes = 20 ms). Per-call: reset
-        # in start_call alongside _voice_format_sent.
+        # Last outbound media timestamp (ms, 32-bit IAX2 space). It steps by
+        # payload duration so back-to-back buffers keep a uniform 20 ms
+        # timeline, and snaps to the wall clock across a PTT silence gap so
+        # chan_iax2 does not resync the next key. Reset in start_call.
         self._tx_media_ts: int = 0
 
         # Last NEW target — lets a CallToken challenge re-send the identical
@@ -435,8 +432,8 @@ class IAX2Session:
         self._voice_format_sent = False
         # The RX unwrap anchor belongs to the previous call's timeline.
         self._rx_ts32 = None
-        # New call = new media timeline (Asterisk re-anchors on the first
-        # full VOICE frame of each call).
+        # New call = new media timeline: clear the last-tx guard so the first
+        # full VOICE frame can adopt the current wall-clock timestamp.
         self._tx_media_ts = 0
         self._state = self.STATE_CALLING
 
@@ -537,6 +534,35 @@ class IAX2Session:
         for d in digits:
             self.send_dtmf(d)
 
+    def _next_tx_media_ts(self, payload_ms: int) -> int:
+        """Return the next 32-bit IAX2 media timestamp for outbound voice.
+
+        Consecutive frames advance by the payload duration (160 bytes = 20 ms
+        at 8 kHz). PortAudio on Windows can deliver two buffers inside the
+        same wall-clock millisecond; stepping by 1 ms there would pack 20 ms
+        of audio into 1 ms of media timeline, so chan_iax2 plays the frames
+        back-to-back and fills the rest of the window with silence. The
+        timeline must stay uniform regardless of callback jitter.
+
+        During PTT silence no frames are sent, so the payload counter freezes
+        while Asterisk's wall clock keeps moving and the next key would land
+        seconds late and trip ``Resyncing the jb``. When the wall clock is
+        ahead by more than one payload, snap forward and let the jitter buffer
+        resync once, then resume uniform stepping. A signed delta keeps this
+        correct while payload stepping is temporarily ahead of the clock (the
+        pre-roll burst flushes several buffered frames at once).
+        """
+        now_ms = int((time.monotonic() - self._start_ts) * 1000) & 0xFFFFFFFF
+        step = max(1, payload_ms)
+        delta = (now_ms - self._tx_media_ts) & 0xFFFFFFFF
+        if delta >= 0x80000000:
+            delta -= 0x100000000
+        if delta > step:
+            self._tx_media_ts = now_ms
+        else:
+            self._tx_media_ts = (self._tx_media_ts + step) & 0xFFFFFFFF
+        return self._tx_media_ts
+
     def send_voice(self, ulaw_payload: bytes) -> bool:
         """Send ulaw audio as a mini voice frame.
 
@@ -559,10 +585,10 @@ class IAX2Session:
 
         if not self._voice_format_sent:
             self._voice_format_sent = True
-            # Anchor the media timeline: the full VOICE frame carries ts=0
-            # and every mini frame that follows steps by payload duration.
-            frame_ts = self._tx_media_ts
-            self._tx_media_ts += len(ulaw_payload) // 8
+            # The codec-announcing full frame carries the first audio chunk.
+            # Its ts shares the wall clock with DTMF and every later frame,
+            # including frames sent after a silence gap.
+            frame_ts = self._next_tx_media_ts(len(ulaw_payload) // 8)
             self._send_full_frame(
                 dest_callno=self._dest_callno,
                 frametype=IAX_TYPE_VOICE,
@@ -575,11 +601,8 @@ class IAX2Session:
             self._oseqno = (self._oseqno + 1) & 0xFF
             return True
 
-        # Media counter, not the wall clock: two audio buffers can land in
-        # the same millisecond and a repeated ts is dropped by Asterisk's
-        # jitter buffer as a duplicate replay.
-        ts_low = self._tx_media_ts & 0xFFFF
-        self._tx_media_ts += len(ulaw_payload) // 8
+        # Uniform payload stepping, with a wall-clock catch-up after silence.
+        ts_low = self._next_tx_media_ts(len(ulaw_payload) // 8) & 0xFFFF
 
         # Mini frame (RFC 5456 §8.1.2): the F bit MUST be 0 and the 15-bit
         # field carries the SOURCE call number. chan_iax2 builds it exactly
