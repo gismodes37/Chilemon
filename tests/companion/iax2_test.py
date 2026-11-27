@@ -24,7 +24,9 @@ from app.Services.WebRTCBridge.iax2 import (
     IE_CALLTOKEN,
     IE_MD5_RESULT,
     IE_USERNAME,
+    CONTROL_ANSWER,
     IAX_CMD_AUTHREP,
+    IAX_CMD_HANGUP,
     IAX_CMD_NEW,
     _make_ie,
     _parse_ies,
@@ -661,3 +663,126 @@ def test_start_call_resets_rx_timestamp_anchor() -> None:
         "start_call must clear the RX timestamp anchor so the new call's "
         "frames are unwrapped from their own full VOICE frame"
     )
+
+
+def _answering_session() -> tuple[IAX2Session, _CapturedTransport]:
+    """A call that got NEWACK and is waiting for ANSWER."""
+    sess, transport = _session()
+    sess._state = sess.STATE_CALLING
+    sess._callno = 0x0002
+    sess._dest_callno = 0x002A
+    sess._response_data = "NEWACK"
+    return sess, transport
+
+
+def test_stale_hangup_during_answer_wait_does_not_fail_the_call() -> None:
+    sess, _transport = _answering_session()
+
+    sess._on_iax_control(IAX_CMD_HANGUP, 0x1234, b"")
+
+    assert sess._state == sess.STATE_CALLING
+    assert sess._dest_callno == 0x002A
+    assert sess._response_data == "NEWACK"
+    assert not sess._response_event.is_set()
+
+
+def test_matching_hangup_still_fails_the_call() -> None:
+    sess, _transport = _answering_session()
+
+    sess._on_iax_control(IAX_CMD_HANGUP, sess._dest_callno, b"")
+
+    assert sess._state == sess.STATE_REGISTERED
+    assert sess._dest_callno == 0
+    assert sess._response_data == "HANGUP"
+    assert sess._response_event.is_set()
+
+
+def test_answer_for_the_current_call_wins_after_a_stale_hangup() -> None:
+    sess, _transport = _answering_session()
+    sess._on_iax_control(IAX_CMD_HANGUP, 0x1234, b"")
+
+    sess._on_control(CONTROL_ANSWER, sess._dest_callno)
+
+    assert sess._response_data == "ANSWER"
+    assert sess._response_event.is_set()
+    assert sess._dest_callno == 0x002A
+
+
+def test_answer_from_another_call_is_ignored() -> None:
+    sess, _transport = _answering_session()
+
+    sess._on_control(CONTROL_ANSWER, 0x1234)
+
+    assert sess._response_data == "NEWACK"
+    assert not sess._response_event.is_set()
+
+
+def _probe_answer_wait_session():
+    sess, _ = _session()
+    sess._state = sess.STATE_CALLING
+    sess._callno = 2
+    sess._dest_callno = 0x2A
+    sess._response_data = "NEWACK"
+    return sess
+
+
+def _probe_call(hangup_callno, answer_callno=None):
+    async def run():
+        loop = asyncio.get_running_loop()
+        sess = _probe_answer_wait_session()
+
+        def fake_new(*args, **kwargs):
+            loop.call_soon(sess._on_iax_control, iax2.IAX_CMD_ACCEPT, 0x2A, b"")
+            loop.call_later(
+                0.01, sess._on_iax_control, iax2.IAX_CMD_HANGUP, hangup_callno, b""
+            )
+            if answer_callno is not None:
+                loop.call_later(
+                    0.03, sess._on_control, iax2.CONTROL_ANSWER, answer_callno
+                )
+
+        sess._send_new = fake_new
+        return await sess.start_call("54614", "494780"), sess
+
+    return asyncio.run(run())
+
+
+def test_probe_stale_hangup_does_not_reject_live_call(monkeypatch):
+    monkeypatch.setattr(iax2, "CALL_ANSWER_TIMEOUT", 0.2)
+    ok, sess = _probe_call(0x1234)
+    assert ok is True
+    assert sess._state == sess.STATE_ACTIVE
+
+
+def test_probe_current_hangup_still_rejects_call(monkeypatch):
+    monkeypatch.setattr(iax2, "CALL_ANSWER_TIMEOUT", 0.2)
+    ok, sess = _probe_call(0x2A)
+    assert ok is False
+    assert sess._state == sess.STATE_REGISTERED
+
+
+def test_probe_current_answer_beats_stale_hangup(monkeypatch):
+    monkeypatch.setattr(iax2, "CALL_ANSWER_TIMEOUT", 0.2)
+    ok, sess = _probe_call(0x1234, 0x2A)
+    assert ok is True
+    assert sess._response_data == "ANSWER"
+
+
+def test_probe_other_call_control_frames_ignored():
+    sess = _probe_answer_wait_session()
+    sess._on_control(iax2.CONTROL_RINGING, 0x1234)
+    sess._on_control(iax2.CONTROL_ANSWER, 0x1234)
+    assert sess._response_data == "NEWACK"
+    assert not sess._response_event.is_set()
+
+
+def test_probe_inbound_call_accepts_current_peer_control_frames():
+    sess, _ = _session()
+    sess._state = sess.STATE_REGISTERED
+    sess._on_iax_control(iax2.IAX_CMD_NEW, 0x2A, b"")
+    sess._on_iax_control(iax2.IAX_CMD_HANGUP, 0x1234, b"")
+    assert sess._state == sess.STATE_CALLING
+    sess._on_control(iax2.CONTROL_RINGING, 0x2A)
+    sess._on_control(iax2.CONTROL_ANSWER, 0x2A)
+    assert sess._response_data == "ANSWER"
+    assert sess._dest_callno == 0x2A

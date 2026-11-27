@@ -1075,6 +1075,12 @@ class IAX2Session:
                 asyncio.ensure_future(self.on_inbound_call(self._inbound_called_num))
 
         elif subclass == IAX_CMD_HANGUP:
+            if not self._is_current_callno(src_callno):
+                logger.debug(
+                    "Ignoring HANGUP from unrelated callno=%d (expected=%d)",
+                    src_callno, self._expected_callno(),
+                )
+                return
             logger.info("Remote HANGUP received")
             self._state = self.STATE_REGISTERED
             self._dest_callno = 0
@@ -1095,8 +1101,33 @@ class IAX2Session:
             logger.debug("POKE from Asterisk (callno=%d) — sending PONG", src_callno)
             self._send_poke_pong(dest_callno=src_callno, ts=ts)
 
+    def _expected_callno(self) -> int:
+        """Peer call number expected for frames of the current dialog."""
+        if self._state >= self.STATE_CALLING:
+            return self._dest_callno
+        return self._reg_callno
+
+    def _is_current_callno(self, src_callno: int) -> bool:
+        """Reject retransmissions from calls other than the active dialog.
+
+        Asterisk retransmits HANGUP/ANSWER frames from earlier calls. Without
+        this check a stale HANGUP arriving in the short ANSWER wait wins the
+        race: the client reports the call as failed while Asterisk keeps the
+        channel Up and the later ANSWER is logged too late to matter.
+        """
+        expected = self._expected_callno()
+        return expected != 0 and src_callno == expected
+
     def _on_control(self, subclass: int, src_callno: int) -> None:
-        """Handle control frames (ringing, answer)."""
+        """Handle control frames (ringing, answer) for the current call."""
+        if subclass in (CONTROL_RINGING, CONTROL_ANSWER) \
+                and not self._is_current_callno(src_callno):
+            logger.debug(
+                "Ignoring control 0x%02x from unrelated callno=%d (expected=%d)",
+                subclass, src_callno, self._expected_callno(),
+            )
+            return
+
         if subclass == CONTROL_RINGING:
             logger.debug("Call ringing")
             self._response_data = "RINGING"
