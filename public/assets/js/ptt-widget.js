@@ -559,13 +559,20 @@ class PTTWidget {
     }
 
     _onKeyDown(e) {
-        if (e.code === 'Space') {
-            const tag = document.activeElement ? document.activeElement.tagName : '';
-            if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-            e.preventDefault();
-            if (!e.repeat) {
-                this.keyPtt();
-            }
+        if (e.code !== 'Space') return;
+
+        const active = document.activeElement;
+        const tag = active ? active.tagName : '';
+        // The node field only holds digits, so keeping focus there after a
+        // connect must not leave the spacebar PTT dead. Real text entry still
+        // owns the spacebar.
+        const isTextEntry = tag === 'TEXTAREA' || tag === 'SELECT'
+            || (tag === 'INPUT' && (!active || active.id !== 'node-number'));
+        if (isTextEntry) return;
+
+        e.preventDefault();
+        if (!e.repeat) {
+            this.keyPtt();
         }
     }
 

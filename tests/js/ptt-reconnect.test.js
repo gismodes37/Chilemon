@@ -57,6 +57,7 @@ function makeStorage() {
 function makeWidget(storage = makeStorage()) {
   const sockets = [];
   const timers = [];
+  const documentListeners = {};
 
   class FakeWebSocket {
     static OPEN = 1;
@@ -79,7 +80,9 @@ function makeWidget(storage = makeStorage()) {
     body: { appendChild() {}, removeChild() {} },
     getElementById(id) { return id === 'ptt-widget' ? null : null; },
     createElement() { return makeElement(); },
-    addEventListener() {},
+    addEventListener(type, handler) {
+      (documentListeners[type] ||= []).push(handler);
+    },
     removeEventListener() {},
   };
 
@@ -105,7 +108,19 @@ function makeWidget(storage = makeStorage()) {
 
   const widget = new context.PTTWidget();
   widget._createDOM();
-  return { widget, sockets, timers, document, storage };
+  return { widget, sockets, timers, document, documentListeners, context, storage };
+}
+
+function fireKey(documentListeners, type, code, extra = {}) {
+  let prevented = false;
+  const event = {
+    code,
+    repeat: false,
+    preventDefault() { prevented = true; },
+    ...extra,
+  };
+  for (const handler of documentListeners[type] || []) handler(event);
+  return prevented;
 }
 
 function openAndDrop(widget, sockets, timers) {
@@ -321,4 +336,85 @@ test('Reconectar reopens the IAX2 call without a second WebSocket', () => {
   });
   assert.equal(widget.connectBtn.disabled, false);
   assert.equal(widget.connectBtn.textContent, 'Reconectar');
+});
+
+test('spacebar keys and unkeys PTT when the IAX2 call is active', () => {
+  const { widget, sockets, documentListeners, context } = makeWidget();
+  widget._bindGlobalEvents();
+  widget._openWebSocket();
+  const ws = sockets.at(-1);
+  ws.onopen?.();
+  widget._handleJSON({
+    type: 'status', connected: true, call_active: true, ptt: false,
+  });
+  context.document.activeElement = { tagName: 'BUTTON' };
+
+  const preventedDown = fireKey(documentListeners, 'keydown', 'Space');
+  assert.equal(preventedDown, true, 'Space must not scroll the dashboard');
+  assert.deepEqual(ws.sent.filter((msg) => msg.type === 'ptt'), [
+    { type: 'ptt', action: 'key' },
+  ]);
+  assert.equal(widget.statusText.textContent, 'TRANSMITTING');
+
+  fireKey(documentListeners, 'keyup', 'Space');
+  assert.deepEqual(ws.sent.filter((msg) => msg.type === 'ptt'), [
+    { type: 'ptt', action: 'key' },
+    { type: 'ptt', action: 'unkey' },
+  ]);
+  assert.equal(widget.pttActive, false);
+});
+
+test('holding the spacebar does not resend the PTT key', () => {
+  const { widget, sockets, documentListeners, context } = makeWidget();
+  widget._bindGlobalEvents();
+  widget._openWebSocket();
+  sockets.at(-1).onopen?.();
+  widget._handleJSON({
+    type: 'status', connected: true, call_active: true, ptt: false,
+  });
+  context.document.activeElement = { tagName: 'BODY' };
+
+  fireKey(documentListeners, 'keydown', 'Space');
+  fireKey(documentListeners, 'keydown', 'Space', { repeat: true });
+
+  assert.equal(
+    sockets.at(-1).sent.filter((msg) => msg.type === 'ptt').length,
+    1,
+  );
+});
+
+test('spacebar works while the numeric node field keeps focus', () => {
+  const { widget, sockets, documentListeners, context } = makeWidget();
+  widget._bindGlobalEvents();
+  widget._openWebSocket();
+  const ws = sockets.at(-1);
+  ws.onopen?.();
+  widget._handleJSON({
+    type: 'status', connected: true, call_active: true, ptt: false,
+  });
+  context.document.activeElement = { tagName: 'INPUT', id: 'node-number' };
+
+  const prevented = fireKey(documentListeners, 'keydown', 'Space');
+
+  assert.equal(prevented, true, 'the numeric node field cannot swallow Space');
+  assert.deepEqual(ws.sent.filter((msg) => msg.type === 'ptt'), [
+    { type: 'ptt', action: 'key' },
+  ]);
+});
+
+test('spacebar still respects text fields and refuses without a call', () => {
+  const { widget, sockets, documentListeners, context } = makeWidget();
+  widget._bindGlobalEvents();
+  widget._openWebSocket();
+  const ws = sockets.at(-1);
+  ws.onopen?.();
+  context.document.activeElement = { tagName: 'INPUT' };
+
+  fireKey(documentListeners, 'keydown', 'Space');
+  assert.equal(ws.sent.filter((msg) => msg.type === 'ptt').length, 0);
+
+  context.document.activeElement = { tagName: 'BODY' };
+  fireKey(documentListeners, 'keydown', 'Space');
+  assert.equal(ws.sent.filter((msg) => msg.type === 'ptt').length, 0);
+  assert.equal(widget.statusText.textContent, 'Sin llamada IAX2 - conectate a un nodo');
 });
