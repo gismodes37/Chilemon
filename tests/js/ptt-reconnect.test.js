@@ -247,3 +247,78 @@ test('the resting state also arrives nested in audio stats', () => {
     'Mic en reposo - listo para transmitir',
   );
 });
+
+test('PTT without an IAX2 call refuses to key and explains why', () => {
+  const { widget, sockets } = makeWidget();
+  widget._openWebSocket();
+  const ws = sockets.at(-1);
+  ws.onopen?.();
+
+  widget.keyPtt();
+
+  assert.equal(widget.pttActive, false, 'local PTT must not lie without a call');
+  assert.equal(widget.statusText.textContent, 'Sin llamada IAX2 - conectate a un nodo');
+  assert.equal(
+    ws.sent.filter((msg) => msg.type === 'ptt').length,
+    0,
+    'no ptt key message may be sent without an IAX2 call',
+  );
+});
+
+test('PTT still keys normally when the call is active', () => {
+  const { widget, sockets } = makeWidget();
+  widget._openWebSocket();
+  const ws = sockets.at(-1);
+  ws.onopen?.();
+  widget._handleJSON({
+    type: 'status', connected: true, call_active: true, ptt: false,
+  });
+
+  widget.keyPtt();
+
+  assert.equal(widget.pttActive, true);
+  assert.equal(widget.statusText.textContent, 'TRANSMITTING');
+  assert.deepEqual(ws.sent.filter((msg) => msg.type === 'ptt'), [
+    { type: 'ptt', action: 'key' },
+  ]);
+});
+
+test('a dropped call is visible before the operator presses PTT', () => {
+  const { widget, sockets } = makeWidget();
+  widget._openWebSocket();
+  sockets.at(-1).onopen?.();
+  widget.placeCall('54614');
+  widget._handleJSON({
+    type: 'status', connected: true, call_active: false, ptt: false,
+  });
+
+  assert.equal(widget.statusText.textContent, 'Sin llamada IAX2 - usa Reconectar');
+});
+
+test('Reconectar reopens the IAX2 call without a second WebSocket', () => {
+  const { widget, sockets } = makeWidget();
+  widget._openWebSocket();
+  const ws = sockets.at(-1);
+  ws.onopen?.();
+  widget.placeCall('54614');
+  widget._handleJSON({
+    type: 'status', connected: true, call_active: false, ptt: false,
+  });
+
+  const socketsBefore = sockets.length;
+  widget.connectBtn.handlers.click();
+
+  assert.equal(sockets.length, socketsBefore, 'the WS is already alive');
+  assert.deepEqual(
+    ws.sent.filter((msg) => msg.type === 'call'),
+    [{ type: 'call', node: '54614' }, { type: 'call', node: '54614' }],
+  );
+  assert.equal(widget.connectBtn.textContent, 'Llamando...');
+  assert.equal(widget.connectBtn.disabled, true, 'avoid a burst of call attempts');
+
+  widget._handleJSON({
+    type: 'status', connected: true, call_active: true, ptt: false,
+  });
+  assert.equal(widget.connectBtn.disabled, false);
+  assert.equal(widget.connectBtn.textContent, 'Reconectar');
+});

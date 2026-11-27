@@ -123,7 +123,7 @@ class PTTWidget {
             this.connected = true;
             this.reconnectAttempts = 0;
             this._wsFailed = false;
-            this._setStatus('connected', 'Companion Connected');
+            this._setStatus('connected', this._idleStatusText());
 
             // The dashboard knows how the browser reached the Pi. Sharing that
             // host lets the Companion re-verify IAX2 after a DHCP address change
@@ -258,10 +258,17 @@ class PTTWidget {
             || (msg.audio && msg.audio.tx_state)
             || 'active';
 
+        // Any companion status ends a pending reconnect attempt, successful
+        // or not, so the button can never stay stuck in "Llamando...".
+        if (this.connectBtn) {
+            this.connectBtn.textContent = 'Reconectar';
+            this.connectBtn.disabled = false;
+        }
+
         if (this.callActive) {
             this._setStatus('connected', this._callStatusText());
         } else if (msg.connected) {
-            this._setStatus('connected', 'Companion Connected');
+            this._setStatus('connected', this._idleStatusText());
         } else {
             this._setStatus('error', 'Disconnected');
         }
@@ -295,6 +302,13 @@ class PTTWidget {
 
     keyPtt() {
         if (!this.connected || this.pttActive) return;
+        // Without an IAX2 channel the companion ignores PTT and drops every
+        // audio frame. Refuse locally instead of showing TRANSMITTING while
+        // nothing reaches the network.
+        if (!this.callActive) {
+            this._setStatus('connected', this._noCallStatusText());
+            return;
+        }
         this._send({ type: 'ptt', action: 'key' });
         this.pttActive = true;
         if (this._visualizer) this._visualizer.setTransmitting(true);
@@ -307,7 +321,7 @@ class PTTWidget {
         this._send({ type: 'ptt', action: 'unkey' });
         this.pttActive = false;
         if (this._visualizer) this._visualizer.setTransmitting(false);
-        this._setStatus('connected', this.callActive ? this._callStatusText() : 'Companion Connected');
+        this._setStatus('connected', this.callActive ? this._callStatusText() : this._idleStatusText());
         this._updateUI();
     }
 
@@ -407,6 +421,22 @@ class PTTWidget {
             : 'Call active';
     }
 
+    // A live WebSocket is not an audio channel. Once a node was linked, a
+    // missing call is actionable and must never be reported as ready.
+    _idleStatusText() {
+        return this.lastCallNode
+            ? 'Sin llamada IAX2 - usa Reconectar'
+            : 'Companion Connected';
+    }
+
+    // Pressing PTT with no channel must always say why, even on a fresh
+    // session where no node was linked yet.
+    _noCallStatusText() {
+        return this.lastCallNode
+            ? 'Sin llamada IAX2 - usa Reconectar'
+            : 'Sin llamada IAX2 - conectate a un nodo';
+    }
+
     _setStatus(state, text) {
         if (this.statusDot) {
             this.statusDot.className = 'ptt-status-dot ptt-status-' + state;
@@ -473,8 +503,15 @@ class PTTWidget {
         this.volumeContainer = this.widget.querySelector('#ptt-volume-bar');
         this.connectBtn = this.widget.querySelector('#ptt-connect-btn');
 
-        // Connect button — reset backoff so a manual click retries immediately
+        // Connect button — with a live WebSocket this reopens the IAX2 call;
+        // otherwise it resets backoff and retries the companion immediately.
         this.connectBtn.addEventListener('click', () => {
+            if (this.connected && this.lastCallNode && !this.callActive) {
+                this.connectBtn.disabled = true;
+                this.connectBtn.textContent = 'Llamando...';
+                this.placeCall(this.lastCallNode);
+                return;
+            }
             this.connectBtn.disabled = true;
             this.connectBtn.textContent = 'Buscando...';
             this.reconnectAttempts = 0;
