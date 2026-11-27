@@ -37,6 +37,13 @@ FRAMES_PER_BUFFER = 160  # 20 ms at 8000 Hz
 DTYPE = "int16"  # 16-bit PCM
 ULAW_INPUT_SCALE = 1 / 32768.0  # s16 -> float for RMS
 
+# Short automatic mic probe. The OS default can open successfully while
+# delivering digital zero (a disconnected or muted capture device), so the
+# engine measures every input on the default device's host API and uses the
+# one that actually produces signal. No device name or index is ever pinned.
+INPUT_PROBE_MS = 100
+MIN_LIVE_INPUT_RMS = 2.0  # LSB; a dead MME input reads <= 1
+
 # PortAudio can silently stop delivering callbacks on Windows when a Bluetooth
 # device sleeps. The stream objects remain non-None, so is_running cannot
 # detect it. A stalled callback also stops the other one: both share the same
@@ -178,6 +185,10 @@ class AudioEngine:
         # against a fresh resolution so a changed OS default is picked up.
         self._input_device_id = -1
         self._output_device_id = -1
+        # OS defaults observed at stream open. Tracked separately from the
+        # auto-probed input so choosing a live mic is not mistaken for a
+        # default-device change on every health tick.
+        self._default_device_ids = (-1, -1)
         self._input_silent_since = 0.0
         self._last_restart = 0.0
 
@@ -225,9 +236,16 @@ class AudioEngine:
             return
         self._running = True
 
-        # Resolve device IDs
-        input_id = self._resolve_device(self._input_device, is_input=True)
+        # Resolve device IDs. Remember the OS defaults separately: a live mic
+        # chosen by probe can differ from the default without being a change.
+        default_input_id = self._resolve_device(
+            self._input_device, is_input=True, log=False
+        )
         output_id = self._resolve_device(self._output_device, is_input=False)
+        self._default_device_ids = (default_input_id, output_id)
+
+        input_id = self._pick_input_device()
+        logger.info("Using input device: %s", self._describe_device(input_id))
         self._input_device_id = input_id
         self._output_device_id = output_id
 
@@ -403,9 +421,8 @@ class AudioEngine:
 
         now = time.monotonic()
         device_changed = (
-            self._input_device_id >= 0
-            and self._current_device_ids()
-            != (self._input_device_id, self._output_device_id)
+            self._default_device_ids[0] >= 0
+            and self._current_device_ids() != self._default_device_ids
         )
         # Silence is intentional while listening (PTT up) or while TX is
         # resting. Restarting on that silence drops RX audio and creates a
@@ -595,7 +612,12 @@ class AudioEngine:
         # RX playback delivers received audio, so it must never affect the
         # microphone's silence timer.
         if direction == "tx":
-            if rms >= SILENT_INPUT_RMS:
+            ptt_active = bool(self.is_ptt_active and self.is_ptt_active())
+            # Silence is expected while listening. If it kept aging there,
+            # the first keyed health tick would see 15+ seconds of silence
+            # and reopen the streams exactly when TX starts, dropping the
+            # first frames. Only count silence that happens while keyed.
+            if not ptt_active or rms >= SILENT_INPUT_RMS:
                 self._input_silent_since = 0.0
             elif self._input_silent_since == 0.0:
                 self._input_silent_since = time.monotonic()
@@ -741,6 +763,79 @@ class AudioEngine:
             )
         except Exception:
             return f"id={index}"
+
+    def _pick_input_device(self) -> int:
+        """Pick a live microphone automatically, with no pinned name or index.
+
+        Windows can report a disconnected or muted capture device as the OS
+        default: PortAudio opens it without error but every sample is digital
+        zero. Probing each input on the default device's host API for a short
+        window finds the mic that actually produces signal. An explicit
+        ``input_device`` setting stays an override and skips the probe.
+        """
+        default_id = self._resolve_device(
+            self._input_device, is_input=True, log=False
+        )
+        if self._input_device or sd is None:
+            return default_id
+
+        try:
+            devices = list(sd.query_devices())
+            hostapi = devices[default_id]["hostapi"]
+        except Exception as exc:
+            logger.debug("Cannot probe input devices: %s", exc)
+            return default_id
+
+        candidates = [
+            index
+            for index, dev in enumerate(devices)
+            if dev.get("hostapi") == hostapi
+            and dev.get("max_input_channels", 0) > 0
+        ]
+        if default_id not in candidates:
+            candidates.insert(0, default_id)
+
+        best_id = default_id
+        best_rms = -1.0
+        readings: dict[int, float] = {}
+        for index in candidates:
+            try:
+                frames = sd.rec(
+                    int(RATE * INPUT_PROBE_MS / 1000),
+                    samplerate=RATE,
+                    channels=1,
+                    dtype=DTYPE,
+                    device=index,
+                )
+                sd.wait()
+                samples = np.asarray(frames).reshape(-1).astype(np.float64)
+                rms = (
+                    float(np.sqrt(np.mean(samples * samples)))
+                    if samples.size
+                    else 0.0
+                )
+            except Exception as exc:
+                logger.debug(
+                    "Input probe failed for %s: %s",
+                    self._describe_device(index),
+                    exc,
+                )
+                continue
+            readings[index] = rms
+            if rms >= MIN_LIVE_INPUT_RMS and rms > best_rms:
+                best_id, best_rms = index, rms
+
+        if best_id != default_id:
+            logger.info(
+                "Auto-selected input %s (probe RMS %.1f; default %s measured %.1f)",
+                self._describe_device(best_id),
+                best_rms,
+                self._describe_device(default_id),
+                readings.get(default_id, -1.0),
+            )
+        else:
+            logger.debug("Input probe readings: %s", readings)
+        return best_id
 
     @staticmethod
     def _resolve_device(name: str, is_input: bool, log: bool = True) -> int:

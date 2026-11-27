@@ -85,6 +85,40 @@ def test_mic_silence_without_ptt_does_not_restart_streams() -> None:
     assert calls == []
 
 
+def test_listening_silence_does_not_age_into_a_keyed_restart() -> None:
+    """Silence while listening must not restart streams on the next key.
+
+    The health loop runs every 2s. If the silence timer keeps aging while PTT
+    is up, the first keyed tick sees 15+ seconds of silence and tears down the
+    streams exactly when the operator starts transmitting.
+    """
+    engine = _engine()
+    now = time.monotonic()
+    engine._last_input_callback = now
+    engine._last_output_callback = now
+    engine._tx_state = "active"
+    engine._compute_levels = lambda _payload: (0.0, [])  # type: ignore[method-assign]
+    engine.on_levels = None
+
+    # Long silence while listening: no PTT, so the timer stays cleared.
+    engine.is_ptt_active = lambda: False  # type: ignore[method-assign]
+    engine._input_silent_since = now - SILENT_INPUT_S - 1
+    engine._emit_levels(b"\xff" * 320)
+    assert engine._input_silent_since == 0.0
+
+    # The first keyed silent frame starts a fresh window, not an old one.
+    engine.is_ptt_active = lambda: True  # type: ignore[method-assign]
+    engine._emit_levels(b"\xff" * 320)
+    assert 0.0 < engine._input_silent_since <= time.monotonic()
+
+    calls: list[str] = []
+    engine.stop = lambda: calls.append("stop")  # type: ignore[method-assign]
+    engine.start = lambda: calls.append("start")  # type: ignore[method-assign]
+
+    assert engine.check_health() is False
+    assert calls == []
+
+
 def test_mic_silence_while_keyed_still_restarts_streams() -> None:
     """A keyed operator with no mic signal still needs device recovery."""
     engine = _engine()
