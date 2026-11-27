@@ -8,23 +8,23 @@ Allow admin operators to update ChileMon from the dashboard — check for new ve
 
 ### Requirement: Check for Updates
 
-The system MUST expose `GET /api/check-update.php` that compares the local Git HEAD against `origin/main`.
+The system MUST expose `GET /api/check-update.php` that compares the local Git HEAD against `the checked-out branch's upstream`.
 
 - The endpoint MUST require a valid authenticated session.
 - The endpoint MUST be rate-limited to 30 requests per 60 seconds per session.
 - The endpoint MUST execute `git fetch origin` via `bin/chilemon-rpt git-fetch`.
-- The endpoint MUST compare `HEAD` with `origin/main` and return JSON: `{update_available: bool, local_commit: string, remote_commit: string, summary: string}`.
-- The endpoint MUST return `update_available: false` when HEAD matches `origin/main`.
+- The endpoint MUST compare `HEAD` with `the checked-out branch's upstream` and return JSON: `{update_available: bool, local_commit: string, remote_commit: string, summary: string}`.
+- The endpoint MUST return `update_available: false` when HEAD matches `the checked-out branch's upstream`.
 
 #### Scenario: Update available
 
-- GIVEN the local repo is behind `origin/main`
+- GIVEN the local repo is behind `the checked-out branch's upstream`
 - WHEN `GET /api/check-update.php` is called with a valid session
 - THEN the response MUST contain `update_available: true` with the remote commit SHA and a summary
 
 #### Scenario: No update available
 
-- GIVEN the local HEAD matches `origin/main`
+- GIVEN the local HEAD matches `the checked-out branch's upstream`
 - WHEN `GET /api/check-update.php` is called
 - THEN the response MUST contain `update_available: false`
 

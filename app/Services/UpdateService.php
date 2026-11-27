@@ -38,7 +38,7 @@ final class UpdateService
      * Verifica si hay actualizaciones disponibles.
      *
      * Ejecuta git-fetch para obtener refs remotas, luego git-compare
-     * para comparar HEAD local contra origin/main.
+     * para comparar HEAD local contra la upstream del checkout.
      *
      * @return array{ok: bool, update_available: bool, local_commit: string, remote_commit: string, summary: string}
      */

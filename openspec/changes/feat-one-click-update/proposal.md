@@ -7,7 +7,7 @@ Operators update ChileMon via SSH (`git pull` + `systemctl restart`). One-click 
 ## Scope
 
 ### In Scope
-- `GET /api/check-update.php` — compares local HEAD vs `origin/main`
+- `GET /api/check-update.php` — compares local HEAD vs `the checked-out branch's upstream`
 - `POST /api/apply-update.php` — `git pull` + service restart
 - Pulsing notification in header (admin-only)
 - Confirmation modal + post-update page reload
@@ -27,7 +27,7 @@ Operators update ChileMon via SSH (`git pull` + `systemctl restart`). One-click 
 ## Approach
 
 1. **Extend `bin/chilemon-rpt`** — add `git-fetch` and `git-pull` cases. Runs as root via sudo, repo at `/opt/chilemon`.
-2. **Check endpoint** — GET, authenticates, rate-limited (30/60s). Calls `git fetch origin`, compares HEAD with `origin/main`, returns `{update_available, local_commit, remote_commit, summary}`.
+2. **Check endpoint** — GET, authenticates, rate-limited (30/60s). Calls `git fetch origin`, compares HEAD with `the checked-out branch's upstream`, returns `{update_available, local_commit, remote_commit, summary}`.
 3. **Update endpoint** — POST, requires admin + CSRF + rate limiting (same pattern as `system_action.php`). Runs `git pull origin main`, then `systemctl restart chilemon-webrtc`, then `systemctl reload apache2`.
 4. **Widget** — pulsing button in `header.php` visible only to admin. Polls check endpoint every 5 min.
 5. **Modal** — reuses existing `modalReinicio` pattern from `dashboard.php`.

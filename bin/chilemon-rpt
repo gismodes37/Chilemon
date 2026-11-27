@@ -69,23 +69,30 @@ case "$CMD" in
         ;;
 
     git-compare)
-        # Compara HEAD local con origin/main
+        # Compara HEAD con la upstream del checkout: develop mientras la Pi
+        # sirve la rama de desarrollo, main despues de promover una version.
         ensure_safe_directory
-        cd /opt/chilemon \
-            && echo "LOCAL:$(git rev-parse HEAD)" \
-            && echo "REMOTE:$(git rev-parse origin/main)" \
-            && echo "SUMMARY:$(git log --oneline HEAD..origin/main 2>/dev/null || echo 'up-to-date')"
+        cd /opt/chilemon || exit 1
+        UPSTREAM=$(git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null)
+        if [ -z "$UPSTREAM" ]; then
+            printf 'La rama actual no tiene upstream configurada\n' >&2
+            exit 1
+        fi
+        echo "LOCAL:$(git rev-parse HEAD)"
+        echo "REMOTE:$(git rev-parse "$UPSTREAM")"
+        echo "SUMMARY:$(git log --oneline "HEAD..$UPSTREAM" 2>/dev/null || echo 'up-to-date')"
         ;;
 
     git-pull)
         # Stash tracked, limpiar untracked que conflictean, pull y restore.
         # El exit code reportado debe ser el de git pull, no el de toda la
         # cadena (stash pop podria fallar despues de un pull exitoso).
+        # `git pull` sin argumentos sigue la upstream del checkout.
         ensure_safe_directory
         cd /opt/chilemon || exit 1
         git stash push -m "chilemon-auto-stash-$(date +%s)" 2>/dev/null
         git clean -fd 2>/dev/null
-        git pull origin main 2>&1
+        git pull 2>&1
         PULL_RC=$?
         git stash pop 2>/dev/null
         echo "STASHED:$PULL_RC"

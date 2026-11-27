@@ -2,7 +2,7 @@
 
 ## Technical Approach
 
-Extend the existing `bin/chilemon-rpt` wrapper (already used for Asterisk/system commands via sudo) with `git-fetch` and `git-pull` cases. Create an `UpdateService` PHP class (mirroring `AslRptService`'s `ALLOWED` + `run()` pattern) that both new API endpoints delegate to. The check endpoint (GET) fetches remote refs and compares HEAD vs `origin/main`. The apply endpoint (POST) runs `git pull`, restarts `chilemon-webrtc`, and reloads Apache. Admin-only pulsing notification in the header polls every 5 minutes. Confirmation modal reuses the existing `modalReinicio` pattern from `dashboard.php`.
+Extend the existing `bin/chilemon-rpt` wrapper (already used for Asterisk/system commands via sudo) with `git-fetch` and `git-pull` cases. Create an `UpdateService` PHP class (mirroring `AslRptService`'s `ALLOWED` + `run()` pattern) that both new API endpoints delegate to. The check endpoint (GET) fetches remote refs and compares HEAD vs `$UPSTREAM`. The apply endpoint (POST) runs `git pull`, restarts `chilemon-webrtc`, and reloads Apache. Admin-only pulsing notification in the header polls every 5 minutes. Confirmation modal reuses the existing `modalReinicio` pattern from `dashboard.php`.
 
 ## Architecture Decisions
 
@@ -67,8 +67,8 @@ UpdateService::check() (cont.)
   ▼
 bin/chilemon-rpt (as root)
   │ cd /opt/chilemon && echo "LOCAL:$(git rev-parse HEAD)"
-  │ echo "REMOTE:$(git rev-parse origin/main)"
-  │ echo "SUMMARY:$(git log --oneline HEAD..origin/main 2>/dev/null || echo 'up-to-date')"
+  │ echo "REMOTE:$(git rev-parse $UPSTREAM)"
+  │ echo "SUMMARY:$(git log --oneline HEAD..$UPSTREAM 2>/dev/null || echo 'up-to-date')"
   ▼
 UpdateService::check() (cont.)
   │ Parse LOCAL, REMOTE hashes
@@ -165,7 +165,7 @@ public function apply(): array
 ### UpdateService wrapper commands
 ```
 git-fetch   → cd /opt/chilemon && git fetch origin 2>&1, exit on error
-git-compare → cd /opt/chilemon && echo "LOCAL:$(git rev-parse HEAD)" && echo "REMOTE:$(git rev-parse origin/main)" && echo "SUMMARY:$(git log --oneline HEAD..origin/main 2>/dev/null || echo 'up-to-date')"
+git-compare → cd /opt/chilemon && echo "LOCAL:$(git rev-parse HEAD)" && echo "REMOTE:$(git rev-parse $UPSTREAM)" && echo "SUMMARY:$(git log --oneline HEAD..$UPSTREAM 2>/dev/null || echo 'up-to-date')"
 git-pull    → cd /opt/chilemon && git stash push -m "chilemon-auto-stash-$(date +%s)" 2>/dev/null; git pull origin main 2>&1; echo "STASHED:$?"
 sys-restart-webrtc  → systemctl restart chilemon-webrtc
 sys-reload-apache   → systemctl reload apache2
