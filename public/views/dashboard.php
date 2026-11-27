@@ -147,6 +147,9 @@ $systemInfo = $systemInfo ?? [
                     <button class="btn btn-outline-custom" onclick="window.open('https://wiki.allstarlink.org/archive/', '_blank')">
                         <i class="bi bi-globe"></i> AllStar Wiki
                     </button>
+                    <button class="btn btn-outline-custom" onclick="window.open('https://repo.allstarlink.org/images/pi/', '_blank')">
+                        <i class="bi bi-globe"></i> AllStar Repository
+                    </button>
                     <button class="btn btn-outline-warning" onclick="window.open('https://gismodes37.github.io/Chilemon/', '_blank')">
                         <i class="bi bi-globe"></i> Web Site Chilemon
                     </button>
