@@ -135,21 +135,60 @@ $systemInfo = $systemInfo ?? [
             <div class="col-12">
                 <h5 class="mb-3"><i class="bi bi-grid-3x3-gap"></i> Accesos rápidos</h5>
                 <div class="d-flex flex-wrap justify-content-center gap-2">
-                    <button class="btn btn-outline-custom" onclick="window.open('https://www.allstarlink.org/', '_blank')">
-                        <i class="bi bi-globe"></i> AllStarLink !
+
+                <!-- AllStarLink Dropdown Inicio -->
+                <div class="dropdown">
+                    <button class="btn btn-outline-custom dropdown-toggle"
+                            type="button"
+                            data-bs-toggle="dropdown"
+                            aria-expanded="false">
+                        <i class="bi bi-globe"></i> AllStarLink
                     </button>
-                    <button class="btn btn-outline-custom" onclick="window.open('https://stats.allstarlink.org/maps/allstarUSAMap.html', '_blank')">
-                        <i class="bi bi-globe"></i> AllStar Maps !
-                    </button>
-                    <button class="btn btn-outline-custom" onclick="window.open('https://allstarlink.github.io/', '_blank')">
-                        <i class="bi bi-globe"></i> AllStar How To
-                    </button>
-                    <button class="btn btn-outline-custom" onclick="window.open('https://wiki.allstarlink.org/archive/', '_blank')">
-                        <i class="bi bi-globe"></i> AllStar Wiki
-                    </button>
-                    <button class="btn btn-outline-custom" onclick="window.open('https://repo.allstarlink.org/images/pi/', '_blank')">
-                        <i class="bi bi-globe"></i> AllStar Repository
-                    </button>
+
+                    <ul class="dropdown-menu">
+                        <li>
+                            <a class="dropdown-item"
+                            href="https://www.allstarlink.org/"
+                            target="_blank" rel="noopener noreferrer">
+                                <i class="bi bi-globe"></i> AllStarLink !
+                            </a>
+                        </li>
+
+                        <li>
+                            <a class="dropdown-item"
+                            href="https://stats.allstarlink.org/maps/allstarUSAMap.html"
+                            target="_blank" rel="noopener noreferrer">
+                                <i class="bi bi-globe"></i> AllStar Maps !
+                            </a>
+                        </li>
+
+                        <li>
+                            <a class="dropdown-item"
+                            href="https://allstarlink.github.io/"
+                            target="_blank" rel="noopener noreferrer">
+                                <i class="bi bi-globe"></i> AllStar How To
+                            </a>
+                        </li>
+
+                        <li>
+                            <a class="dropdown-item"
+                            href="https://wiki.allstarlink.org/archive/"
+                            target="_blank" rel="noopener noreferrer">
+                                <i class="bi bi-globe"></i> AllStar Wiki
+                            </a>
+                        </li>
+
+                        <li>
+                            <a class="dropdown-item"
+                            href="https://repo.allstarlink.org/images/pi/"
+                            target="_blank" rel="noopener noreferrer">
+                                <i class="bi bi-globe"></i> AllStar Repository
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+                <!-- AllStarLink Dropdown Fin -->
+
                     <button class="btn btn-outline-warning" onclick="window.open('https://gismodes37.github.io/Chilemon/', '_blank')">
                         <i class="bi bi-globe"></i> Web Site Chilemon
                     </button>

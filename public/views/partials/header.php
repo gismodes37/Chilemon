@@ -186,6 +186,7 @@ $headerStyle = $headerImgUrl
               </div>
             </div>
           </div>
+          <!-- /dropdown final-->
 
             <form method="post"
                   action="<?= rtrim(BASE_PATH, '/') ?>/logout.php"
