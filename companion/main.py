@@ -22,7 +22,7 @@ import signal
 import sys
 import time
 import tomllib
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 from companion.session import CompanionSession
 from companion.audio import AudioEngine
@@ -44,6 +44,11 @@ FALLBACK_CONFIG = os.path.join(os.path.dirname(__file__), "config.toml")
 # Audio callbacks fire every 20 ms; the browser only needs 20 updates/s.
 # Throttling per direction keeps TX and RX visualizers independent.
 AUDIO_LEVEL_INTERVAL_S = 0.05
+
+# PortAudio device opens and the live-mic probe have no internal timeout. On
+# Windows MME a device still held by a previous stream can block indefinitely,
+# so every audio operation is bounded before it can touch the event loop.
+AUDIO_OP_TIMEOUT_S = 5.0
 
 
 def load_config(path: str) -> dict[str, Any]:
@@ -157,6 +162,46 @@ class CompanionApp:
         self.ws_server.on_call = self._place_call
         self.ws_server.on_hangup = self._hangup
 
+    # -- Blocking audio operations --
+    #
+    # sounddevice/PortAudio calls (device open, mic probe, stream start/stop)
+    # can block forever when a Windows MME device is still held by a previous
+    # stream. These helpers keep them off the asyncio thread so the WS server,
+    # /health and call handling stay responsive even if a device misbehaves.
+
+    def _close_audio(self) -> None:
+        """Synchronous reset + stop, kept together as one worker operation."""
+        self.audio.reset()
+        self.audio.stop()
+
+    async def _run_audio(
+        self,
+        op: Callable[..., Any],
+        *args: Any,
+        timeout: float = AUDIO_OP_TIMEOUT_S,
+    ) -> None:
+        """Run a blocking audio operation under a bounded worker-thread call.
+
+        A per-instance lock preserves the serialized ordering that the old
+        direct calls had on the event loop. On timeout the worker thread may
+        remain stuck in PortAudio, but the loop keeps serving the dashboard
+        and the operator can recover with a reconnect or a restart.
+        """
+        lock = getattr(self, "_audio_lock", None)
+        if lock is None:
+            lock = self._audio_lock = asyncio.Lock()
+        async with lock:
+            try:
+                await asyncio.wait_for(
+                    asyncio.to_thread(op, *args), timeout=timeout
+                )
+            except TimeoutError:
+                logger.warning(
+                    "Audio operation %s exceeded %.1fs; event loop stays responsive",
+                    getattr(op, "__name__", "operation"),
+                    timeout,
+                )
+
     async def _on_session_audio_rx(self, ulaw_payload: bytes, ts_ms: int) -> None:
         """Forward received audio from IAX2 to speaker."""
         self.audio.play_ulaw(ulaw_payload, ts_ms)
@@ -164,23 +209,21 @@ class CompanionApp:
     async def _hangup(self) -> None:
         """Unkey, hang up and close mic/speaker so no audio loop remains."""
         await self.session.hangup_call()
-        self.audio.reset()
-        self.audio.stop()
+        await self._run_audio(self._close_audio)
 
     async def _place_call(self, node: str) -> None:
         """Reopen audio only when the IAX2 call was actually established."""
         await self.session.place_call(node)
         if self.session.in_call:
-            self.audio.start()
+            await self._run_audio(self.audio.start)
 
     async def _on_session_status(self, status: dict) -> None:
         """Forward status and keep audio streams tied to the active call."""
         call_active = bool(status.get("call_active"))
         if call_active and not self.audio.is_running:
-            self.audio.start()
+            await self._run_audio(self.audio.start)
         elif not call_active and self.audio.is_running:
-            self.audio.reset()
-            self.audio.stop()
+            await self._run_audio(self._close_audio)
         await self.ws_server.broadcast_status(status)
 
     def _on_audio_tx(self, ulaw_payload: bytes) -> None:
@@ -343,7 +386,7 @@ class CompanionApp:
                 pass
 
         await self.session.stop()
-        self.audio.stop()
+        await self._run_audio(self.audio.stop)
         await self.ws_server.stop()
         logger.info("Shutdown complete")
 
@@ -370,7 +413,7 @@ class CompanionApp:
             try:
                 await asyncio.sleep(2)
                 if self.audio:
-                    self.audio.check_health()
+                    await self._run_audio(self.audio.check_health)
             except asyncio.CancelledError:
                 break
             except Exception as exc:
